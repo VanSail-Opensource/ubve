@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "generator": "pycdlib 1.14.0; UDF 2.60",
+  "fixtureKind": "byte-pattern filesystem; not playable Blu-ray",
+  "imageSha256": "1ef0e2dc497f4281c6a4a7246490ca95ea0e43ea75537b59401d9612ca29aef3",
+  "file": {
+    "path": "BDMV/STREAM/00001.m2ts",
+    "bytes": 1048848,
+    "sha256": "181d76c91c91ea48ac8fc81280204801c062405b99c714fde6965834fc1b2ef1"
+  },
+  "reference": "pycdlib independent extraction compared byte for byte",
+  "limitations": [
+    "No fragmented extents fixture",
+    "No actual large ISO endurance",
+    "No whole-title playback"
+  ]
+}

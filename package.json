@@ -16,7 +16,7 @@
     "check": "npm run check:types && npm run check:boundaries",
     "check:types": "tsc -p packages/core --noEmit --pretty false && npm run build",
     "check:boundaries": "node scripts/check-boundaries.mjs",
-    "build": "tsc -b packages/core packages/testkit packages/browser packages/io-demux packages/presentation packages/wasm-adapters packages/native-bridge --pretty false && tsc -p packages/presentation/tsconfig.worklet.json --pretty false",
+    "build": "tsc -b packages/core packages/testkit packages/browser packages/io-demux packages/presentation packages/wasm-adapters packages/native-bridge packages/disc --pretty false && tsc -p packages/presentation/tsconfig.worklet.json --pretty false",
     "test:unit": "npm run build && node --test test/*.test.mjs",
     "test": "npm run check && npm run test:unit",
     "test:io": "tsc -b packages/io-demux --pretty false && node --test test/io-demux.test.mjs",
@@ -26,7 +26,9 @@
     "build:codecs": "node scripts/build-codecs.mjs",
     "test:codecs": "npm run build && npm run build:codecs && node --test test/codec-lifecycle.test.mjs test/codecs-node.evidence.mjs",
     "test:native:wasm": "tsc -b packages/native-bridge --pretty false && node --test test/native-bridge.test.mjs",
-    "test:native:browser": "node test/native-bridge-browser.mjs"
+    "test:native:browser": "node test/native-bridge-browser.mjs",
+    "build:disc": "node scripts/prepare-disc-assets.mjs",
+    "test:disc": "tsc -b packages/disc packages/io-demux --pretty false && node --test test/disc.test.mjs test/mp4-index.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

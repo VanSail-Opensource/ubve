@@ -34,8 +34,12 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npm run build:presentation
+      - run: npm run build:disc
       - run: npx playwright install --with-deps chromium
+        id: chromium
       - run: npm run test:presentation:browser
+      - run: node test/disc-browser.mjs
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

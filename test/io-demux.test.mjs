@@ -152,3 +152,26 @@ test('selected Matroska track scanning does not load unselected large payloads',
   assert.ok(source.stats.deliveredBytes <= 192, `unselected packet read amplification: ${source.stats.deliveredBytes}`);
   await cache.close(); assert.equal(source.ledger.snapshot().bytes, 0);
 });
+
+test('MP4 preflight rejects encrypted descriptions inside stsd and applies versioned table entry bounds', async () => {
+  const box = (type, ...payload) => {
+    const data = Buffer.concat(payload), head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length + 8); head.write(type, 4);
+    return Buffer.concat([head, data]);
+  };
+  const count = (version, offset, n) => {
+    const bytes = Buffer.alloc(offset + 4); bytes[0] = version; bytes.writeUInt32BE(n, offset); return bytes;
+  };
+  const movie = item => box('moov', box('trak', box('mdia', box('minf', box('stbl', item)))));
+  for (const [data, error] of [
+    [movie(box('stsd', count(0, 4, 1), box('encv'))), 'UNSUPPORTED_CODEC'],
+    [movie(box('sbgp', count(1, 12, 5000000))), 'ITEM_TOO_LARGE'],
+    [movie(box('sgpd', count(2, 16, 5000000))), 'ITEM_TOO_LARGE'],
+    [Buffer.concat([box('ftyp'), box('moof', box('traf', box('trun', count(0, 4, 5000000))))]), 'ITEM_TOO_LARGE'],
+  ]) {
+    const source = new BlobSource(new Blob([data])), cache = new SourceCache(source);
+    await assert.rejects(preflightMetadata(cache, op()), { code: error });
+    assert.equal(cache.snapshot().retainedParserResults, 0, 'preflight only borrows parser buffers');
+    await cache.close();
+  }
+});

@@ -141,7 +141,11 @@ export class SourceCache {
       this.#pages.delete(first[0]); this.#bytes -= first[1].bytes; first[1].release();
     }
     const work = this.source.readExact({ start: start as ByteRange['start'], end: end as ByteRange['end'] }, operation).then(read => {
-      if (this.#closed) { read.bytes.release(); throw new EngineError('DISPOSED', 'Cache closed during read'); }
+      try {
+        if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed during read');
+        checkOperation(operation, browserScheduler);
+        if (this.source instanceof BoundedSource) this.source.assertReadable();
+      } catch (error) { read.bytes.release(); throw error; }
       this.#pages.set(page, read.bytes); this.#bytes += read.bytes.bytes; this.#peak = Math.max(this.#peak, this.#bytes); return read.bytes;
     }).finally(() => this.#pending.delete(page));
     this.#pending.set(page, work); return work;

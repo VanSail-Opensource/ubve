@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "qualification": "NOT_QUALIFIED",
+  "description": "Two clear angle-zero BDMV clips authored by tsMuxeR, with 720p24 AVC color bars and 48 kHz AC-3 stereo synthetic sine; content is not a benchmark",
+  "authoring": {
+    "ffmpeg": "7.1.5-0+deb13u1",
+    "tsMuxeR": "2.7.0 linux",
+    "release": "https://github.com/justdan96/tsMuxer/releases/tag/2.7.0",
+    "archiveSha256": "ceaaa181ab70e201685b1e45260d337d1cbdb0aba1408d4fbc47e232a7e4c987",
+    "binarySha256": "e1e2caeb624876c22d1ee1cb545d4ded9da4c5138b2259f36fd236b0f67e2e47"
+  },
+  "files": {
+    "BDMV/CLIPINF/00000.clpi": "fb95bca7ccd43da0531f0c67059a7237653acdff6cde297a3cd6a28f13a78414",
+    "BDMV/CLIPINF/00001.clpi": "32d3796624ac29af670ba31de49478d55c8d624ea759f466b18f99ad15c79580",
+    "BDMV/MovieObject.bdmv": "2e1f45c71e9115613102f885ebd17705f35f14f591c2c03d536c462b29158071",
+    "BDMV/PLAYLIST/00000.mpls": "ae289121821298684f10fd2bda09fd05f89fd72a928b95b595b33cc3e76db8d4",
+    "BDMV/STREAM/00000.m2ts": "5f6208eef6876a622b01cd7ba09c7068c5e466769d19fa46f296144282b973e2",
+    "BDMV/STREAM/00001.m2ts": "58fb8fca3ed1f6064da0e66ac8b8156c58eece2349b3cab764654ee0b24a4848",
+    "BDMV/index.bdmv": "06d93a945547bc14fa70776f95369d15c7ea4dd3ad1107cfcac6f8ef52114ad4"
+  },
+  "independentMplsParse": {
+    "timeBase": "1/45000",
+    "clips": [
+      { "id": "00000", "in": 27000000, "out": 27067500 },
+      { "id": "00001", "in": 27067500, "out": 27090000 }
+    ],
+    "chapters": [
+      { "clip": 0, "sourceTime": 27000000 },
+      { "clip": 0, "sourceTime": 27045000 }
+    ]
+  },
+  "independentFfprobe": {
+    "command": "ffprobe -v error -show_entries format=start_time,duration:stream=id,codec_name,channels,width,height,avg_frame_rate,start_pts,time_base -of json CLIP.m2ts",
+    "timeBase": "1/90000",
+    "video": { "pid": 4113, "codec": "h264", "width": 1280, "height": 720, "cadence": "24/1", "startPts": [54000000, 54135000] },
+    "audio": { "pid": 4352, "codec": "ac3", "channels": 2, "startPts": [54000000, 54129600] },
+    "notice": "Clip 2 includes 5400 ticks (60 ms) of audio before the playlist IN point; a presentation adapter must trim decoded samples, not flatten this difference. FFmpeg's bluray protocol excluded the short title, so only direct clip probing is recorded."
+  }
+}
