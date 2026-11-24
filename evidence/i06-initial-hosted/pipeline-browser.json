@@ -1,0 +1,204 @@
+{
+  "schema": "ubve-implementation-pipeline-v1",
+  "evidenceClass": "browser-short-pipeline-candidate",
+  "recordedAt": "2026-11-24T23:13:26.668Z",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+  "crossOriginIsolated": true,
+  "route": "C1",
+  "fixture": {
+    "name": "combined-720p60.mkv",
+    "bytes": 4536776,
+    "sha256": "4e681a037ee5a4fdf57ac7512e702012d15b986133e27410e826c45fe76ad187"
+  },
+  "nativeDecoderExecuted": false,
+  "gpuQualificationExecuted": false,
+  "transforms": [
+    "Explicit 720p SDR output cap and PQ tone map",
+    "Explicit stereo index fold-down for the test host"
+  ],
+  "physicalOutputVerified": null,
+  "sustainedTrials": [],
+  "qualified": false,
+  "stages": [
+    {
+      "event": "open-ready",
+      "elapsedMs": 897.4000000000015,
+      "snapshot": {
+        "sessionId": "a25ef9ad-8bba-48cf-a19b-99107cc8a835",
+        "state": "ready",
+        "source": {
+          "name": "combined-720p60.mkv",
+          "kind": "local",
+          "bytes": 4536776,
+          "mime": "video/x-matroska; codecs=\"av01.0.18H.10.0.112.09.16.09.0, mlpa\"",
+          "width": 1280,
+          "height": 720,
+          "color": "Original decode → ≤720p SDR / sRGB",
+          "audio": "TrueHD · 6 source channels · explicit stereo index fold-down"
+        },
+        "time": 0,
+        "duration": 0.8,
+        "volume": 0,
+        "muted": false,
+        "rate": 1,
+        "quality": "performance",
+        "route": "C1",
+        "routeDescription": "AV1 dav1d WASM + TrueHD PCM + subtitle composition",
+        "tracks": [
+          {
+            "id": "mkv:1",
+            "kind": "video",
+            "label": "AV1",
+            "codec": "av1",
+            "language": "und",
+            "channels": null,
+            "selectable": false
+          },
+          {
+            "id": "mkv:2",
+            "kind": "audio",
+            "label": "TRUEHD",
+            "codec": "truehd",
+            "language": "und",
+            "channels": 6,
+            "selectable": false
+          },
+          {
+            "id": "mkv:3",
+            "kind": "subtitle",
+            "label": "Original complex24 ASS initial portion",
+            "codec": "ass",
+            "language": "eng",
+            "channels": null,
+            "selectable": false
+          }
+        ],
+        "selectedAudio": "mkv:2",
+        "selectedSubtitle": "external",
+        "subtitleLabel": "Embedded ASS",
+        "subtitleOffset": 0,
+        "requiresOverlay": true,
+        "transforms": [
+          "Original AV1 source pictures decoded",
+          "Video output capped at 720p",
+          "PQ/BT.2020 mapped to SDR/sRGB when required",
+          "Subtitle raster capped at 1080p",
+          "Explicit channel-index stereo fold-down",
+          "No temporal frame dropping"
+        ],
+        "telemetry": {
+          "presentedFrames": 0,
+          "droppedFrames": 0,
+          "callbackRate": null,
+          "processingMs": 0,
+          "bufferedSeconds": 0.06,
+          "explicitBytes": 9777608,
+          "acceleration": "unknown",
+          "hdrOutput": "unverified"
+        },
+        "gate": "NOT_QUALIFIED",
+        "notices": [
+          "Managed software candidate. Decode, draw submissions and the PCM graph are observed separately; physical output and full 60/120 gates remain unqualified.",
+          "Channel-index identity is retained. Speaker mapping and output-device routing are unverified.",
+          "Explicit stereo output transform: even source channel indices average to left, odd indices average to right. This does not preserve a cinema speaker layout.",
+          "One subtitle worker, zero pthread children; libass cache limits are soft and do not cap the complete WASM heap.",
+          "Attached or bundled fonts only; remote font lookup and local-font permission prompts are disabled.",
+          "SDR subtitle-overlay luminance follows the browser compositor; physical HDR subtitle appearance is unverified."
+        ],
+        "error": null
+      }
+    },
+    {
+      "event": "disposed",
+      "snapshot": {
+        "sessionId": null,
+        "state": "disposed",
+        "source": {
+          "name": "combined-720p60.mkv",
+          "kind": "local",
+          "bytes": 4536776,
+          "mime": "video/x-matroska; codecs=\"av01.0.18H.10.0.112.09.16.09.0, mlpa\"",
+          "width": 1280,
+          "height": 720,
+          "color": "Original decode → ≤720p SDR / sRGB",
+          "audio": "TrueHD · 6 source channels · explicit stereo index fold-down"
+        },
+        "time": 0,
+        "duration": 0,
+        "volume": 0,
+        "muted": false,
+        "rate": 1,
+        "quality": "performance",
+        "route": null,
+        "routeDescription": "No source selected",
+        "tracks": [],
+        "selectedAudio": null,
+        "selectedSubtitle": null,
+        "subtitleLabel": null,
+        "subtitleOffset": 0,
+        "requiresOverlay": false,
+        "transforms": [
+          "Original source decode retained",
+          "Subtitle raster capped at 1080p",
+          "No temporal frame dropping"
+        ],
+        "telemetry": {
+          "presentedFrames": 0,
+          "droppedFrames": 0,
+          "callbackRate": null,
+          "processingMs": null,
+          "bufferedSeconds": 0,
+          "explicitBytes": null,
+          "acceleration": "unknown",
+          "hdrOutput": "unverified"
+        },
+        "gate": "NOT_QUALIFIED",
+        "notices": [],
+        "error": {
+          "code": "BACKPRESSURE",
+          "message": "Managed audio underrun recovery budget exhausted"
+        }
+      }
+    }
+  ],
+  "error": {
+    "name": "Error",
+    "message": "{\"code\":\"BACKPRESSURE\",\"message\":\"Managed audio underrun recovery budget exhausted\"}",
+    "stack": "Error: {\"code\":\"BACKPRESSURE\",\"message\":\"Managed audio underrun recovery budget exhausted\"}\n    at run (http://127.0.0.1:41135/tests/pipeline.ts:70:51)"
+  },
+  "status": "FAILED",
+  "elapsedMs": 3497.0750000000044,
+  "pageErrors": [],
+  "fixtureManifest": {
+    "schema": 1,
+    "path": "test/fixtures/primary/combined-720p60.mkv",
+    "sha256": "4e681a037ee5a4fdf57ac7512e702012d15b986133e27410e826c45fe76ad187",
+    "bytes": 4536776,
+    "origin": "User-supplied v8 media11 current combined fixture, not historical snapshot",
+    "video": {
+      "codec_name": "av1",
+      "profile": "Main",
+      "pix_fmt": "yuv420p10le",
+      "width": 1280,
+      "height": 720,
+      "r_frame_rate": "60/1",
+      "nb_read_frames": "48",
+      "color_range": "tv",
+      "color_space": "bt2020nc",
+      "color_transfer": "smpte2084",
+      "color_primaries": "bt2020"
+    },
+    "audio": {
+      "codec_name": "truehd",
+      "sample_rate": "48000",
+      "channels": 6,
+      "channel_layout": "5.1(side)",
+      "bits_per_raw_sample": "24"
+    },
+    "subtitle": {
+      "codec_name": "ass",
+      "nb_read_frames": "24"
+    },
+    "scope": "0.8-second correctness/startup fixture; not sustained qualification or 120fps source"
+  }
+}

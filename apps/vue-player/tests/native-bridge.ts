@@ -32,10 +32,10 @@ document.querySelector<HTMLButtonElement>('#run')!.addEventListener('click', asy
     if (typeof MediaSource === 'undefined' || !mimeQueries.some(type => MediaSource.isTypeSupported(type))) {
       evidence['status'] = 'EXACT_MSE_MIME_REJECTED_NOT_QUALIFIED';
     } else {
-      let cues = 0;
+      let cues = 0; const cueDurations = new Set<string>();
       native = await createNativeStream(media, video, selection, { allowExperimental: true, onSubtitle: packet => {
-        if (packet.durationTicks !== 800000000n) throw Error('Unexpected ASS event duration');
-        cues++;
+        if (packet.durationTicks === null || packet.durationTicks <= 0n) throw Error('Invalid ASS event duration');
+        cueDurations.add(packet.durationTicks.toString()); cues++;
       } });
       await native.ready;
       evidence['prePlay'] = { readyState: video.readyState, seeking: video.seeking, remainsPaused: video.paused };
@@ -43,7 +43,7 @@ document.querySelector<HTMLButtonElement>('#run')!.addEventListener('click', asy
       const ended = waitForMedia('ended'); ended.catch(() => {});
       await video.play(); await ended; await native.completion;
       const rendered = video.getVideoPlaybackQuality();
-      evidence['initialPlayback'] = { duration: video.duration, currentTime: video.currentTime, width: video.videoWidth, height: video.videoHeight, readyState: video.readyState, totalVideoFrames: rendered.totalVideoFrames, droppedVideoFrames: rendered.droppedVideoFrames, forwardedSubtitlePackets: cues, stats: native.snapshot() };
+      evidence['initialPlayback'] = { duration: video.duration, currentTime: video.currentTime, width: video.videoWidth, height: video.videoHeight, readyState: video.readyState, totalVideoFrames: rendered.totalVideoFrames, droppedVideoFrames: rendered.droppedVideoFrames, forwardedSubtitlePackets: cues, cueDurationsNs: [...cueDurations], stats: native.snapshot() };
       await native.seek(0.213);
       evidence['seek'] = { requested: 0.213, observed: video.currentTime, remainsPaused: video.paused, readyState: video.readyState, seeking: video.seeking };
       if (!video.paused || video.seeking || video.readyState < video.HAVE_CURRENT_DATA || Math.abs(video.currentTime - 0.213) > 0.01) throw Error('Seek did not prime the requested timestamp and remain paused');

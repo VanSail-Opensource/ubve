@@ -22,7 +22,8 @@
     "sample_rate": "48000",
     "channels": 6,
     "channel_layout": "5.1(side)",
-    "bits_per_raw_sample": "24"
+    "bits_per_raw_sample": "24",
+    "decoded_sample_frames": 38400
   },
   "subtitle": {
     "codec_name": "ass",
