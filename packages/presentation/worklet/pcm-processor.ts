@@ -78,8 +78,10 @@ class UbvePcmProcessor extends AudioWorkletProcessor {
   }
 
   fail(reason: string): void {
-    if (this.state === 'disposed') return;
+    if (this.state === 'disposed' || this.state === 'failed') return;
     this.state = 'failed';
+    this.anchor = null;
+    this.cancelScheduledStart();
     this.clear('FAILED');
     this.emit('error', undefined, reason);
   }
@@ -139,7 +141,9 @@ class UbvePcmProcessor extends AudioWorkletProcessor {
       this.emit('disposed', message.requestId);
       return;
     }
-    if (this.state === 'disposed') throw new Error('PCM output is disposed');
+    if (this.state === 'disposed' || this.state === 'failed') {
+      this.emit('control-rejected', message.requestId, 'TERMINAL'); return;
+    }
     if (message.type === 'reset') {
       if (!Number.isSafeInteger(message.epoch) || message.epoch! <= this.epoch
         || !Number.isSafeInteger(message.firstMediaSample) || message.firstMediaSample! < 0) throw new Error('Invalid new PCM epoch');

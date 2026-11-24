@@ -73,52 +73,76 @@ function prepareNativeCandidate(media: MediaSourceSession, video: HTMLVideoEleme
   const audio = media.tracks.find(track => track.id === audioId);
   const subtitle = selectDefault(media.tracks, 'subtitle');
   let subtitlesEnabled = true;
+  let embeddedInitialized = false;
   let subtitleEpoch = 0;
+  let runtimeRevision = 0;
   const errors = new Set<(error: unknown) => void>();
   const route = audio?.codec === 'truehd' ? 'N2' : 'N1';
-  async function start(time = 0): Promise<void> {
-    if (disposed || signal.aborted) throw new DOMException('Open was cancelled', 'AbortError');
-    if (subtitle) {
+  async function start(time = 0, operationSignal = signal): Promise<void> {
+    const runtimeSignal = AbortSignal.any([signal, operationSignal]);
+    const ensureActive = (): void => { if (disposed || runtimeSignal.aborted) throw new DOMException('Open was cancelled', 'AbortError'); };
+    ensureActive();
+    const revision = ++runtimeRevision;
+    const previous = stream; stream = null;
+    await previous?.dispose(); ensureActive();
+    if (subtitle && subtitlesEnabled) {
       if (!subtitles || (subtitle.codec !== 'ass' && subtitle.codec !== 'ssa')) throw new EngineError('UNSUPPORTED_PROFILE', `Embedded ${subtitle.codec} streaming is not admitted for this route.`, 'caller-fix');
-      await subtitles.load({ kind: subtitle.codec, data: new TextDecoder().decode(subtitle.codecPrivate), fonts: media.attachments.filter(font => /\.(ttf|otf|woff2?)$/i.test(font.name) || /font|truetype|opentype/i.test(font.mimeType)).map(font => ({ name: font.name, data: font.data })), label: subtitle.name ?? subtitle.codec.toUpperCase() });
+      if (!embeddedInitialized) {
+        await subtitles.load({ kind: subtitle.codec, data: new TextDecoder().decode(subtitle.codecPrivate), fonts: media.attachments.filter(font => /\.(ttf|otf|woff2?)$/i.test(font.name) || /font|truetype|opentype/i.test(font.mimeType)).map(font => ({ name: font.name, data: font.data })), label: subtitle.name ?? subtitle.codec.toUpperCase() });
+        embeddedInitialized = true;
+      }
       await subtitles.resetStream(++subtitleEpoch);
     }
-    const selection = { ...(videoId ? { videoTrackId: videoId } : {}), ...(audioId ? { audioTrackId: audioId } : {}), ...(subtitle ? { subtitleTrackId: subtitle.id } : {}) };
-    stream = await createNativeStream(media, video, selection, { allowExperimental: true, assetBaseUrl, signal, ...(subtitle && subtitles ? { onSubtitle: async (packet) => { if (!subtitlesEnabled) return; const timing = packetSeconds(packet); await subtitles.addPacket({ kind: subtitle.codec as 'ass' | 'ssa', data: packet.bytes.borrow(), ptsSeconds: timing.timestamp, durationSeconds: timing.duration, epoch: subtitleEpoch }); } } : {}) });
-    void stream.completion.catch(error => { for (const listener of errors) listener(error); });
-    await stream.ready;
-    if (time > 0) await stream.seek(time);
+    ensureActive();
+    const activeSubtitle = subtitlesEnabled ? subtitle : undefined, epoch = subtitleEpoch;
+    const selection = { ...(videoId ? { videoTrackId: videoId } : {}), ...(audioId ? { audioTrackId: audioId } : {}), ...(activeSubtitle ? { subtitleTrackId: activeSubtitle.id } : {}) };
+    // An exact-end seek is a terminal transport position, not a picture interval.
+    // Prime from just before the end, then let the facade set the requested endpoint.
+    const startTime = media.duration !== null && time >= media.duration ? Math.max(0, media.duration - 0.25) : time;
+    const next = await createNativeStream(media, video, selection, { allowExperimental: true, assetBaseUrl, signal: runtimeSignal, startTime, ...(activeSubtitle && subtitles ? { onSubtitle: async (packet) => {
+      if (revision !== runtimeRevision || !subtitlesEnabled) return;
+      const timing = packetSeconds(packet);
+      await subtitles.addPacket({ kind: activeSubtitle.codec as 'ass' | 'ssa', data: packet.bytes.borrow(), ptsSeconds: timing.timestamp, durationSeconds: timing.duration, epoch });
+    } } : {}) });
+    try {
+      ensureActive(); stream = next;
+      void next.completion.catch(error => { if (revision === runtimeRevision && !runtimeSignal.aborted && !disposed) for (const listener of errors) listener(error); });
+      await next.ready; ensureActive();
+    } catch (error) { await next.dispose(); if (stream === next) stream = null; throw error; }
   }
   return {
     route,
     description: route === 'N2' ? 'TrueHD → exact PCM → FLAC · unchanged video' : 'Stream-copy remux · unchanged encoded tracks',
-    tracks: mapTracks(media.tracks, true), selectedAudio: audioId ?? null,
+    tracks: mapTracks(media.tracks, track => track.kind === 'audio' && (track.codec === 'truehd') === (route === 'N2') && media.tracks.filter(candidate => candidate.kind === 'audio' && (candidate.codec === 'truehd') === (route === 'N2')).length > 1), selectedAudio: audioId ?? null,
     selectedSubtitle: subtitle?.id ?? null, subtitleLabel: subtitle ? subtitle.name ?? `Embedded ${subtitle.codec.toUpperCase()}` : null,
-    source: { ...describeMedia(media), audio: audio ? `${audio.codec.toUpperCase()} · ${audio.channelCount ?? '?'} channels${route === 'N2' ? ' → FLAC bridge' : ''}` : 'No audio track' },
+    get source() {
+      const selected = media.tracks.find(track => track.id === audioId);
+      return { ...describeMedia(media), audio: selected ? `${selected.codec.toUpperCase()} · ${selected.channelCount ?? '?'} channels${route === 'N2' ? ' → FLAC bridge' : ''}` : 'No audio track' };
+    },
     notices: ['Experimental candidate explicitly selected. Native output, HDR10 fidelity and full 60/120 performance gates remain unqualified.'],
     async attach() { await start(); },
-    async seek(seconds) { if (!stream) throw new EngineError('INTERNAL', 'Native stream is not attached'); if (subtitle && subtitles && subtitlesEnabled) await subtitles.resetStream(++subtitleEpoch); await stream.seek(seconds); },
+    async seek(seconds, seekSignal) { await start(seconds, seekSignal); },
     setSubtitleEnabled(enabled) { subtitlesEnabled = enabled; },
-    async selectAudio(trackId, seconds) {
+    async selectAudio(trackId, seconds, trackSignal) {
       const next = media.tracks.find(track => track.kind === 'audio' && track.id === trackId);
       if (!next) throw new EngineError('INVALID_ARGUMENT', 'Requested audio track does not exist');
       if (Boolean(next.codec === 'truehd') !== Boolean(audio?.codec === 'truehd')) throw new EngineError('UNSUPPORTED_PROFILE', 'Switching soundtrack bridge types requires reopening the source');
-      await stream?.dispose(); stream = null; audioId = trackId; await start(seconds);
+      audioId = trackId; await start(seconds, trackSignal);
     },
     telemetry: () => ({ explicitBytes: media.snapshot().cache.bytes }),
     subscribeError(listener) { errors.add(listener); return () => errors.delete(listener); },
-    async dispose() { if (disposed) return; disposed = true; errors.clear(); await stream?.dispose(); await media.dispose(); },
+    async dispose() { if (disposed) return; disposed = true; ++runtimeRevision; errors.clear(); await stream?.dispose(); await media.dispose(); },
   };
 }
 
 function selectDefault(tracks: readonly MediaTrack[], kind: MediaTrack['kind']): MediaTrack | undefined {
   return tracks.find(track => track.kind === kind && track.default) ?? tracks.find(track => track.kind === kind);
 }
-function mapTracks(tracks: readonly MediaTrack[], switchable: boolean): readonly PlayerTrack[] {
+function mapTracks(tracks: readonly MediaTrack[], switchable: false | ((track: MediaTrack) => boolean)): readonly PlayerTrack[] {
   return Object.freeze(tracks.map(track => Object.freeze({
     id: track.id, kind: track.kind, label: track.name ?? `${track.language === 'und' ? '' : `${track.language} · `}${track.codec.toUpperCase()}${track.channelCount ? ` · ${track.channelCount} ch` : ''}`,
     language: track.language, codec: track.codec, channels: track.channelCount,
-    selectable: switchable && track.kind === 'audio',
+    selectable: switchable ? switchable(track) : false,
   })));
 }
 function describeMedia(media: MediaSourceSession): Partial<PlayerSourceInfo> {

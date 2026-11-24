@@ -38,14 +38,19 @@ let unsubscribe: (() => void) | undefined;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 const hasSource = computed(() => snapshot.value?.source !== null && snapshot.value?.source !== undefined);
 const playable = computed(() => hasSource.value && !['opening', 'failed', 'disposed'].includes(snapshot.value?.state ?? 'empty'));
-const isPlaying = computed(() => snapshot.value?.state === 'playing' || snapshot.value?.state === 'rebuffering');
+const isPlaying = computed(() => snapshot.value?.state === 'playing');
+const wantsPlayback = computed(() => snapshot.value?.wantsPlayback ?? false);
+const seekable = computed(() => playable.value && (snapshot.value?.duration ?? 0) > 0);
+const nativePicture = computed(() => playable.value && Boolean(snapshot.value?.route?.startsWith('N')) && Boolean(media.value?.videoWidth));
+const nativeControlsAvailable = computed(() => nativePicture.value && !snapshot.value?.requiresOverlay);
+const routeUsesManagedClock = computed(() => snapshot.value?.route === 'C1');
 const busy = computed(() => ['opening', 'seeking', 'rebuffering'].includes(snapshot.value?.state ?? ''));
 const currentIndex = computed(() => queue.value.findIndex(item => item.id === selectedId.value));
 const audioTracks = computed(() => snapshot.value?.tracks.filter(track => track.kind === 'audio') ?? []);
 const stateLabel = computed(() => t.value[snapshot.value?.state ?? 'empty']);
 const position = computed(() => seekDraft.value ?? snapshot.value?.time ?? 0);
 const percent = computed(() => snapshot.value?.duration ? position.value / snapshot.value.duration * 100 : 0);
-const routeNames: Record<RoutePreference, string> = { automatic: 'Automatic', native: 'Native direct', experimental: 'Experimental remux / audio bridge', managed: 'Managed software decode' };
+const routeNames = computed<Record<RoutePreference, string>>(() => ({ automatic: t.value.automatic, native: t.value.nativeDirect, experimental: t.value.nativeBridge, managed: t.value.managed }));
 watch(locale, value => { document.documentElement.lang = value; });
 
 function notify(error: unknown): void {
@@ -80,6 +85,7 @@ function savePreferences(): void {
 async function openItem(id: string): Promise<void> {
   const input = inputs.get(id); if (!input || !player.value) return;
   selectedId.value = id;
+  seekDraft.value = null;
   toast.value = null;
   await player.value.open(input);
 }
@@ -103,17 +109,18 @@ async function chooseFiles(event: Event): Promise<void> {
 }
 async function addUrl(): Promise<void> {
   let parsed: URL;
-  try { parsed = new URL(url.value.trim()); } catch { notify('Enter a valid HTTP or HTTPS media URL.'); return; }
-  if (!['http:', 'https:'].includes(parsed.protocol)) { notify('Media URLs must use HTTP or HTTPS.'); return; }
+  try { parsed = new URL(url.value.trim()); } catch { notify(t.value.invalidUrl); return; }
+  if (!['http:', 'https:'].includes(parsed.protocol)) { notify(t.value.invalidUrl); return; }
   const id = crypto.randomUUID();
-  const name = decodeURIComponent(parsed.pathname.split('/').pop() || parsed.hostname);
+  let name = parsed.pathname.split('/').pop() || parsed.hostname;
+  try { name = decodeURIComponent(name); } catch { /* Retain an escaped label if it cannot be decoded. */ }
   inputs.set(id, { url: parsed.href }); queue.value.push({ id, name, size: null, kind: 'url' });
   urlDialog.value?.close(); url.value = '';
   await act(() => openItem(id));
 }
 function openUrlDialog(): void { urlDialog.value?.showModal(); queueMicrotask(() => urlInput.value?.focus()); }
 async function togglePlayback(): Promise<void> {
-  if (isPlaying.value) await act(() => player.value?.pause()); else await act(() => player.value?.play());
+  if (wantsPlayback.value) await act(() => player.value?.pause()); else await act(() => player.value?.play());
 }
 async function relativeFile(delta: number): Promise<void> {
   const item = queue.value[currentIndex.value + delta]; if (item) await act(() => openItem(item.id));
@@ -127,11 +134,16 @@ async function fullscreen(): Promise<void> {
   if (document.fullscreenElement) await document.exitFullscreen(); else await playerHost.value?.requestFullscreen();
 }
 async function pictureInPicture(): Promise<void> {
-  if (!media.value || snapshot.value?.requiresOverlay) return;
+  if (!media.value || !nativeControlsAvailable.value || !pipSupported.value) return;
   if (document.pictureInPictureElement) await document.exitPictureInPicture(); else await media.value.requestPictureInPicture();
 }
 function quality(mode: QualityMode): void { void act(async () => { await player.value?.setQuality(mode); savePreferences(); }); }
-function volume(event: Event): void { player.value?.setVolume(Number((event.target as HTMLInputElement).value)); savePreferences(); }
+function volume(event: Event): void {
+  const value = Number((event.target as HTMLInputElement).value);
+  player.value?.setVolume(value);
+  if (value > 0 && snapshot.value?.muted) player.value?.setMuted(false);
+  savePreferences();
+}
 function mute(): void { player.value?.setMuted(!snapshot.value?.muted); savePreferences(); }
 function onDrop(event: DragEvent): void {
   dragging.value = false; dragDepth.value = 0;
@@ -149,8 +161,8 @@ function keyboard(event: KeyboardEvent): void {
   if (event.altKey || event.ctrlKey || event.metaKey || urlDialog.value?.open) return;
   switch (event.key.toLowerCase()) {
     case ' ': case 'k': if (playable.value) { event.preventDefault(); void togglePlayback(); } break;
-    case 'arrowleft': if (playable.value) { event.preventDefault(); void act(() => player.value?.seek((snapshot.value?.time ?? 0) - 5)); } break;
-    case 'arrowright': if (playable.value) { event.preventDefault(); void act(() => player.value?.seek((snapshot.value?.time ?? 0) + 5)); } break;
+    case 'arrowleft': if (seekable.value) { event.preventDefault(); void act(() => player.value?.seek((snapshot.value?.time ?? 0) - 5)); } break;
+    case 'arrowright': if (seekable.value) { event.preventDefault(); void act(() => player.value?.seek((snapshot.value?.time ?? 0) + 5)); } break;
     case 'm': mute(); break;
     case 'f': if (fullscreenSupported.value) void act(fullscreen); break;
     case 'escape': settingsOpen.value = false; break;
@@ -193,8 +205,8 @@ onBeforeUnmount(() => { unsubscribe?.(); document.removeEventListener('keydown',
       <section class="main-column" aria-label="Media player">
         <div class="section-heading"><div><p class="eyebrow">UNIVERSAL BROWSER VIDEO ENGINE</p><h1>{{ hasSource ? snapshot?.source?.name : t.tagline }}</h1></div><span class="session-state" :class="{ active: isPlaying }"><span class="state-dot"></span>{{ stateLabel }}</span></div>
         <div ref="playerHost" class="player-host" :class="{ 'has-source': hasSource, 'is-busy': busy }">
-          <div class="video-stage" @dblclick="act(fullscreen)">
-            <video ref="media" class="video" :controls="browserControls" playsinline preload="metadata" :aria-label="snapshot?.source?.name ?? t.player" @click="playable && togglePlayback()"></video>
+          <div class="video-stage" @dblclick="fullscreenSupported && act(fullscreen)" @click.self="routeUsesManagedClock && playable && togglePlayback()">
+            <video ref="media" class="video" :controls="browserControls && nativeControlsAvailable" :disable-picture-in-picture="!nativeControlsAvailable" playsinline preload="metadata" :aria-label="snapshot?.source?.name ?? t.player" @click="playable && !(browserControls && nativeControlsAvailable) && togglePlayback()"></video>
             <div ref="overlay" class="subtitle-overlay"></div>
             <div v-if="!hasSource" class="empty-stage">
               <div class="stage-mark" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -208,16 +220,16 @@ onBeforeUnmount(() => { unsubscribe?.(); document.removeEventListener('keydown',
             <span v-if="hasSource" class="stage-label">{{ snapshot?.route ?? '…' }}<template v-if="snapshot?.source?.width"> · {{ snapshot.source.width }} × {{ snapshot.source.height }}</template></span>
           </div>
           <div class="transport">
-            <label class="sr-only" for="seek-position">{{ t.position }}</label><input id="seek-position" class="timeline" type="range" min="0" :max="snapshot?.duration || 1" step="0.01" :value="position" :disabled="!playable" :style="{ '--progress': `${percent}%` }" :aria-valuetext="`${time(position)} / ${time(snapshot?.duration ?? 0)}`" @input="seekDraft = Number(($event.target as HTMLInputElement).value)" @change="seekTo" />
+            <label class="sr-only" for="seek-position">{{ t.position }}</label><input id="seek-position" class="timeline" type="range" min="0" :max="snapshot?.duration || 1" step="any" :value="position" :disabled="!seekable" :style="{ '--progress': `${percent}%` }" :aria-valuetext="`${time(position)} / ${seekable ? time(snapshot?.duration ?? 0) : t.unknown}`" @input="seekDraft = Number(($event.target as HTMLInputElement).value)" @change="seekTo" />
             <div class="transport-row">
-              <button class="icon-button transport-play" :aria-label="isPlaying ? t.pause : t.play" :disabled="!playable" @click="togglePlayback"><Icon :name="isPlaying ? 'pause' : 'play'" :size="23" /></button>
+              <button class="icon-button transport-play" :aria-label="wantsPlayback ? t.pause : t.play" :disabled="!playable" @click="togglePlayback"><Icon :name="wantsPlayback ? 'pause' : 'play'" :size="23" /></button>
               <button class="icon-button optional-control" :aria-label="t.previous" :disabled="currentIndex <= 0" @click="relativeFile(-1)"><Icon name="back" :size="18" /></button><button class="icon-button optional-control" :aria-label="t.next" :disabled="currentIndex < 0 || currentIndex >= queue.length - 1" @click="relativeFile(1)"><Icon name="next" :size="18" /></button>
-              <span class="time-display">{{ time(position) }}<span>/ {{ time(snapshot?.duration ?? 0) }}</span></span>
+              <span class="time-display">{{ time(position) }}<span>/ {{ seekable ? time(snapshot?.duration ?? 0) : '—' }}</span></span>
               <div class="volume-control"><button class="icon-button" :aria-label="snapshot?.muted ? t.unmute : t.mute" @click="mute"><Icon :name="snapshot?.muted || snapshot?.volume === 0 ? 'muted' : 'volume'" :size="19" /></button><input type="range" min="0" max="1" step="0.01" :value="snapshot?.muted ? 0 : snapshot?.volume ?? 1" :aria-label="t.volume" @input="volume" /></div>
               <span class="transport-spacer"></span>
               <button class="icon-button" :class="{ 'is-selected': snapshot?.subtitleLabel }" :aria-label="t.subtitleLoad" :disabled="!playable" @click="subtitleInput?.click()"><Icon name="subtitles" /></button>
-              <div class="settings-anchor"><button class="icon-button" :aria-label="t.settings" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen"><Icon name="settings" /></button><div v-if="settingsOpen" class="settings-popover"><div class="popover-heading"><strong>{{ t.settings }}</strong><button class="icon-button" :aria-label="t.close" @click="settingsOpen = false"><Icon name="close" :size="16" /></button></div><label>{{ t.rate }}<select :value="snapshot?.rate ?? 1" @change="player?.setRate(Number(($event.target as HTMLSelectElement).value))"><option v-for="rate in [0.5, 0.75, 1, 1.25, 1.5, 2]" :key="rate" :value="rate">{{ rate }}×</option></select></label><label>{{ t.language }}<select v-model="locale" @change="savePreferences"><option value="en">English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option></select></label><label class="checkbox-label"><span>{{ t.browserControls }}</span><input v-model="browserControls" type="checkbox" /></label></div></div>
-              <button class="icon-button pip-button" :aria-label="t.pip" :title="snapshot?.requiresOverlay ? t.pipUnavailable : t.pip" :disabled="!playable || !pipSupported || snapshot?.requiresOverlay" @click="act(pictureInPicture)"><Icon name="pip" /></button>
+              <div class="settings-anchor"><button class="icon-button" :aria-label="t.settings" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen"><Icon name="settings" /></button><div v-if="settingsOpen" class="settings-popover"><div class="popover-heading"><strong>{{ t.settings }}</strong><button class="icon-button" :aria-label="t.close" @click="settingsOpen = false"><Icon name="close" :size="16" /></button></div><label>{{ t.rate }}<select :value="snapshot?.rate ?? 1" :disabled="routeUsesManagedClock" :title="routeUsesManagedClock ? t.managedRate : undefined" @change="act(() => player?.setRate(Number(($event.target as HTMLSelectElement).value)))"><option v-for="rate in [0.5, 0.75, 1, 1.25, 1.5, 2]" :key="rate" :value="rate">{{ rate }}×</option></select></label><label>{{ t.language }}<select v-model="locale" @change="savePreferences"><option value="en">English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option></select></label><label class="checkbox-label"><span>{{ t.browserControls }}</span><input v-model="browserControls" type="checkbox" :disabled="!nativeControlsAvailable" :title="!nativeControlsAvailable ? t.customControlsRequired : undefined" /></label></div></div>
+              <button class="icon-button pip-button" :aria-label="t.pip" :title="!nativeControlsAvailable ? t.pipUnavailable : t.pip" :disabled="!nativeControlsAvailable || !pipSupported" @click="act(pictureInPicture)"><Icon name="pip" /></button>
               <button class="icon-button" :aria-label="t.fullscreen" :disabled="!fullscreenSupported" @click="act(fullscreen)"><Icon name="fullscreen" /></button>
             </div>
           </div>
@@ -229,11 +241,11 @@ onBeforeUnmount(() => { unsubscribe?.(); document.removeEventListener('keydown',
 
       <aside v-show="showInspector" class="inspector">
         <section class="inspector-section playback-card"><div class="panel-heading"><h2>{{ t.output }}</h2><span class="engine-label">ENGINE v0.1</span></div><div class="quality-switch" role="group" :aria-label="t.quality"><button :class="{ selected: snapshot?.quality !== 'performance' }" :aria-pressed="snapshot?.quality !== 'performance'" @click="quality('full')">{{ t.full }}</button><button :class="{ selected: snapshot?.quality === 'performance' }" :aria-pressed="snapshot?.quality === 'performance'" @click="quality('performance')">{{ t.performance }}</button></div><p class="mode-description">{{ snapshot?.quality === 'performance' ? ((snapshot.route === 'C1' || routePreference === 'managed') ? t.managedPerfHint : t.perfHint) : t.fullHint }}</p><div class="target-row"><div><span>{{ t.target }}</span><strong>{{ snapshot?.quality === 'performance' ? '120' : '60' }}<small>{{ t.sourcePictures }}</small></strong></div><span class="target-mark" aria-hidden="true"><Icon name="activity" :size="26" /></span></div><details class="qualification"><summary><Icon name="info" :size="15" />{{ t.qualification }}<Icon name="chevron" :size="14" /></summary><p>{{ t.qualificationHint }}</p></details>
-          <label class="route-picker">{{ t.routeMode }}<select v-model="routePreference"><option v-for="(label, value) in routeNames" :key="value" :value="value">{{ label }}</option></select></label><p v-if="routePreference !== 'automatic' && routePreference !== 'native'" class="route-note">Experimental route · applies when opening a source · unqualified.</p><label v-if="routePreference === 'managed'" class="fold-option"><input v-model="allowStereoFoldDown" type="checkbox" /><span>{{ t.stereoFold }}<small>{{ t.stereoFoldHint }}</small></span></label><ul v-if="snapshot?.route === 'C1'" class="transform-list"><li v-for="transform in snapshot.transforms" :key="transform">{{ transform }}</li></ul>
+          <label class="route-picker">{{ t.routeMode }}<select v-model="routePreference"><option v-for="(label, value) in routeNames" :key="value" :value="value">{{ label }}</option></select></label><p class="route-note">{{ routePreference === 'experimental' || routePreference === 'managed' ? t.experimentalRoute : t.routeOnOpen }}</p><label v-if="routePreference === 'managed'" class="fold-option"><input v-model="allowStereoFoldDown" type="checkbox" /><span>{{ t.stereoFold }}<small>{{ t.stereoFoldHint }}</small></span></label><ul v-if="snapshot?.route" class="transform-list"><li v-for="transform in snapshot.transforms" :key="transform">{{ transform }}</li></ul>
         </section>
-        <section class="inspector-section"><div class="panel-heading"><h2>{{ t.details }}</h2><Icon name="film" :size="17" /></div><dl v-if="hasSource" class="signal-list"><div><dt>{{ t.format }}</dt><dd>{{ snapshot?.source?.mime || t.unknown }}</dd></div><div><dt>{{ t.resolution }}</dt><dd>{{ snapshot?.source?.width ? `${snapshot.source.width} × ${snapshot.source.height}` : '—' }}</dd></div><div><dt>{{ t.bytes }}</dt><dd>{{ bytes(snapshot?.source?.bytes ?? null) }}</dd></div><div><dt>{{ t.route }}</dt><dd>{{ snapshot?.route || '—' }}<small>{{ snapshot?.routeDescription }}</small></dd></div><div><dt>{{ t.color }}</dt><dd>{{ snapshot?.source?.color }}</dd></div><div><dt>{{ t.audio }}</dt><dd>{{ snapshot?.source?.audio }}</dd></div></dl><p v-else class="muted-copy">{{ t.noSource }}</p><label v-if="audioTracks.some(track => track.selectable)" class="audio-picker">{{ t.audio }}<select :value="snapshot?.selectedAudio" @change="act(() => player?.selectAudio(($event.target as HTMLSelectElement).value))"><option v-for="track in audioTracks" :key="track.id" :value="track.id" :disabled="!track.selectable">{{ track.label }}</option></select></label></section>
-        <section class="inspector-section"><div class="panel-heading"><h2>{{ t.subtitles }}</h2><Icon name="subtitles" :size="18" /></div><template v-if="snapshot?.subtitleLabel"><div class="subtitle-selected"><span>{{ snapshot.subtitleLabel }}</span><button class="icon-button" :aria-label="t.subtitleOff" @click="act(() => player?.clearSubtitle())"><Icon name="close" :size="15" /></button></div><label class="offset-control">{{ t.offset }}<span><input type="number" min="-3600" max="3600" step="0.1" :value="snapshot.subtitleOffset" :title="t.subtitleOffsetHint" @change="act(() => player?.setSubtitleOffset(Number(($event.target as HTMLInputElement).value)))" />{{ t.seconds }}</span></label></template><p v-else class="muted-copy">{{ t.subtitleHint }}</p><button class="button subtitle-add" :disabled="!playable" @click="subtitleInput?.click()"><Icon name="plus" :size="16" />{{ t.subtitleLoad }}</button><p class="supported-caption">ASS · SSA · SRT · VTT · TTML · PGS</p><label class="route-picker">PGS palette interpretation<select v-model="pgsPalette"><option value="bt709-limited">BT.709 limited range</option><option value="bt601-limited">BT.601 limited range</option></select></label></section>
-        <section class="inspector-section monitor-section"><div class="panel-heading"><h2>{{ t.telemetry }}</h2><Icon name="activity" :size="18" /></div><div class="metrics"><div><span>{{ t.callbackRate }}</span><strong>{{ metric(snapshot?.telemetry.callbackRate, 1) }}<small>/s</small></strong></div><div><span>{{ t.buffer }}</span><strong>{{ hasSource ? metric(snapshot?.telemetry.bufferedSeconds, 1) : '—' }}<small>s</small></strong></div><div><span>{{ t.frames }}</span><strong>{{ hasSource ? metric(snapshot?.telemetry.presentedFrames) : '—' }}</strong></div><div><span>{{ t.dropped }}</span><strong>{{ hasSource ? metric(snapshot?.telemetry.droppedFrames) : '—' }}</strong></div></div><p class="monitor-note">{{ t.monitorHint }}</p><details v-if="snapshot?.notices.length" class="runtime-notices"><summary>{{ t.details }}</summary><p v-for="notice in snapshot.notices" :key="notice">{{ notice }}</p></details><button class="quiet-button export-button" :disabled="!hasSource" @click="exportDiagnostics"><Icon name="download" :size="15" />{{ t.export }}</button></section>
+        <section class="inspector-section"><div class="panel-heading"><h2>{{ t.details }}</h2><Icon name="film" :size="17" /></div><dl v-if="hasSource" class="signal-list"><div><dt>{{ t.format }}</dt><dd>{{ snapshot?.source?.mime || t.unknown }}</dd></div><div><dt>{{ t.resolution }}</dt><dd>{{ snapshot?.source?.width ? `${snapshot.source.width} × ${snapshot.source.height}` : '—' }}</dd></div><div><dt>{{ t.bytes }}</dt><dd>{{ bytes(snapshot?.source?.bytes ?? null) }}</dd></div><div><dt>{{ t.route }}</dt><dd>{{ snapshot?.route || '—' }}<small>{{ snapshot?.routeDescription }}</small></dd></div><div><dt>{{ t.color }}</dt><dd>{{ snapshot?.source?.color }}</dd></div><div><dt>{{ t.audio }}</dt><dd>{{ snapshot?.source?.audio }}</dd></div></dl><p v-else class="muted-copy">{{ t.noSource }}</p><label v-if="audioTracks.some(track => track.selectable)" class="audio-picker">{{ t.audio }}<select :value="snapshot?.selectedAudio" :disabled="!playable || busy" @change="act(() => player?.selectAudio(($event.target as HTMLSelectElement).value))"><option v-for="track in audioTracks" :key="track.id" :value="track.id" :disabled="!track.selectable">{{ track.label }}</option></select></label></section>
+        <section class="inspector-section"><div class="panel-heading"><h2>{{ t.subtitles }}</h2><Icon name="subtitles" :size="18" /></div><template v-if="snapshot?.subtitleLabel"><div class="subtitle-selected"><span>{{ snapshot.subtitleLabel }}</span><button class="icon-button" :aria-label="t.subtitleOff" @click="act(() => player?.clearSubtitle())"><Icon name="close" :size="15" /></button></div><label class="offset-control">{{ t.offset }}<span><input type="number" min="-3600" max="3600" step="0.1" :value="snapshot.subtitleOffset" :title="t.subtitleOffsetHint" @change="act(() => player?.setSubtitleOffset(Number(($event.target as HTMLInputElement).value)))" />{{ t.seconds }}</span></label></template><p v-else class="muted-copy">{{ t.subtitleHint }}</p><button class="button subtitle-add" :disabled="!playable" @click="subtitleInput?.click()"><Icon name="plus" :size="16" />{{ t.subtitleLoad }}</button><p class="supported-caption">ASS · SSA · SRT · VTT · TTML · PGS</p><label class="route-picker">{{ t.pgsPalette }}<select v-model="pgsPalette"><option value="bt709-limited">BT.709 limited range</option><option value="bt601-limited">BT.601 limited range</option></select></label></section>
+        <section class="inspector-section monitor-section"><div class="panel-heading"><h2>{{ t.telemetry }}</h2><Icon name="activity" :size="18" /></div><div class="metrics"><div><span>{{ t.callbackRate }}</span><strong>{{ metric(snapshot?.telemetry.callbackRate, 1) }}<small>/s</small></strong></div><div><span>{{ t.buffer }}</span><strong>{{ hasSource ? metric(snapshot?.telemetry.bufferedSeconds, 1) : '—' }}<small>s</small></strong></div><div><span>{{ routeUsesManagedClock ? t.submitted : t.frames }}</span><strong>{{ hasSource ? metric(snapshot?.telemetry.presentedFrames) : '—' }}</strong></div><div><span>{{ routeUsesManagedClock ? t.deliberateDrops : t.dropped }}</span><strong>{{ hasSource ? metric(snapshot?.telemetry.droppedFrames) : '—' }}</strong></div></div><p class="monitor-note">{{ t.monitorHint }}</p><details v-if="snapshot?.notices.length" class="runtime-notices"><summary>{{ t.details }}</summary><p v-for="notice in snapshot.notices" :key="notice">{{ notice }}</p></details><button class="quiet-button export-button" :disabled="!hasSource" @click="exportDiagnostics"><Icon name="download" :size="15" />{{ t.export }}</button></section>
       </aside>
     </main>
 
@@ -241,7 +253,7 @@ onBeforeUnmount(() => { unsubscribe?.(); document.removeEventListener('keydown',
     <div v-if="dragging" class="drop-screen"><Icon name="folder" :size="48" /><strong>{{ t.drop }}</strong></div>
     <div v-if="toast" class="toast" role="alert"><Icon name="info" :size="19" /><p>{{ toast }}</p><button class="icon-button" :aria-label="t.dismiss" @click="toast = null"><Icon name="close" :size="17" /></button></div>
     <dialog ref="urlDialog" class="url-dialog" @click="($event.target === urlDialog) && urlDialog?.close()"><form @submit.prevent="addUrl"><div class="dialog-heading"><span class="dialog-icon"><Icon name="link" :size="23" /></span><button type="button" class="icon-button" :aria-label="t.close" @click="urlDialog?.close()"><Icon name="close" /></button></div><h2>{{ t.urlTitle }}</h2><p>{{ t.urlHint }}</p><label for="media-url">{{ t.urlLabel }}</label><input id="media-url" ref="urlInput" v-model="url" type="url" placeholder="https://example.com/video.mp4" autocomplete="off" required /><div class="dialog-actions"><button type="button" class="button" @click="urlDialog?.close()">{{ t.cancel }}</button><button type="submit" class="button button-primary">{{ t.urlAction }}</button></div></form></dialog>
-    <input ref="fileInput" class="sr-only" type="file" multiple accept="video/*,audio/*,.mkv,.m2ts,.mts,.ts,.mov,.avi,.mxf,.nut,.flv,.ogv,.mpg,.mpeg,.vob,.webm,.mp4,.wav,.flac,.mp3,.ass,.ssa,.srt,.vtt,.ttml,.sup" aria-label="Open local media files" @change="chooseFiles" />
-    <input ref="subtitleInput" class="sr-only" type="file" accept=".ass,.ssa,.srt,.vtt,.ttml,.dfxp,.sup" aria-label="Open subtitle file" @change="act(async () => { const input = $event.target as HTMLInputElement; if (input.files?.[0]) await player?.loadSubtitle(input.files[0], { pgsPalette }); input.value = ''; })" />
+    <input ref="fileInput" class="sr-only" type="file" multiple accept="video/*,audio/*,.mkv,.m2ts,.mts,.ts,.mov,.avi,.mxf,.nut,.flv,.ogv,.mpg,.mpeg,.vob,.webm,.mp4,.wav,.flac,.mp3,.ass,.ssa,.srt,.vtt,.ttml,.sup" :aria-label="t.open" @change="chooseFiles" />
+    <input ref="subtitleInput" class="sr-only" type="file" accept=".ass,.ssa,.srt,.vtt,.ttml,.dfxp,.sup" :aria-label="t.subtitleLoad" @change="act(async () => { const input = $event.target as HTMLInputElement; const selected = input.files?.[0]; input.value = ''; if (selected) await player?.loadSubtitle(selected, { pgsPalette }); })" />
   </div>
 </template>

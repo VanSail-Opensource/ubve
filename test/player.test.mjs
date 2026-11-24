@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ReferencePlayer, prepareDirectPlayback } from '../packages/browser/src/player.ts';
+import { ReferencePlayer, describeInput, prepareDirectPlayback } from '../packages/browser/src/player.ts';
+import { PacketStage } from '../packages/browser/src/packet-stage.ts';
 
 // These are DOM-transport state-machine tests, not native decode or presentation evidence.
 class MediaHost extends EventTarget {
@@ -162,4 +163,90 @@ test('repeated disposal returns the same completion barrier', async () => {
   const first = player.dispose(), second = player.dispose();
   assert.equal(first, second);
   release(); await Promise.all([first, second]); assert.equal(stats.disposed, 1);
+});
+
+test('selected-track staging retains bounded capacity in flight and does not block the other track', () => {
+  const video = new PacketStage(2, 6), audio = new PacketStage(2, 4);
+  const released = [];
+  video.enqueue('v0', 4, () => released.push('v0'));
+  video.enqueue('v1', 2, () => released.push('v1'));
+  const held = video.take();
+  assert.equal(held.value, 'v0');
+  assert.equal(video.canEnqueue(1), false);
+  assert.equal(video.snapshot().bytes, 6);
+  assert.equal(audio.canEnqueue(4), true);
+  audio.enqueue('a0', 4, () => released.push('a0'));
+  assert.throws(() => video.canEnqueue(7), { code: 'ITEM_TOO_LARGE' });
+  assert.throws(() => video.enqueue('overflow', 1, () => released.push('overflow')), { code: 'BACKPRESSURE' });
+  held.release(); held.release();
+  assert.equal(video.canEnqueue(4), true);
+  video.clear(); audio.clear();
+  assert.deepEqual(released, ['v0', 'v1', 'a0']);
+  assert.equal(video.snapshot().items, 0); assert.equal(audio.snapshot().items, 0);
+});
+
+test('superseded prepared seek is cancelled and fully settles before the latest seek mutates the host', async () => {
+  const trace = [];
+  const player = new ReferencePlayer({ video: new MediaHost(), prepare: async () => ({ ...prepared({ attached: 0, disposed: 0 }),
+    async seek(time, signal) {
+      trace.push(['start', time]);
+      if (time === 1) await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }));
+      trace.push(['settle', time, signal.aborted]);
+    },
+  }) });
+  try {
+    await player.open(file('native.mkv')); await player.play();
+    const first = player.seek(1), rejected = assert.rejects(first, { name: 'AbortError' });
+    await tick();
+    const second = player.seek(2); await player.pause();
+    await Promise.all([rejected, second]);
+    assert.deepEqual(trace, [['start', 1], ['settle', 1, true], ['start', 2], ['settle', 2, false]]);
+    assert.equal(player.snapshot().state, 'paused'); assert.equal(player.snapshot().time, 2);
+  } finally { await player.dispose(); }
+});
+
+test('native seek-to-end stays ended rather than restarting a previously playing source', async () => {
+  const host = new MediaHost();
+  const player = new ReferencePlayer({ video: host, prepare: async () => prepared({ attached: 0, disposed: 0 }) });
+  try {
+    await player.open(file('end.webm')); await player.play(); await player.seek(8);
+    assert.equal(player.snapshot().state, 'ended'); assert.equal(player.snapshot().time, 8);
+    assert.equal(player.snapshot().wantsPlayback, false); assert.equal(host.paused, true);
+  } finally { await player.dispose(); }
+});
+
+test('stale managed pause completion cannot pause or rewrite a replacement native source', async () => {
+  const host = new MediaHost(), stats = { attached: 0, disposed: 0 };
+  let releasePause;
+  const managed = { snapshot: () => ({ state: 'playing', duration: 8, time: 0, transforms: [], telemetry: {} }),
+    async pause() { return new Promise(resolve => { releasePause = resolve; }); }, async play() {}, setVolume() {}, setQuality() {} };
+  const player = new ReferencePlayer({ video: host, prepare: async input => input.name === 'managed.mkv'
+    ? { ...prepared(stats), route: 'C1', driver: managed } : prepared(stats) });
+  try {
+    await player.open(file('managed.mkv'));
+    const pause = player.pause(); await tick();
+    await player.open(file('replacement.webm')); await player.play();
+    releasePause(); await pause;
+    assert.equal(host.paused, false); assert.equal(player.snapshot().state, 'playing');
+  } finally { releasePause?.(); await player.dispose(); }
+});
+
+test('embedded subtitle identity survives opening and differs from an external sidecar', async () => {
+  const host = new MediaHost(), seen = [];
+  const player = new ReferencePlayer({ video: host, prepare: async () => ({ ...prepared({ attached: 0, disposed: 0 }),
+    selectedSubtitle: 'stream-2', subtitleLabel: 'Embedded ASS', setSubtitleEnabled: value => seen.push(value),
+  }), subtitles: { async load() {}, setQuality() {}, setOffset() {}, async clear() {}, getStatus: () => ({ requiresOverlay: true }), async dispose() {} } });
+  try {
+    await player.open(file('subbed.mkv'));
+    assert.equal(player.snapshot().selectedSubtitle, 'stream-2');
+    await player.loadSubtitle(new File(['WEBVTT'], 'sidecar.vtt'));
+    assert.equal(player.snapshot().selectedSubtitle, 'external');
+    await player.clearSubtitle();
+    assert.equal(player.snapshot().selectedSubtitle, null); assert.deepEqual(seen, [false, false]);
+  } finally { await player.dispose(); }
+});
+
+test('malformed escape sequences do not make a valid media URL unopenable', () => {
+  assert.equal(describeInput({ url: 'https://example.test/%E0%A4%A.webm' }).name, '%E0%A4%A.webm');
+  assert.equal(describeInput({ url: 'https://example.test/space%20movie.webm' }).name, 'space movie.webm');
 });

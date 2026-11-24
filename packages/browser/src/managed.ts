@@ -6,6 +6,7 @@ import { Av1Decoder, TrueHdDecoder, integerPcmToFloat } from '@ubve/wasm-adapter
 import { PcmOutput, RawCanvasRenderer } from '@ubve/presentation';
 import type { PcmEvent, SubtitleController } from '@ubve/presentation';
 import type { ManagedTransport, ManagedTransportSnapshot, PlayerTrack, PreparedPlayback, QualityMode } from './player.js';
+import { PacketStage } from './packet-stage.js';
 
 export interface ManagedPlaybackOptions {
   readonly media: MediaSourceSession;
@@ -27,6 +28,8 @@ type Epoch = {
   readonly firstSample: bigint;
   readonly frames: Frame[];
   readonly tasks: Promise<void>[];
+  readonly videoPackets: PacketStage<EncodedPacket>;
+  readonly audioPackets: PacketStage<EncodedPacket>;
   video: Av1Decoder | null;
   audio: TrueHdDecoder | null;
   pcm: PcmOutput | null;
@@ -84,6 +87,7 @@ export class ManagedPlayback implements ManagedTransport {
   #rate: number | null = null;
   #recoveryTimes: number[] = [];
   #totalRecoveries = 0;
+  #lastUnderrun: Readonly<Record<string, unknown>> | null = null;
   #transition: Promise<void> = Promise.resolve();
   #audioChannels = 0;
   #sourceChannels = 0;
@@ -130,9 +134,9 @@ export class ManagedPlayback implements ManagedTransport {
       selectedAudio: this.#audioTrack?.id ?? null,
       selectedSubtitle: this.#subtitleTrack?.id ?? null,
       subtitleLabel: this.#subtitleTrack ? `Embedded ${this.#subtitleTrack.codec.toUpperCase()}` : null,
-      source: { width: this.#videoTrack?.width ?? null, height: this.#videoTrack?.height ?? null, mime: media.mimeType || media.container,
-        color: this.#quality === 'performance' ? 'Original decode → ≤720p SDR / sRGB' : 'Original decode → SDR / sRGB',
-        audio: this.#audioTrack ? `TrueHD · ${this.#audioTrack.channelCount} source channels${this.#options.allowStereoFoldDown ? ' · explicit stereo index fold-down' : ' · discrete channel output'}` : 'No audio track' },
+      get source() { return { width: self.#videoTrack?.width ?? null, height: self.#videoTrack?.height ?? null, mime: media.mimeType || media.container,
+        color: self.#quality === 'performance' ? 'Original decode → ≤720p SDR / sRGB' : 'Original decode → SDR / sRGB',
+        audio: self.#audioTrack ? `TrueHD · ${self.#audioTrack.channelCount} source channels${self.#sourceChannels > self.#audioChannels ? ' · explicit stereo index fold-down' : ' · discrete channel output'}` : 'No audio track' }; },
       notices: ['Managed software candidate. Decode, draw submissions and the PCM graph are observed separately; physical output and full 60/120 gates remain unqualified.',
         'Channel-index identity is retained. Speaker mapping and output-device routing are unverified.',
         ...(this.#options.allowStereoFoldDown ? ['Explicit stereo output transform: even source channel indices average to left, odd indices average to right. This does not preserve a cinema speaker layout.'] : [])],
@@ -154,25 +158,28 @@ export class ManagedPlayback implements ManagedTransport {
     return Object.freeze({ state: this.#state, time, duration: this.#options.media.duration ?? 0, transforms: Object.freeze(transforms), telemetry: {
       presentedFrames: this.#submitted, droppedFrames: 0, callbackRate: this.#rate, processingMs: this.#renderMs,
       bufferedSeconds: epoch?.pcm ? Math.max(0, Number(epoch.nextWritten) / epoch.sampleRate - time) : Math.max(0, (epoch?.frames.at(-1) ? stampTime(epoch.frames.at(-1)!) : time) - time),
-      explicitBytes: this.#options.media.snapshot().cache.bytes + pendingVideoBytes + (epoch?.pcm?.transportBytes ?? 0),
+      explicitBytes: this.#options.media.snapshot().cache.bytes + pendingVideoBytes + (epoch?.pcm?.transportBytes ?? 0) +
+        (epoch?.videoPackets.snapshot().bytes ?? 0) + (epoch?.audioPackets.snapshot().bytes ?? 0),
     } });
   }
 
   diagnostics(): Readonly<Record<string, unknown>> {
     return { state: this.#state, decodedVideoFrames: this.#decoded, submittedVideoFrames: this.#submitted,
-      lateVideoSubmissions: this.#late, deliberateDrops: 0, recoveries: this.#totalRecoveries,
+      lateVideoSubmissions: this.#late, deliberateDrops: 0, recoveries: this.#totalRecoveries, lastUnderrun: this.#lastUnderrun,
       audio: this.#epoch?.pcm?.snapshot ?? null, videoDecoder: this.#epoch?.video?.diagnostics() ?? null,
       audioDecoder: this.#epoch?.audio?.diagnostics() ?? null,
+      subtitles: this.#options.subtitles.getStatus(),
+      stagedPackets: this.#epoch ? { video: this.#epoch.videoPackets.snapshot(), audio: this.#epoch.audioPackets.snapshot() } : null,
       cadenceEvidence: 'Canvas submissions; no physical-display qualification', failure: this.#failure instanceof Error ? this.#failure.message : this.#failure,
     };
   }
 
   async play(): Promise<void> {
     this.#ensureLive(); this.#wantPlay = true;
-    const epoch = this.#epoch; if (!epoch) throw new EngineError('INVALID_ARGUMENT', 'Managed source is not ready');
     if (this.#state === 'playing') return;
     if (this.#state === 'ended') await this.seek(0, this.#options.signal);
-    const active = this.#epoch!;
+    const active = this.#epoch;
+    if (!active) throw new EngineError('INVALID_ARGUMENT', 'Managed source is not ready');
     this.#state = 'rebuffering'; active.priming = true; this.#wake();
     await this.#wait(() => this.#primed(active) || !this.#wantPlay, active.abort.signal, 10_000, 'Managed resume priming');
     if (!this.#wantPlay) { active.priming = false; return; }
@@ -189,10 +196,15 @@ export class ManagedPlayback implements ManagedTransport {
 
   async pause(): Promise<void> {
     this.#ensureLive(); this.#wantPlay = false;
+    if (this.#state === 'ended') return;
     const epoch = this.#epoch;
     this.#logicalTime = this.#clock(); this.#state = 'paused'; this.#wallAnchor = null;
     if (this.#frameRequest !== null) cancelAnimationFrame(this.#frameRequest); this.#frameRequest = null;
-    if (epoch?.pcm) { epoch.frozenSample = Number(await epoch.pcm.pause()); epoch.anchor = null; this.#logicalTime = epoch.frozenSample / epoch.sampleRate; }
+    if (epoch?.pcm) {
+      const stopped = await epoch.pcm.pause();
+      if (this.#epoch !== epoch || epoch.abort.signal.aborted || this.#wantPlay) return;
+      epoch.frozenSample = Number(stopped); epoch.anchor = null; this.#logicalTime = epoch.frozenSample / epoch.sampleRate;
+    }
     this.#wake();
   }
 
@@ -202,7 +214,14 @@ export class ManagedPlayback implements ManagedTransport {
     this.#epoch?.abort.abort(); this.#wake();
     const operation = async (): Promise<void> => {
       if (signal.aborted || this.#disposed) throw cancelled();
-      this.#state = 'seeking'; await this.#replaceEpoch(target);
+      this.#state = 'seeking';
+      if (this.#options.media.duration !== null && target === this.#options.media.duration) {
+        await this.#retireEpoch();
+        if (signal.aborted || this.#disposed) throw cancelled();
+        this.#logicalTime = target; this.#state = 'ended'; this.#wantPlay = false;
+        return;
+      }
+      await this.#replaceEpoch(target, signal);
       if (signal.aborted) { this.#epoch?.abort.abort(); this.#wake(); throw cancelled(); }
       this.#state = 'paused';
     };
@@ -225,17 +244,22 @@ export class ManagedPlayback implements ManagedTransport {
     await this.#options.subtitles.setQuality(this.#quality);
   }
 
-  async #replaceEpoch(target: number): Promise<void> {
+  async #replaceEpoch(target: number, operationSignal?: AbortSignal): Promise<void> {
     await this.#retireEpoch();
     this.#ensureLive();
-    if (this.#options.signal.aborted) throw cancelled();
+    if (this.#options.signal.aborted || operationSignal?.aborted) throw cancelled();
     const id = ++this.#epochId, rate = this.#audioTrack?.sampleRate ?? 48000;
     const firstSample = BigInt(Math.floor(target * rate));
+    // With one additionally held demux packet, these limits remain within the
+    // source's 128-item / 64 MiB packet ledger even at its largest admitted item.
     const epoch: Epoch = { id, abort: new AbortController(), target, firstSample, frames: [], tasks: [],
+      videoPackets: new PacketStage(30, 16 * 1024 * 1024), audioPackets: new PacketStage(80, 4 * 1024 * 1024),
       video: null, audio: null, pcm: null, preroll: null, videoPrimed: !this.#videoTrack, audioPrimed: !this.#audioTrack,
       videoEos: !this.#videoTrack, audioEos: !this.#audioTrack, sourceEos: false, priming: true, sampleRate: rate, anchor: null,
       frozenSample: Number(firstSample), nextWritten: firstSample, nextDecoded: firstSample, pendingPcm: null, pendingFrames: 0 };
     this.#epoch = epoch; this.#logicalTime = target; this.#wallAnchor = null;
+    const cancelOperation = (): void => { epoch.abort.abort(); this.#wake(); };
+    operationSignal?.addEventListener('abort', cancelOperation, { once: true });
     const stamp = sessionStamp(this.#options.media.stamp.sessionId, id);
     try {
       if (this.#subtitleTrack && this.#embeddedSubtitlesEnabled) await this.#options.subtitles.resetStream(id);
@@ -251,7 +275,7 @@ export class ManagedPlayback implements ManagedTransport {
         this.#sourceChannels = count;
         this.#audioChannels = this.#options.allowStereoFoldDown && count > 2 ? 2 : count;
         epoch.pcm = await PcmOutput.create({ sampleRate: rate, channelLabels: this.#audioChannels === count ? labels : ['fold-left', 'fold-right'],
-          firstMediaSample: firstSample, blockFrames: 960, poolBlocks: 12, primeMs: 40, onEvent: event => this.#audioEvent(epoch, event) });
+          firstMediaSample: firstSample, blockFrames: Math.round(rate / 50), poolBlocks: 32, primeMs: 240, onEvent: event => this.#audioEvent(epoch, event) });
         epoch.pcm.setVolume(this.#volume);
         epoch.pendingPcm = new Float32Array(epoch.pcm.config.blockFrames * this.#audioChannels);
         epoch.audio = await TrueHdDecoder.create({ sampleRate: rate, channelLabels: labels, stamp, outputFrames: 8, assetBaseUrl: this.#options.assetBaseUrl,
@@ -262,8 +286,8 @@ export class ManagedPlayback implements ManagedTransport {
         epoch.tasks.push(task);
         void task.catch(error => { if (!epoch.abort.signal.aborted && this.#epoch === epoch) this.#fail(error); });
       };
-      if (epoch.video) trackTask(this.#consumeVideo(epoch));
-      if (epoch.audio) trackTask(this.#consumeAudio(epoch));
+      if (epoch.video) { trackTask(this.#consumeVideo(epoch)); trackTask(this.#feed(epoch, epoch.videoPackets, epoch.video, 'video')); }
+      if (epoch.audio) { trackTask(this.#consumeAudio(epoch)); trackTask(this.#feed(epoch, epoch.audioPackets, epoch.audio, 'audio')); }
       trackTask(this.#produce(epoch));
       await this.#wait(() => this.#primed(epoch), epoch.abort.signal, 15_000, 'Managed source priming');
       epoch.priming = false;
@@ -271,6 +295,7 @@ export class ManagedPlayback implements ManagedTransport {
       if (first) { const pixels = first.payload.borrow(); this.#renderer.present(pixels); await this.#options.subtitles.renderAt(target, pixels.visibleRect.width, pixels.visibleRect.height); }
       this.#wake();
     } catch (error) { epoch.abort.abort(); this.#wake(); await this.#retireEpoch(); throw error; }
+    finally { operationSignal?.removeEventListener('abort', cancelOperation); }
   }
 
   #primed(epoch: Epoch): boolean {
@@ -282,6 +307,7 @@ export class ManagedPlayback implements ManagedTransport {
     const tracks = [this.#videoTrack, this.#audioTrack, this.#subtitleTrack].filter((track): track is MediaTrack => Boolean(track));
     const stamp = sessionStamp(this.#options.media.stamp.sessionId, epoch.id);
     for await (const packet of this.#options.media.packets(tracks.map(track => track.id), { startTime: epoch.target, signal: epoch.abort.signal, stamp })) {
+      let staged = false;
       try {
         await this.#waitForActive(epoch);
         if (packet.discardPaddingNs !== 0n) throw new EngineError('UNSUPPORTED_PROFILE', 'Selected-track discard padding requires sample-accurate trim before managed admission');
@@ -289,16 +315,29 @@ export class ManagedPlayback implements ManagedTransport {
           const timing = packetSeconds(packet);
           if (this.#embeddedSubtitlesEnabled) await this.#options.subtitles.addPacket({ kind: this.#subtitleTrack.codec as 'ass' | 'ssa', data: packet.bytes.borrow(), ptsSeconds: timing.timestamp, durationSeconds: timing.duration, epoch: epoch.id });
         } else {
-          const decoder = packet.trackId === this.#videoTrack?.id ? epoch.video : epoch.audio;
-          if (!decoder) throw new EngineError('INTERNAL', 'Selected packet has no decoder');
-          if (decoder === epoch.video) await this.#wait(() => epoch.frames.length < 6 && (!epoch.videoPrimed || this.#active(epoch)), epoch.abort.signal, null, 'Video queue capacity');
-          await this.#submit(decoder, packet, epoch);
+          const stage = packet.trackId === this.#videoTrack?.id ? epoch.videoPackets : epoch.audioPackets;
+          const bytes = packet.bytes.bytes;
+          await this.#wait(() => stage.canEnqueue(bytes), epoch.abort.signal, null, 'Compressed track staging');
+          stage.enqueue(packet, bytes, () => packet.bytes.release()); staged = true;
+          this.#wake();
         }
-      } finally { packet.bytes.release(); }
+      } finally { if (!staged) packet.bytes.release(); }
     }
     epoch.sourceEos = true;
-    await Promise.all([epoch.video?.flushEndOfStream(this.#op(epoch, 'video-eos', 15_000)), epoch.audio?.flushEndOfStream(this.#op(epoch, 'audio-eos', 15_000))]);
     this.#wake();
+  }
+
+  async #feed(epoch: Epoch, stage: PacketStage<EncodedPacket>, decoder: Pick<Decoder<VideoPixels>, 'trySubmit' | 'flushEndOfStream'>, kind: 'video' | 'audio'): Promise<void> {
+    for (;;) {
+      await this.#wait(() => (!stage.empty && this.#active(epoch)) || (epoch.sourceEos && stage.empty), epoch.abort.signal, null, `${kind} input`);
+      const item = stage.take();
+      if (!item) break;
+      try {
+        if (kind === 'video') await this.#wait(() => epoch.frames.length < 6 && this.#active(epoch), epoch.abort.signal, null, 'Video queue capacity');
+        await this.#submit(decoder, item.value, epoch);
+      } finally { item.release(); this.#wake(); }
+    }
+    await decoder.flushEndOfStream(this.#op(epoch, `${kind}-eos`, 15_000));
   }
 
   async #submit(decoder: Pick<Decoder<VideoPixels>, 'trySubmit'>, packet: EncodedPacket, epoch: Epoch): Promise<void> {
@@ -383,13 +422,20 @@ export class ManagedPlayback implements ManagedTransport {
     if (event.type === 'progress' || event.type === 'paused') epoch.frozenSample = event.nextMediaSample;
     if (event.type === 'ended') { epoch.frozenSample = event.nextMediaSample; epoch.anchor = null; this.#logicalTime = event.nextMediaSample / epoch.sampleRate; this.#finishIfEnded(); }
     if (event.type === 'underrun') {
+      this.#lastUnderrun = Object.freeze({ mediaSample: event.nextMediaSample, graphFrame: event.graphFrame,
+        writtenSample: Number(epoch.nextWritten), decodedSample: Number(epoch.nextDecoded), waitingPictures: epoch.frames.length,
+        videoPackets: epoch.videoPackets.snapshot(), audioPackets: epoch.audioPackets.snapshot(), sourceEos: epoch.sourceEos });
       epoch.frozenSample = event.nextMediaSample; epoch.anchor = null; this.#logicalTime = event.nextMediaSample / epoch.sampleRate;
       this.#state = 'rebuffering'; epoch.abort.abort(); this.#wake();
       const now = performance.now(); this.#recoveryTimes = this.#recoveryTimes.filter(at => now - at < 30_000);
       if (this.#recoveryTimes.length >= 2 || this.#totalRecoveries >= 6) { this.#fail(new EngineError('BACKPRESSURE', 'Managed audio underrun recovery budget exhausted')); return; }
       this.#recoveryTimes.push(now); this.#totalRecoveries++;
       const target = this.#logicalTime;
-      const recovery = async (): Promise<void> => { await this.#replaceEpoch(target); if (this.#wantPlay) await this.play(); else this.#state = 'paused'; };
+      const recovery = async (): Promise<void> => {
+        if (this.#epoch !== epoch || this.#disposed) return;
+        await this.#replaceEpoch(target);
+        if (this.#wantPlay) await this.play(); else this.#state = 'paused';
+      };
       this.#transition = this.#transition.catch(() => undefined).then(recovery);
       void this.#transition.catch(error => this.#fail(error));
     }
@@ -481,6 +527,7 @@ export class ManagedPlayback implements ManagedTransport {
     await this.#renderTask?.catch(() => undefined);
     for (const frame of epoch.frames) frame.payload.release(); epoch.frames.length = 0;
     epoch.preroll?.payload.release(); epoch.preroll = null;
+    epoch.videoPackets.clear(); epoch.audioPackets.clear();
     await Promise.allSettled([epoch.video?.dispose(), epoch.audio?.dispose(), epoch.pcm?.dispose()]);
     await Promise.allSettled(epoch.tasks);
   }

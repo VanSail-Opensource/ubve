@@ -144,6 +144,7 @@ test('output modes preserve required overlays and never admit unverified HDR', (
   assert.equal(getPresentationEligibility({ mode: 'video-pip', customSubtitles: true }).allowed, false);
   assert.equal(getPresentationEligibility({ mode: 'document-fullscreen', customSubtitles: true }).allowed, true);
   assert.equal(assessHdrOutput({ sourceIsHdr: true, route: 'canvas2d' }).output, 'refused');
+  assert.equal(assessHdrOutput({ sourceIsHdr: false, route: 'canvas2d' }).output, 'sdr');
   assert.equal(assessHdrOutput({ sourceIsHdr: true, route: 'webgpu', acceptedExtendedCanvas: true }).qualification, 'DEFERRED_NOT_QUALIFIED');
   const recovery = new RecoveryBudget();
   assert.equal(recovery.request(1), true); assert.equal(recovery.request(2), true); assert.equal(recovery.request(3), false);

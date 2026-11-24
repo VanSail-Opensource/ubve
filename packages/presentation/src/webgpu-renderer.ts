@@ -86,7 +86,9 @@ export class WebGpuRawRenderer {
   readonly qualification = 'DEFERRED_NOT_QUALIFIED' as const;
   #pipeline: GPURenderPipeline;
   #uniform: GPUBuffer;
+  #uniformData = new Float32Array(20);
   #textures: GPUTexture[] = [];
+  #bind: GPUBindGroup | null = null;
   #shape = '';
   #disposed = false;
   #lost: string | null = null;
@@ -96,16 +98,22 @@ export class WebGpuRawRenderer {
     this.canvas = canvas; this.context = context; this.device = device; this.#pipeline = pipeline; this.options = options;
     this.#uniform = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     void device.lost.then(info => { this.#lost = info.message || 'WebGPU device lost'; });
+    device.addEventListener('uncapturederror', event => { this.#lost ??= event.error.message || 'WebGPU operation failed'; });
   }
 
   static async create(canvas: HTMLCanvasElement, options: WebGpuRendererOptions): Promise<WebGpuRawRenderer> {
     if (!navigator.gpu) throw new Error('WebGPU is unavailable');
     if (!Number.isFinite(options.referenceWhiteNits) || options.referenceWhiteNits < 80 || options.referenceWhiteNits > 500) throw new Error('HDR reference white must be explicitly declared within 80–500 nits');
+    if (options.maximumHeight !== undefined && (!Number.isSafeInteger(options.maximumHeight) || options.maximumHeight < 1)) throw new Error('Invalid GPU output raster cap');
     const adapter = await finite(navigator.gpu.requestAdapter(), 5_000, 'WebGPU adapter');
     if (!adapter) throw new Error('No WebGPU adapter');
-    const device = await finite(adapter.requestDevice(), 5_000, 'WebGPU device');
+    const pendingDevice = adapter.requestDevice();
+    let device: GPUDevice;
+    try { device = await finite(pendingDevice, 5_000, 'WebGPU device'); }
+    catch (error) { void pendingDevice.then(late => late.destroy(), () => undefined); throw error; }
+    let context: GPUCanvasContext | null = null;
     try {
-      const context = canvas.getContext('webgpu');
+      context = canvas.getContext('webgpu');
       if (!context) throw new Error('Canvas WebGPU context unavailable');
       const hdr = options.output === 'hdr-candidate';
       const format: GPUTextureFormat = hdr ? 'rgba16float' : navigator.gpu.getPreferredCanvasFormat();
@@ -124,7 +132,7 @@ export class WebGpuRawRenderer {
         vertex: { module: shader, entryPoint: 'vertex' }, fragment: { module: shader, entryPoint: 'fragment', targets: [{ format }] },
         primitive: { topology: 'triangle-list' } }), 5_000, 'WebGPU render pipeline');
       return new WebGpuRawRenderer(canvas, context, device, pipeline, options);
-    } catch (error) { device.destroy(); throw error; }
+    } catch (error) { context?.unconfigure(); device.destroy(); throw error; }
   }
 
   present(frame: RawPlaneFrame): { readonly output: 'sdr' | 'hdr-candidate'; readonly qualification: 'DEFERRED_NOT_QUALIFIED' } {
@@ -140,17 +148,27 @@ export class WebGpuRawRenderer {
     const cap = this.options.maximumHeight ?? frame.visibleRect.height;
     const scale = Math.min(1, cap / frame.visibleRect.height);
     const width = Math.max(1, Math.round(frame.visibleRect.width * scale)), height = Math.max(1, Math.round(frame.visibleRect.height * scale));
-    if (width > this.device.limits.maxTextureDimension2D || height > this.device.limits.maxTextureDimension2D) throw new Error('Output exceeds WebGPU raster limits');
-    this.canvas.width = width; this.canvas.height = height;
+    const limit = this.device.limits.maxTextureDimension2D;
+    if (Math.max(width, height, frame.codedWidth, frame.codedHeight) > limit) throw new Error('Video planes or output exceed WebGPU raster limits');
+    if (this.canvas.width !== width) this.canvas.width = width;
+    if (this.canvas.height !== height) this.canvas.height = height;
     const depth = frame.format === 'I420P8' ? 8 : frame.format === 'I444P16' ? 16 : 10;
     const sx = frame.format === 'I444P16' ? 1 : 2, sy = frame.format === 'I420P8' || frame.format === 'I420P10' ? 2 : 1;
     const shape = `${frame.format}/${frame.codedWidth}/${frame.codedHeight}`;
     if (this.#shape !== shape) {
-      for (const texture of this.#textures) texture.destroy(); this.#textures = []; this.#shape = shape;
-      for (let i = 0; i < 3; i++) this.#textures.push(this.device.createTexture({
-        size: [i === 0 ? frame.codedWidth : Math.ceil(frame.codedWidth / sx), i === 0 ? frame.codedHeight : Math.ceil(frame.codedHeight / sy)],
-        format: depth === 8 ? 'r8uint' : 'r16uint', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      }));
+      const textures: GPUTexture[] = [];
+      try {
+        for (let i = 0; i < 3; i++) textures.push(this.device.createTexture({
+          size: [i === 0 ? frame.codedWidth : Math.ceil(frame.codedWidth / sx), i === 0 ? frame.codedHeight : Math.ceil(frame.codedHeight / sy)],
+          format: depth === 8 ? 'r8uint' : 'r16uint', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        }));
+        const bind = this.device.createBindGroup({ layout: this.#pipeline.getBindGroupLayout(0), entries: [
+          ...textures.map((texture, binding) => ({ binding, resource: texture.createView() })),
+          { binding: 3, resource: { buffer: this.#uniform } },
+        ] });
+        for (const texture of this.#textures) texture.destroy();
+        this.#textures = textures; this.#bind = bind; this.#shape = shape;
+      } catch (error) { for (const texture of textures) texture.destroy(); throw error; }
     }
     for (let i = 0; i < 3; i++) {
       const plane = frame.planes[i]!;
@@ -160,19 +178,15 @@ export class WebGpuRawRenderer {
         { width: i === 0 ? frame.codedWidth : Math.ceil(frame.codedWidth / sx), height: i === 0 ? frame.codedHeight : Math.ceil(frame.codedHeight / sy) });
     }
     const is2020 = frame.color.primaries === 'bt2020';
-    const params = new Float32Array([frame.codedWidth, frame.codedHeight, frame.visibleRect.x, frame.visibleRect.y,
+    this.#uniformData.set([frame.codedWidth, frame.codedHeight, frame.visibleRect.x, frame.visibleRect.y,
       frame.visibleRect.width, frame.visibleRect.height, depth, frame.color.range === 'limited' ? 1 : 0,
       sx, sy, this.options.chromaLocation === 'center' ? (sx - 1) / 2 : 0, this.options.chromaLocation === 'topleft' ? 0 : (sy - 1) / 2,
       frame.color.matrix === 'bt2020-ncl' ? 0.2627 : 0.2126, frame.color.matrix === 'bt2020-ncl' ? 0.0593 : 0.0722,
       hdr ? 1 : 0, this.options.output === 'hdr-candidate' ? 1 : 0, this.options.referenceWhiteNits, is2020 ? 1 : 0, 0, 0]);
-    this.device.queue.writeBuffer(this.#uniform, 0, params);
-    const bind = this.device.createBindGroup({ layout: this.#pipeline.getBindGroupLayout(0), entries: [
-      { binding: 0, resource: this.#textures[0]!.createView() }, { binding: 1, resource: this.#textures[1]!.createView() },
-      { binding: 2, resource: this.#textures[2]!.createView() }, { binding: 3, resource: { buffer: this.#uniform } },
-    ] });
+    this.device.queue.writeBuffer(this.#uniform, 0, this.#uniformData);
     const encoder = this.device.createCommandEncoder();
     const pass = encoder.beginRenderPass({ colorAttachments: [{ view: this.context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }] });
-    pass.setPipeline(this.#pipeline); pass.setBindGroup(0, bind); pass.draw(3); pass.end();
+    pass.setPipeline(this.#pipeline); pass.setBindGroup(0, this.#bind); pass.draw(3); pass.end();
     this.device.queue.submit([encoder.finish()]);
     return { output: this.options.output, qualification: this.qualification };
   }
@@ -180,6 +194,7 @@ export class WebGpuRawRenderer {
   async dispose(): Promise<void> {
     if (this.#disposed) return; this.#disposed = true;
     try { await finite(this.device.queue.onSubmittedWorkDone(), 1_000, 'WebGPU disposal'); }
-    finally { for (const texture of this.#textures) texture.destroy(); this.#uniform.destroy(); this.context.unconfigure(); this.device.destroy(); }
+    finally { for (const texture of this.#textures) texture.destroy(); this.#textures = []; this.#bind = null;
+      this.#uniform.destroy(); this.context.unconfigure(); this.device.destroy(); }
   }
 }

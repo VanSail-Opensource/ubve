@@ -107,6 +107,7 @@ export interface PlayerSnapshot {
   readonly volume: number;
   readonly muted: boolean;
   readonly rate: number;
+  readonly wantsPlayback: boolean;
   readonly quality: QualityMode;
   readonly route: PlaybackRoute | null;
   readonly routeDescription: string;
@@ -194,12 +195,17 @@ export class ReferencePlayer {
   readonly #listeners = new Set<(snapshot: PlayerSnapshot) => void>();
   #sessionAbort: AbortController | null = null;
   #seekAbort: AbortController | null = null;
+  #transportTask: Promise<void> | null = null;
+  #transportKind: 'seek' | 'audio' | null = null;
+  #playAttempt: { readonly intent: number; readonly done: Promise<void> } | null = null;
+  #playIntent = 0;
   #prepared: PreparedPlayback | null = null;
   #preparedErrorUnsubscribe: (() => void) | null = null;
   #epochs: EpochController | null = null;
   #generation = 0;
   readonly #openingTasks = new Set<Promise<PlayerSnapshot>>();
   #retiring: Promise<void> = Promise.resolve();
+  readonly #retired = new WeakMap<PreparedPlayback, Promise<void>>();
   #disposal: Promise<void> | null = null;
   #disposed = false;
   #state: PlayerSnapshot['state'] = 'empty';
@@ -207,6 +213,7 @@ export class ReferencePlayer {
   #error: PlayerSnapshot['error'] = null;
   #quality: QualityMode = 'full';
   #subtitleLabel: string | null = null;
+  #selectedSubtitle: string | null = null;
   #subtitleOffset = 0;
   #subtitleGeneration = 0;
   #selectedAudio: string | null = null;
@@ -226,10 +233,17 @@ export class ReferencePlayer {
     this.#prepare = options.prepare ?? prepareDirectPlayback;
     this.#subtitles = options.subtitles;
     if (options.onSnapshot) this.#listeners.add(options.onSnapshot);
+    this.#listen('play', () => {
+      if (this.#prepared && !this.#prepared.driver && !this.video.paused && !['seeking', 'failed', 'opening'].includes(this.#state)) this.#desiredPlaying = true;
+    });
     this.#listen('playing', () => { if (this.#prepared && this.#desiredPlaying && this.#state !== 'seeking') this.#state = 'playing'; });
-    this.#listen('pause', () => { if (this.#prepared && !['seeking', 'ended', 'failed', 'opening'].includes(this.#state)) this.#state = 'paused'; });
+    this.#listen('pause', () => {
+      if (this.#prepared && !this.#prepared.driver && this.video.paused && !['seeking', 'ended', 'failed', 'opening'].includes(this.#state)) {
+        this.#state = 'paused'; this.#desiredPlaying = false; ++this.#playIntent;
+      }
+    });
     this.#listen('waiting', () => { if (this.#desiredPlaying && this.#state === 'playing') this.#state = 'rebuffering'; });
-    this.#listen('ended', () => { this.#state = 'ended'; this.#desiredPlaying = false; });
+    this.#listen('ended', () => { if (this.#prepared && this.video.ended && this.#state !== 'seeking') { this.#state = 'ended'; this.#desiredPlaying = false; } });
     this.#listen('error', () => { if (this.#prepared && this.#state !== 'opening') this.#fail(mediaElementError(this.video)); });
     for (const type of ['loadedmetadata', 'durationchange', 'volumechange', 'ratechange', 'seeked']) this.#listen(type, () => {});
     this.#timer = setInterval(() => this.#emit(), 250);
@@ -257,17 +271,20 @@ export class ReferencePlayer {
       if (video.buffered.start(i) <= video.currentTime && video.buffered.end(i) >= video.currentTime) bufferedSeconds = video.buffered.end(i) - video.currentTime;
     }
     const subtitleStatus = this.#subtitles?.getStatus();
-    const source = this.#source === null ? null : Object.freeze({ ...this.#source,
-      width: video.videoWidth || this.#source.width, height: video.videoHeight || this.#source.height,
+    const outputSource = this.#prepared?.source;
+    const source = this.#source === null ? null : Object.freeze({ ...this.#source, ...outputSource,
+      width: outputSource?.width ?? (video.videoWidth || this.#source.width), height: outputSource?.height ?? (video.videoHeight || this.#source.height),
     });
+    const state = this.#state === 'opening' || this.#state === 'seeking' || this.#state === 'failed' ? this.#state : managed?.state ?? this.#state;
     return Object.freeze({
-      sessionId: this.#epochs?.capture().sessionId ?? null, state: managed?.state ?? this.#state, source,
+      sessionId: this.#epochs?.capture().sessionId ?? null, state, source,
       time: managed?.time ?? finiteTime(video.currentTime), duration: managed?.duration ?? finiteTime(video.duration),
-      volume: video.volume, muted: video.muted, rate: video.playbackRate, quality: this.#quality,
+      volume: video.volume, muted: video.muted, rate: managed ? 1 : video.playbackRate, quality: this.#quality,
+      wantsPlayback: this.#desiredPlaying && !['ended', 'failed', 'disposed'].includes(state),
       route: this.#prepared?.route ?? null,
       routeDescription: this.#prepared?.description ?? 'No source selected',
       tracks: this.#prepared?.tracks ?? [], selectedAudio: this.#selectedAudio,
-      selectedSubtitle: this.#subtitleLabel === null ? null : 'external', subtitleLabel: this.#subtitleLabel,
+      selectedSubtitle: this.#selectedSubtitle, subtitleLabel: this.#subtitleLabel,
       subtitleOffset: this.#subtitleOffset, requiresOverlay: subtitleStatus?.requiresOverlay ?? false,
       transforms: managed?.transforms ?? Object.freeze(this.#quality === 'full' ? ['Original source raster', 'Full subtitle raster', 'Browser output mapping'] :
         ['Original source decode retained', 'Subtitle raster capped at 1080p', 'No temporal frame dropping']),
@@ -306,15 +323,17 @@ export class ReferencePlayer {
     let prepared: PreparedPlayback | null = null;
     try {
       prepared = await this.#prepare(input, controller.signal);
-      if (controller.signal.aborted || generation !== this.#generation) { await prepared.dispose(); throw abortError(); }
+      if (controller.signal.aborted || generation !== this.#generation) throw abortError();
       this.#prepared = prepared;
       this.#preparedErrorUnsubscribe = prepared.subscribeError?.(error => { if (generation === this.#generation && !controller.signal.aborted) this.#fail(error); }) ?? null;
       this.#source = { ...this.#source, ...prepared.source };
       this.#selectedAudio = prepared.selectedAudio ?? prepared.tracks.find(track => track.kind === 'audio')?.id ?? null;
       this.#subtitleLabel = prepared.subtitleLabel ?? null;
+      this.#selectedSubtitle = prepared.selectedSubtitle ?? null;
       await prepared.attach(this.video, controller.signal);
       if (!prepared.driver) await waitForMedia(this.video, 'loadedmetadata', () => this.video.readyState >= 1, controller.signal, 15_000);
       if (controller.signal.aborted || generation !== this.#generation) throw abortError();
+      if (this.#error) throw new EngineError('OUTPUT_UNAVAILABLE', (this.#error as NonNullable<PlayerSnapshot['error']>).message);
       this.#state = 'ready';
       if (!prepared.driver) this.#beginFrameObservation();
       else prepared.driver.setVolume(this.video.muted ? 0 : this.video.volume);
@@ -324,36 +343,59 @@ export class ReferencePlayer {
       if (generation === this.#generation && !this.#disposed && !isAbort(error)) this.#fail(error);
       if (generation === this.#generation && this.#prepared === prepared) {
         this.#prepared = null; controller.abort();
+        this.#preparedErrorUnsubscribe?.(); this.#preparedErrorUnsubscribe = null;
         this.video.removeAttribute('src'); this.video.load();
       }
-      await prepared?.dispose();
+      if (prepared) await this.#retirePrepared(prepared);
       throw error;
     }
   }
 
   async play(): Promise<void> {
     this.#requireSource();
+    if (this.#playAttempt?.intent === this.#playIntent && this.#desiredPlaying) return this.#playAttempt.done;
+    const intent = ++this.#playIntent;
     this.#desiredPlaying = true;
+    this.#emit();
+    if (this.#transportTask) return this.#transportTask;
+    return this.#resumePlayback(intent);
+  }
+
+  #resumePlayback(intent: number): Promise<void> {
     const generation = this.#generation;
-    try {
-      if (this.#prepared?.driver) await this.#prepared.driver.play();
-      else await this.video.play();
-      if (generation !== this.#generation || !this.#desiredPlaying) { if (generation === this.#generation) this.video.pause(); return; }
-      this.#state = 'playing'; this.#emit();
-    } catch (error) {
-      if (generation !== this.#generation) throw abortError();
-      this.#desiredPlaying = false;
-      this.#state = 'paused'; this.#emit();
-      throw error;
-    }
+    const driver = this.#prepared?.driver;
+    const done = (async () => {
+      try {
+        if (driver) await driver.play(); else await this.video.play();
+        if (generation !== this.#generation) throw abortError();
+        if (intent !== this.#playIntent || !this.#desiredPlaying) return;
+        if (this.#state !== 'failed') { this.#state = 'playing'; this.#emit(); }
+      } catch (error) {
+        if (generation !== this.#generation) throw abortError();
+        if (intent !== this.#playIntent || !this.#desiredPlaying) return;
+        this.#desiredPlaying = false;
+        if (this.#state !== 'failed') this.#state = 'paused';
+        this.#emit(); throw error;
+      }
+    })();
+    const attempt = { intent, done }; this.#playAttempt = attempt;
+    const clear = (): void => { if (this.#playAttempt === attempt) this.#playAttempt = null; };
+    void done.then(clear, clear);
+    return done;
   }
 
   async pause(): Promise<void> {
     this.#assertLive();
+    const generation = this.#generation, intent = ++this.#playIntent;
     this.#desiredPlaying = false;
-    await this.#prepared?.driver?.pause();
+    // Pause the native host synchronously before an awaited managed completion
+    // could outlive this source and pause a newer one.
     this.video.pause();
-    if (this.#prepared && this.#state !== 'opening' && this.#state !== 'failed') this.#state = 'paused';
+    this.#emit();
+    if (this.#transportTask && !this.#playAttempt) return;
+    await this.#prepared?.driver?.pause();
+    if (generation !== this.#generation || (intent !== this.#playIntent && this.#desiredPlaying)) return;
+    if (this.#prepared && !['opening', 'failed', 'ended', 'seeking'].includes(this.#state)) this.#state = 'paused';
     this.#emit();
   }
 
@@ -361,30 +403,59 @@ export class ReferencePlayer {
     this.#requireSource();
     if (!Number.isFinite(seconds)) throw new EngineError('INVALID_ARGUMENT', 'Seek target must be finite');
     if (['paused', 'ready', 'ended'].includes(this.snapshot().state)) this.#desiredPlaying = false;
-    const sessionSignal = this.#sessionAbort?.signal;
-    if (!sessionSignal) throw abortError();
-    this.#seekAbort?.abort();
-    const controller = new AbortController(); this.#seekAbort = controller;
-    const onSessionAbort = (): void => controller.abort();
-    sessionSignal.addEventListener('abort', onSessionAbort, { once: true });
-    this.#epochs?.advance();
-    const target = Math.max(0, Math.min(seconds, this.snapshot().duration));
-    this.#state = 'seeking'; this.#emit();
-    try {
-      if (this.#prepared?.seek) await this.#prepared.seek(target, controller.signal);
-      if (controller.signal.aborted) throw abortError();
-      if (!this.#prepared?.driver) {
+    const duration = this.snapshot().duration;
+    if (duration <= 0) throw new EngineError('UNSUPPORTED_PROFILE', 'This source does not have a known seekable duration');
+    const target = Math.max(0, Math.min(seconds, duration)), atEnd = target === duration;
+    return this.#runTransport('seek', async (prepared, signal) => {
+      await prepared.seek?.(target, signal);
+      if (signal.aborted) throw abortError();
+      if (!prepared.driver) {
         if (Math.abs(this.video.currentTime - target) > 0.001) this.video.currentTime = target;
-        await waitForMedia(this.video, 'seeked', () => !this.video.seeking && Math.abs(this.video.currentTime - target) < 0.1, controller.signal, 10_000);
+        await waitForMedia(this.video, 'seeked', () => !this.video.seeking && Math.abs(this.video.currentTime - target) < 0.1, signal, 10_000);
       }
-      if (controller.signal.aborted) throw abortError();
-      if (this.#desiredPlaying) await this.play();
-      else { await this.#prepared?.driver?.pause(); this.video.pause(); this.#state = 'paused'; }
-      this.#emit();
-    } catch (error) {
-      if (!isAbort(error) && !controller.signal.aborted) this.#fail(error);
-      throw error;
-    } finally { sessionSignal.removeEventListener('abort', onSessionAbort); }
+    }, atEnd);
+  }
+
+  #runTransport(kind: 'seek' | 'audio', operation: (prepared: PreparedPlayback, signal: AbortSignal) => Promise<void>, atEnd = false): Promise<void> {
+    const prepared = this.#prepared!, sessionSignal = this.#sessionAbort?.signal;
+    if (!sessionSignal || sessionSignal.aborted) return Promise.reject(abortError());
+    if (this.#transportTask && (kind === 'audio' || this.#transportKind === 'audio')) {
+      return Promise.reject(new EngineError('BACKPRESSURE', 'Wait for the active track or seek operation'));
+    }
+    this.#seekAbort?.abort();
+    const controller = new AbortController(), signal = AbortSignal.any([sessionSignal, controller.signal]), previous = this.#transportTask;
+    this.#seekAbort = controller; this.#transportKind = kind; ++this.#playIntent;
+    this.#epochs?.advance(); this.#state = 'seeking';
+    if (atEnd) this.#desiredPlaying = false;
+    this.video.pause();
+    const check = (): void => { if (signal.aborted || this.#prepared !== prepared) throw abortError(); };
+    const task = (async () => {
+      try {
+        await previous?.catch(() => undefined); check();
+        await operation(prepared, signal); check();
+        if (atEnd) { this.#desiredPlaying = false; this.#state = 'ended'; }
+        else for (;;) {
+          const intent = this.#playIntent;
+          if (this.#desiredPlaying) await this.#resumePlayback(intent); else await prepared.driver?.pause();
+          check();
+          if (intent !== this.#playIntent) continue;
+          if (!this.#desiredPlaying && this.#state !== 'failed') this.#state = 'paused';
+          break;
+        }
+        this.#emit();
+      } catch (error) {
+        if (signal.aborted) throw abortError();
+        if (!isAbort(error)) this.#fail(error);
+        throw error;
+      }
+    })();
+    this.#transportTask = task;
+    this.#emit();
+    const clear = (): void => {
+      if (this.#transportTask === task) { this.#transportTask = null; this.#transportKind = null; this.#seekAbort = null; }
+    };
+    void task.then(clear, clear);
+    return task;
   }
 
   setVolume(volume: number): void {
@@ -405,13 +476,16 @@ export class ReferencePlayer {
   async selectAudio(trackId: string): Promise<void> {
     this.#requireSource();
     if (!this.#prepared?.selectAudio || !this.#sessionAbort) throw new EngineError('UNSUPPORTED_CODEC', 'Audio-track switching is unavailable for this route');
-    const wasPlaying = this.#desiredPlaying;
-    const time = this.video.currentTime;
-    this.#state = 'seeking'; this.#emit();
-    await this.#prepared.selectAudio(trackId, time, this.#sessionAbort.signal);
-    this.#selectedAudio = trackId;
-    if (wasPlaying && this.#desiredPlaying) await this.play(); else { this.video.pause(); this.#state = 'paused'; }
-    this.#emit();
+    if (trackId === this.#selectedAudio) return;
+    if (!this.#prepared.tracks.some(track => track.id === trackId && track.kind === 'audio' && track.selectable)) {
+      throw new EngineError('UNSUPPORTED_PROFILE', 'The selected audio track is not switchable on this route');
+    }
+    const time = this.snapshot().time;
+    return this.#runTransport('audio', async (prepared, signal) => {
+      await prepared.selectAudio!(trackId, time, signal);
+      if (signal.aborted) throw abortError();
+      this.#selectedAudio = trackId;
+    });
   }
   async loadSubtitle(file: File, options: { readonly pgsPalette?: 'bt709-limited' | 'bt601-limited' } = {}): Promise<void> {
     this.#requireSource();
@@ -427,9 +501,15 @@ export class ReferencePlayer {
     this.#prepared?.setSubtitleEnabled?.(false);
     await this.#subtitles.load({ kind, data, label: file.name, ...options });
     if (generation !== this.#subtitleGeneration || sessionGeneration !== this.#generation) throw abortError();
-    this.#subtitleLabel = file.name; this.#emit();
+    this.#subtitleLabel = file.name; this.#selectedSubtitle = 'external'; this.#emit();
   }
-  async clearSubtitle(): Promise<void> { ++this.#subtitleGeneration; this.#prepared?.setSubtitleEnabled?.(false); await this.#subtitles?.clear(); this.#subtitleLabel = null; this.#emit(); }
+  async clearSubtitle(): Promise<void> {
+    const generation = ++this.#subtitleGeneration;
+    this.#prepared?.setSubtitleEnabled?.(false);
+    await this.#subtitles?.clear();
+    if (generation !== this.#subtitleGeneration) return;
+    this.#subtitleLabel = null; this.#selectedSubtitle = null; this.#emit();
+  }
   setSubtitleOffset(seconds: number): void {
     if (!Number.isFinite(seconds) || Math.abs(seconds) > 3600) throw new EngineError('INVALID_ARGUMENT', 'Subtitle offset must be within one hour');
     this.#subtitleOffset = seconds; this.#subtitles?.setOffset(seconds); this.#emit();
@@ -473,15 +553,26 @@ export class ReferencePlayer {
     this.#sessionAbort?.abort(); this.#sessionAbort = null;
     this.#seekAbort?.abort(); this.#seekAbort = null;
     this.#epochs?.dispose(); this.#epochs = null;
-    this.#desiredPlaying = false;
+    this.#desiredPlaying = false; ++this.#playIntent;
     if (this.#callbackId !== null) this.video.cancelVideoFrameCallback(this.#callbackId);
     this.#callbackId = null; this.#lastCallbackTime = null; this.#lastPresented = null; this.#callbackRate = null; this.#processingMs = null;
     const prepared = this.#prepared; this.#prepared = null;
+    const transport = this.#transportTask;
+    this.#transportTask = null; this.#transportKind = null;
     this.#preparedErrorUnsubscribe?.(); this.#preparedErrorUnsubscribe = null;
     this.video.pause(); this.video.removeAttribute('src'); this.video.load();
     this.#selectedAudio = null;
-    this.#retiring = this.#retiring.then(async () => { await prepared?.dispose(); await this.clearSubtitle(); });
+    this.#retiring = this.#retiring.then(async () => {
+      await transport?.catch(() => undefined);
+      try { if (prepared) await this.#retirePrepared(prepared); }
+      finally { await this.clearSubtitle(); }
+    });
     await this.#retiring;
+  }
+  #retirePrepared(prepared: PreparedPlayback): Promise<void> {
+    let retirement = this.#retired.get(prepared);
+    if (!retirement) { retirement = Promise.resolve().then(() => prepared.dispose()); this.#retired.set(prepared, retirement); }
+    return retirement;
   }
   #beginFrameObservation(): void {
     if (typeof this.video.requestVideoFrameCallback !== 'function') return;
@@ -511,7 +602,10 @@ export function describeInput(input: MediaInput): PlayerSourceInfo {
   if (input instanceof File) return { name: input.name, kind: 'local', bytes: input.size, mime: input.type || null, width: null, height: null, color: 'Browser output mapping · unverified', audio: 'Browser audio output' };
   const url = new URL(input.url);
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new EngineError('INVALID_ARGUMENT', 'Media URLs must use HTTPS or HTTP');
-  const name = input.label ?? decodeURIComponent(url.pathname.split('/').pop() || url.hostname);
+  const leaf = url.pathname.split('/').pop() || url.hostname;
+  let name = leaf;
+  try { name = decodeURIComponent(leaf); } catch { /* Keep a malformed escaped filename displayable. */ }
+  name = input.label ?? name;
   return { name, kind: 'url', bytes: null, mime: null, width: null, height: null, color: 'Browser output mapping · unverified', audio: 'Browser audio output' };
 }
 

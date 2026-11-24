@@ -18,7 +18,7 @@ export function getPresentationEligibility(options: {
 }
 
 export interface HdrOutputAssessment {
-  readonly output: 'native-hdr-candidate' | 'webgpu-hdr-candidate' | 'sdr-tonemapped' | 'refused';
+  readonly output: 'native-hdr-candidate' | 'webgpu-hdr-candidate' | 'sdr' | 'sdr-tonemapped' | 'refused';
   readonly qualification: 'DEFERRED_NOT_QUALIFIED' | 'NOT_QUALIFIED';
   readonly reason: string;
 }
@@ -30,7 +30,7 @@ export function assessHdrOutput(options: {
   readonly acceptedExtendedCanvas?: boolean;
   readonly allowSdrToneMap?: boolean;
 }): HdrOutputAssessment {
-  if (!options.sourceIsHdr) return { output: 'sdr-tonemapped', qualification: 'NOT_QUALIFIED', reason: 'SDR output; no HDR claim applies.' };
+  if (!options.sourceIsHdr) return { output: 'sdr', qualification: 'NOT_QUALIFIED', reason: 'SDR output; no HDR claim applies.' };
   if (options.route === 'native') return { output: 'native-hdr-candidate', qualification: 'DEFERRED_NOT_QUALIFIED', reason: 'Encoded HDR metadata remains with the native media route; physical HDR output has not been measured.' };
   if (options.route === 'webgpu' && options.acceptedExtendedCanvas) return { output: 'webgpu-hdr-candidate', qualification: 'DEFERRED_NOT_QUALIFIED', reason: 'Extended canvas accepted; display luminance, gamut, and metadata interpretation remain unverified.' };
   if (options.allowSdrToneMap) return { output: 'sdr-tonemapped', qualification: 'NOT_QUALIFIED', reason: 'Explicit PQ/BT.2020 to SDR tone mapping reduces HDR range and gamut.' };

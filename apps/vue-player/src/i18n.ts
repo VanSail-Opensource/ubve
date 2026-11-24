@@ -21,6 +21,9 @@ export const messages = {
     issueTitle: 'This source needs attention', retry: 'Try again', dismiss: 'Dismiss', shortcut: 'Space: play / pause · ← →: seek · F: fullscreen · M: mute',
     inspector: 'Inspector', noSource: 'Open a source to inspect its signal.', export: 'Export diagnostics', bytes: 'File size',
     automatic: 'Automatic', managed: 'Managed decode', routeMode: 'Playback route', managedHint: 'Uses available software adapters. Unsupported profiles are refused.',
+    nativeDirect: 'Native direct', nativeBridge: 'Experimental remux / audio bridge', routeOnOpen: 'Applies the next time you open a source.', experimentalRoute: 'Applies on next open. Experimental and not qualified.',
+    invalidUrl: 'Enter a valid HTTP or HTTPS media URL.', managedRate: 'Managed audio uses a fixed 1× sample clock.', customControlsRequired: 'This output requires the player’s own controls.',
+    pgsPalette: 'PGS palette interpretation', submitted: 'Draws submitted', deliberateDrops: 'Deliberate drops',
     unsupported: 'Unavailable for this source', subtitleOffsetHint: 'Positive values show subtitles later.',
   },
   'zh-CN': {
@@ -44,6 +47,9 @@ export const messages = {
     issueTitle: '此源文件需要处理', retry: '重试', dismiss: '收起', shortcut: '空格：播放/暂停 · ← →：跳转 · F：全屏 · M：静音',
     inspector: '详情', noSource: '打开媒体以查看信号详情。', export: '导出诊断信息', bytes: '文件大小',
     automatic: '自动', managed: '软件解码', routeMode: '播放路径', managedHint: '使用可用的软件解码器，不支持的规格将明确拒绝。',
+    nativeDirect: '浏览器直接播放', nativeBridge: '实验性重封装 / 音频桥接', routeOnOpen: '下次打开媒体时生效。', experimentalRoute: '下次打开时生效。实验性路径，尚未通过验收。',
+    invalidUrl: '请输入有效的 HTTP 或 HTTPS 媒体链接。', managedRate: '软件解码音频目前使用固定的 1× 采样时钟。', customControlsRequired: '当前输出需要使用播放器的控件。',
+    pgsPalette: 'PGS 调色板解读方式', submitted: '已提交绘制', deliberateDrops: '主动丢帧',
     unsupported: '当前源不可用', subtitleOffsetHint: '正值使字幕延后显示。',
   },
   'zh-TW': {
@@ -67,6 +73,9 @@ export const messages = {
     issueTitle: '此來源檔案需要處理', retry: '重試', dismiss: '收起', shortcut: '空白鍵：播放/暫停 · ← →：跳轉 · F：全螢幕 · M：靜音',
     inspector: '詳情', noSource: '開啟媒體以檢視訊號詳情。', export: '匯出診斷資訊', bytes: '檔案大小',
     automatic: '自動', managed: '軟體解碼', routeMode: '播放路徑', managedHint: '使用可用的軟體解碼器，不支援的規格將明確拒絕。',
+    nativeDirect: '瀏覽器直接播放', nativeBridge: '實驗性重新封裝 / 音訊橋接', routeOnOpen: '下次開啟媒體時生效。', experimentalRoute: '下次開啟時生效。實驗性路徑，尚未通過驗收。',
+    invalidUrl: '請輸入有效的 HTTP 或 HTTPS 媒體連結。', managedRate: '軟體解碼音訊目前使用固定的 1× 取樣時鐘。', customControlsRequired: '目前輸出需要使用播放器的控制項。',
+    pgsPalette: 'PGS 調色盤解讀方式', submitted: '已提交繪製', deliberateDrops: '主動捨棄影格',
     unsupported: '目前來源無法使用', subtitleOffsetHint: '正值使字幕延後顯示。',
   },
 } as const;

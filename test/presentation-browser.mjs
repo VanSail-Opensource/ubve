@@ -41,6 +41,9 @@ try {
     };
     const block = new Float32Array(512);
     for (let i = 0; i < 256; i++) { block[i * 2] = i / 65536; block[i * 2 + 1] = -i / 65536; }
+    const cancelledStart = audio.start().then(() => 'unexpected-success', error => error.name);
+    await audio.pause();
+    const cancelledBeforePrime = await cancelledStart;
     if (!audio.tryWrite(block, 0n) || !audio.tryWrite(block, 256n)) throw new Error('Initial pool admission failed');
     const started = await audio.start();
     await wait(() => events.some(event => event.type === 'underrun'));
@@ -61,12 +64,13 @@ try {
     await wait(() => events.some(event => event.type === 'ended' && event.epoch === 2));
     await audio.dispose();
     return { userAgent: navigator.userAgent, crossOriginIsolated, sampleRate: audio.context.sampleRate,
-      started, missing, frozen, restarted, final, paused: String(paused),
+      started, cancelledBeforePrime, missing, frozen, restarted, final, paused: String(paused),
       disposed: audio.context.state, transportBytes: audio.transportBytes, events };
   });
   assert.equal(result.crossOriginIsolated, true);
   assert.equal(result.missing, 512); assert.equal(result.frozen, 512);
   assert.equal(result.started.type, 'started'); assert.equal(result.restarted.type, 'started');
+  assert.equal(result.cancelledBeforePrime, 'AbortError');
   assert.equal(result.final.nextMediaSample, 1024); assert.equal(result.final.underruns, 1);
   assert.equal(result.paused, '10000'); assert.equal(result.disposed, 'closed');
   assert.equal(result.events.filter(e => e.type === 'disposed').length, 1);
