@@ -4,3 +4,6 @@ export * from './output-policy.js';
 export * from './color.js';
 export * from './raw-renderer.js';
 export * from './webgpu-renderer.js';
+export * from './subtitle-input.js';
+export * from './pgs.js';
+export * from './subtitles.js';

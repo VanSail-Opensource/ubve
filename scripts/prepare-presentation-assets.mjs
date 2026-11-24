@@ -19,12 +19,25 @@ const expectedThreadSource = 'export const THREAD_COUNT = self.crossOriginIsolat
 const utilFile = path.join(jassubRoot, 'dist/worker/util.js');
 const upstreamUtil = await readFile(utilFile, 'utf8');
 if (upstreamUtil.split(expectedThreadSource).length !== 2) throw new Error('Upstream JASSUB thread-selection source changed; review the patch');
+const workerFile = path.join(jassubRoot, 'dist/worker/worker.js');
+const upstreamWorker = await readFile(workerFile, 'utf8');
+const expectedImages = 'function readImages(view) {\n    const images = [];';
+const expectedImagePush = '        images.push({';
+if (upstreamWorker.split(expectedImages).length !== 2 || upstreamWorker.split(expectedImagePush).length !== 2) throw new Error('Upstream JASSUB descriptor parser changed; review bitmap-bound checks');
 await build({ entryPoints: [path.join(jassubRoot, 'dist/worker/worker.js')],
   outfile: path.join(destination, 'jassub/worker.js'), bundle: true, format: 'esm', target: 'es2023',
   plugins: [{ name: 'ubve-subtitle-worker-budget', setup(context) {
     context.onLoad({ filter: /[\\/]jassub[\\/]dist[\\/]worker[\\/]util\.js$/ }, () => ({
       contents: upstreamUtil.replace(expectedThreadSource, 'export const THREAD_COUNT = 1; // UBVE measured one-thread candidate; zero pthread pool.'),
       loader: 'js', resolveDir: path.dirname(utilFile),
+    }));
+    context.onLoad({ filter: /[\\/]jassub[\\/]dist[\\/]worker[\\/]worker\.js$/ }, () => ({
+      contents: upstreamWorker.replace(expectedImages, `function readImages(view) {
+    if (view.length % 8 || view.length > 8 * 50000) throw new Error('UBVE: invalid ASS descriptor count');
+    const images = [];`).replace(expectedImagePush, `        const width = view[i], height = view[i + 1], pointer = view[i + 4] >>> 0, stride = view[i + 6];
+        if (width < 0 || height < 0 || stride < width || !Number.isSafeInteger(pointer + stride * height) || pointer + stride * height > self.HEAPU8RAW.byteLength) throw new Error('UBVE: ASS bitmap exceeds WASM memory');
+        images.push({`),
+      loader: 'js', resolveDir: path.dirname(workerFile),
     }));
   } }],
 });
@@ -45,8 +58,8 @@ for (const directory of ['ubve', 'jassub']) {
 }
 const manifest = {
   schema: 'ubve-presentation-assets-v1', jassub: '2.5.38', imsc: '2.0.0',
-  patch: { description: 'Pin the public JASSUB worker thread count to 1, creating no pthread children.',
-    upstreamUtilSha256: hash(upstreamUtil), replacement: 'THREAD_COUNT = 1', wasmChanged: false },
+  patch: { description: 'Pin JASSUB thread count to 1; validate packed eight-word descriptor counts and bitmap extents before rendering.',
+    upstreamUtilSha256: hash(upstreamUtil), upstreamWorkerSha256: hash(upstreamWorker), replacement: 'THREAD_COUNT = 1; descriptor bounds', wasmChanged: false },
   threadBudget: { hostWorkers: 1, pthreadChildren: 0 },
   physicalOutputQualification: 'DEFERRED_NOT_QUALIFIED', assets,
 };
