@@ -39,5 +39,14 @@ export interface BrowserPlayer {
 }
 export type CreatePlayer = (options: PlayerOptions) => BrowserPlayer;
 
-// No createPlayer success stub is exported. This package currently freezes the
-// assembly/public-API contract. Implement it with real adapters and lifecycle tests.
+export { createPlayer, ReferencePlayer, prepareDirectPlayback } from './player.js';
+export type {
+  MediaInput, PlaybackRoute, PlayerSnapshot, PlayerSourceInfo, PlayerTelemetry,
+  PlayerTrack, PreparedPlayback, PreparePlayback, QualityMode, ReferencePlayerOptions,
+  SubtitleAdapter,
+  ManagedTransport, ManagedTransportSnapshot,
+} from './player.js';
+export { createReferencePlayer, preparePlayback, qualityTarget } from './assembly.js';
+export type { ReferencePlayerFactoryOptions, RoutePreference } from './assembly.js';
+export { ManagedPlayback, stereoIndexFold } from './managed.js';
+export type { ManagedPlaybackOptions } from './managed.js';

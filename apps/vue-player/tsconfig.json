@@ -1,0 +1,48 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable",
+      "ESNext.Disposable"
+    ],
+    "types": [
+      "vite/client",
+      "@webgpu/types"
+    ],
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@ubve/core": [
+        "../../packages/core/src/index.ts"
+      ],
+      "@ubve/browser": [
+        "../../packages/browser/src/index.ts"
+      ],
+      "@ubve/presentation": [
+        "../../packages/presentation/src/index.ts"
+      ],
+      "@ubve/io-demux": [
+        "../../packages/io-demux/src/index.ts"
+      ],
+      "@ubve/wasm-adapters": [
+        "../../packages/wasm-adapters/src/index.ts"
+      ],
+      "@ubve/native-bridge": [
+        "../../packages/native-bridge/src/index.ts"
+      ],
+      "@ubve/disc": [
+        "../../packages/disc/src/index.ts"
+      ]
+    },
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "tests/**/*.ts"
+  ]
+}
