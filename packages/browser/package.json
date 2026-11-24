@@ -3,6 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "dependencies": { "@ubve/core": "0.0.0" }
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@ubve/core": "0.0.0",
+    "@ubve/io-demux": "0.0.0",
+    "@ubve/wasm-adapters": "0.0.0",
+    "@ubve/native-bridge": "0.0.0",
+    "@ubve/presentation": "0.0.0"
+  }
 }
