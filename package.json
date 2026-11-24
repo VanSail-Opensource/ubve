@@ -19,7 +19,8 @@
     "build": "tsc -b packages/core packages/testkit packages/browser packages/io-demux --pretty false",
     "test:unit": "npm run build && node --test test/*.test.mjs",
     "test": "npm run check && npm run test:unit",
-    "test:io": "tsc -b packages/io-demux --pretty false && node --test test/io-demux.test.mjs"
+    "test:io": "tsc -b packages/io-demux --pretty false && node --test test/io-demux.test.mjs",
+    "test:http": "tsc -b packages/io-demux --pretty false && node --test test/http-source.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
