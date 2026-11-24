@@ -32,7 +32,9 @@ execution is deferred in this environment.
   (zero pthread children) and validating descriptor/bitmap extents. WASM bytes are
   unchanged. The generated manifest binds all workers, WASM and bundled font
   hashes. Attached fonts are preflighted; remote lookup and local font permission
-  prompts are disabled. Missing families are visible, not silently called exact.
+  prompts are disabled. The worker receives the bounded bundled fallback font
+  before readiness so the first cue cannot depend on a background font reload.
+  Missing families are visible, not silently called exact.
 - Native WebVTT is used with the native-video clock. Managed playback admits a
   separate basic text profile: timing, line breaks, b/i/u and alignment. CSS,
   regions, vertical writing and richer WebVTT markup are refused in that profile.
