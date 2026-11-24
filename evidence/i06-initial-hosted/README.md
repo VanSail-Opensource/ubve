@@ -1,0 +1,5 @@
+# I06 first hosted Chromium attempt
+
+[GitHub Actions browser candidate job](https://github.com/VanSail-Opensource/ubve/actions/runs/45507997332/job/138848089319) executed the draft implementation in Chromium headless 151.0.7922.34. It passed the separate real-time AudioWorklet starvation/reprime/tail/disposal test and failed the short integrated 720p60 AV1/TrueHD/ASS test with `BACKPRESSURE` / `Managed audio underrun recovery budget exhausted`. The native/GPU/physical and sustained gates were not executed.
+
+The committed JSON files are byte-for-byte copies of the two test records from [artifact 14975185223](https://github.com/VanSail-Opensource/ubve/actions/runs/45507997332/artifacts/14975185223). The downloaded archive SHA-256 is `57db9925c43eb7931f3fc0d35845ab092e4583ffd308c6105bb34df68b194a55`. Startup reached `ready` with 60 ms of PCM buffered. The original harness did not capture diagnostics at the failure boundary, so sample/queue counters at failure are unknown. This failed trial is retained independently of future fixes or reruns.

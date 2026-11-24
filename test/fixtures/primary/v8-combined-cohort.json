@@ -1,0 +1,223 @@
+{
+  "schema": 1,
+  "sourceManifestSha256": "f8c1d9ed9e288b04a7d8c05c98835ea9e9d9f618194f2b37db37ee6c6b451911",
+  "scope": "Eight manifest-pinned untimed 48-picture AV1/HDR10+TrueHD+ASS fixture cases. Not sustained qualification.",
+  "cases": [
+    {
+      "id": "720p60",
+      "path": "combined-hdr10-av1-truehd-ass-1280x720-60fps-20M.mkv",
+      "sha256": "4e681a037ee5a4fdf57ac7512e702012d15b986133e27410e826c45fe76ad187",
+      "bytes": 4536776,
+      "video": {
+        "codec_name": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 1280,
+        "height": 720,
+        "r_frame_rate": "60/1",
+        "nb_read_frames": "48",
+        "sourceMeanMbps": 36.77025,
+        "nominalEncoderMbps": 20
+      },
+      "audio": {
+        "codec_name": "truehd",
+        "channels": 6,
+        "sample_rate": "48000",
+        "decoded_sample_frames": 38400
+      },
+      "subtitle": {
+        "codec_name": "ass",
+        "nb_read_frames": "24"
+      }
+    },
+    {
+      "id": "720p120",
+      "path": "combined-hdr10-av1-truehd-ass-1280x720-120fps-20M.mkv",
+      "sha256": "6098d42610c5ac3f67b918657da50aaef8d852956f3d62082d654b00838ff832",
+      "bytes": 2867266,
+      "video": {
+        "codec_name": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 1280,
+        "height": 720,
+        "r_frame_rate": "120/1",
+        "nb_read_frames": "48",
+        "sourceMeanMbps": 47.24094,
+        "nominalEncoderMbps": 20
+      },
+      "audio": {
+        "codec_name": "truehd",
+        "channels": 6,
+        "sample_rate": "48000",
+        "decoded_sample_frames": 19200
+      },
+      "subtitle": {
+        "codec_name": "ass",
+        "nb_read_frames": "24"
+      }
+    },
+    {
+      "id": "1080p60",
+      "path": "combined-hdr10-av1-truehd-ass-1920x1080-60fps-20M.mkv",
+      "sha256": "d4761862f39a348493d43b1a743b3ce562c1e18333e82b76f68170adbbde6e87",
+      "bytes": 4849019,
+      "video": {
+        "codec_name": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 1920,
+        "height": 1080,
+        "r_frame_rate": "60/1",
+        "nb_read_frames": "48",
+        "sourceMeanMbps": 39.89268,
+        "nominalEncoderMbps": 20
+      },
+      "audio": {
+        "codec_name": "truehd",
+        "channels": 6,
+        "sample_rate": "48000",
+        "decoded_sample_frames": 38400
+      },
+      "subtitle": {
+        "codec_name": "ass",
+        "nb_read_frames": "24"
+      }
+    },
+    {
+      "id": "1080p120",
+      "path": "combined-hdr10-av1-truehd-ass-1920x1080-120fps-20M.mkv",
+      "sha256": "8da3d675261cc830a9024b67f11aa7d4f08e4154a9c852b3b9230c15eddd2389",
+      "bytes": 2469713,
+      "video": {
+        "codec_name": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 1920,
+        "height": 1080,
+        "r_frame_rate": "120/1",
+        "nb_read_frames": "48",
+        "sourceMeanMbps": 39.28986,
+        "nominalEncoderMbps": 20
+      },
+      "audio": {
+        "codec_name": "truehd",
+        "channels": 6,
+        "sample_rate": "48000",
+        "decoded_sample_frames": 19200
+      },
+      "subtitle": {
+        "codec_name": "ass",
+        "nb_read_frames": "24"
+      }
+    },
+    {
+      "id": "1440p60",
+      "path": "combined-hdr10-av1-truehd-ass-2560x1440-60fps-20M.mkv",
+      "sha256": "ddcb752a0a4271c4f209c97228977f6fd5c82a1a87f07bb926c9c8c83dd70a93",
+      "bytes": 4638315,
+      "video": {
+        "codec_name": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 2560,
+        "height": 1440,
+        "r_frame_rate": "60/1",
+        "nb_read_frames": "48",
+        "sourceMeanMbps": 37.78564,
+        "nominalEncoderMbps": 20
+      },
+      "audio": {
+        "codec_name": "truehd",
+        "channels": 6,
+        "sample_rate": "48000",
+        "decoded_sample_frames": 38400
+      },
+      "subtitle": {
+        "codec_name": "ass",
+        "nb_read_frames": "24"
+      }
+    },
+    {
+      "id": "1440p120",
+      "path": "combined-hdr10-av1-truehd-ass-2560x1440-120fps-20M.mkv",
+      "sha256": "972223e7692c29a19f5c66f8cf7d19e3b92d03213cea9ae7b4cff069de6ffa36",
+      "bytes": 2065115,
+      "video": {
+        "codec_name": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 2560,
+        "height": 1440,
+        "r_frame_rate": "120/1",
+        "nb_read_frames": "48",
+        "sourceMeanMbps": 31.19792,
+        "nominalEncoderMbps": 20
+      },
+      "audio": {
+        "codec_name": "truehd",
+        "channels": 6,
+        "sample_rate": "48000",
+        "decoded_sample_frames": 19200
+      },
+      "subtitle": {
+        "codec_name": "ass",
+        "nb_read_frames": "24"
+      }
+    },
+    {
+      "id": "2160p60",
+      "path": "combined-hdr10-av1-truehd-ass-3840x2160-60fps-20M.mkv",
+      "sha256": "780b75ddaae839816f79b4f414285fd6e0ac19a03a8fb3afc437d8a0336a29dd",
+      "bytes": 3816980,
+      "video": {
+        "codec_name": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "r_frame_rate": "60/1",
+        "nb_read_frames": "48",
+        "sourceMeanMbps": 29.57229,
+        "nominalEncoderMbps": 20
+      },
+      "audio": {
+        "codec_name": "truehd",
+        "channels": 6,
+        "sample_rate": "48000",
+        "decoded_sample_frames": 38400
+      },
+      "subtitle": {
+        "codec_name": "ass",
+        "nb_read_frames": "24"
+      }
+    },
+    {
+      "id": "2160p120",
+      "path": "combined-hdr10-av1-truehd-ass-3840x2160-120fps-20M.mkv",
+      "sha256": "6a8ded77b2447b400d8726ee2587d0b2d0a6da63e93788430995746d58600af0",
+      "bytes": 1315359,
+      "video": {
+        "codec_name": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "r_frame_rate": "120/1",
+        "nb_read_frames": "48",
+        "sourceMeanMbps": 16.2028,
+        "nominalEncoderMbps": 20
+      },
+      "audio": {
+        "codec_name": "truehd",
+        "channels": 6,
+        "sample_rate": "48000",
+        "decoded_sample_frames": 19200
+      },
+      "subtitle": {
+        "codec_name": "ass",
+        "nb_read_frames": "24"
+      }
+    }
+  ]
+}

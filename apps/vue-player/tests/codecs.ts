@@ -1,3 +1,5 @@
+export {};
+
 // Development only: explicit capped fixture materialization is excluded from production source budgets.
 const button = document.querySelector<HTMLButtonElement>('#run')!;
 const status = document.querySelector<HTMLElement>('#status')!;
