@@ -47,6 +47,7 @@ export class SubtitleController {
   #status: SubtitleStatus = { state: 'off', renderer: 'none', requiresOverlay: false, rasterCap: null, eventCount: 0,
     fontCount: 0, fallbackFonts: [], diagnostics: [], qualification: 'NOT_QUALIFIED' };
   #ass: JASSUB | null = null;
+  #assDefaultFont: Promise<Uint8Array<ArrayBuffer>> | null = null;
   #assHeader = '';
   #imsc: typeof Imsc | null = null;
   #tt: Imsc.TTElement | null = null;
@@ -141,12 +142,20 @@ export class SubtitleController {
     const { default: Ass } = await import('jassub');
     const base = this.#options.assetBaseUrl ?? '/vendor/jassub/';
     const asset = (name: string): string => new URL(name, new URL(base, document.baseURI)).href;
+    // This JASSUB version otherwise fetches fallback font bytes only after a
+    // missing-glyph log, with no redraw when the request finishes. Require the
+    // bounded self-hosted font before the first truthful ready/draw result.
+    const initialFont = this.#assDefaultFont ??= loadBundledAssFont(asset('default.woff2'));
+    let defaultFont: Uint8Array<ArrayBuffer>;
+    try { defaultFont = await initialFont; }
+    catch (error) { if (this.#assDefaultFont === initialFont) this.#assDefaultFont = null; throw error; }
     const ownedFonts = fonts.map(font => ({ name: font.name, data: font.data.slice() }));
-    const availableFonts: Record<string, Uint8Array | string> = { 'liberation sans': asset('default.woff2') };
+    const availableFonts: Record<string, Uint8Array> = Object.create(null);
     for (const font of ownedFonts) for (const family of readFontFamilyNames(font.data)) availableFonts[family.toLowerCase()] = font.data;
-    const fallbackFonts = metadata.requestedFonts.filter(name => !availableFonts[name.toLowerCase()]);
+    const fallbackFonts = metadata.requestedFonts.filter(name => name.toLowerCase() !== 'liberation sans' && !availableFonts[name.toLowerCase()]);
     const canvas = document.createElement('canvas'); this.overlay.append(canvas); this.#canvas = canvas;
-    const instance = new Ass({ canvas, subContent: source, queryFonts: false, fonts: ownedFonts.map(font => font.data), availableFonts,
+    const instance = new Ass({ canvas, subContent: source, queryFonts: false, defaultFont: 'Liberation Sans',
+      fonts: [...ownedFonts.map(font => font.data), defaultFont], availableFonts,
       workerUrl: asset('worker.js'), wasmUrl: asset('jassub-worker.wasm'), modernWasmUrl: asset('jassub-worker-modern.wasm'),
       wasmWorkerUrl: asset('jassub-worker.js'), modernWasmWorkerUrl: asset('jassub-worker-modern.js'),
       libassMemoryLimit: 32, libassGlyphLimit: 10000, maxRenderHeight: this.#quality === 'performance' ? 1080 : 0 });
@@ -413,6 +422,7 @@ export class SubtitleController {
 
   async dispose(): Promise<void> {
     if (this.#disposed) return; this.#disposed = true; ++this.#generation;
+    this.#assDefaultFont = null;
     if (this.#callback !== null) this.video.cancelVideoFrameCallback(this.#callback);
     if (this.#raf !== null) cancelAnimationFrame(this.#raf);
     this.#observer.disconnect();
@@ -424,6 +434,29 @@ export class SubtitleController {
     const next = this.#serial.then(operation); this.#serial = next.catch(() => undefined); return next;
   }
   #update(patch: Partial<SubtitleStatus>): void { this.#status = Object.freeze({ ...this.#status, ...patch }); this.#options.onStatus?.(this.#status); }
+}
+
+async function loadBundledAssFont(url: string): Promise<Uint8Array<ArrayBuffer>> {
+  const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+  if (!response.ok || !response.body) throw new Error(`Bundled ASS fallback font unavailable (${response.status})`);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = []; let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > SUBTITLE_LIMITS.fontBytes) throw new Error('Bundled ASS fallback font exceeds the 4 MiB envelope');
+      chunks.push(value);
+    }
+  } catch (error) { await reader.cancel().catch(() => undefined); throw error; }
+  finally { reader.releaseLock(); }
+  const font = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { font.set(chunk, offset); offset += chunk.byteLength; }
+  if (size < 48 || font[0] !== 0x77 || font[1] !== 0x4f || font[2] !== 0x46 || font[3] !== 0x32
+    || new DataView(font.buffer).getUint32(8) !== size) throw new Error('Bundled ASS fallback is not a complete WOFF2 font');
+  return font;
 }
 
 function eventIndex(times: readonly number[], time: number): number {

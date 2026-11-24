@@ -113,11 +113,20 @@ try {
   assert.equal(imsc.status.renderer, 'imsc-2.0.0');
   assert.match(imsc.first, /Timed IMSC cue/); assert.match(imsc.second, /Next IMSC cue/);
   assert.doesNotMatch(imsc.second, /Timed IMSC cue/);
+  const missingBundledFont = await page.evaluate(async fixture => {
+    const { SubtitleController } = await import('/presentation.js');
+    const subtitles = new SubtitleController({ video: document.querySelector('video'), overlay: document.querySelector('#overlay'),
+      assetBaseUrl: '/intentionally-missing-subtitle-assets/' });
+    try { await subtitles.load({ kind: 'ass', data: fixture }); return { state: 'unexpected-ready', message: '' }; }
+    catch (error) { return { state: subtitles.getStatus().state, message: error.message }; }
+    finally { await subtitles.dispose(); }
+  }, assFixture);
+  assert.equal(missingBundledFont.state, 'failed'); assert.match(missingBundledFont.message, /Bundled ASS fallback font unavailable/);
   assert.equal(errors.length, 0, errors.join('\n'));
   const evidence = { schema: 'ubve-presentation-browser-v1', recordedAt: new Date().toISOString(),
     status: 'COMPONENT_VERIFIED', qualifiedPlayback: false, gpuExecuted: false, nativeDecoderExecuted: false,
     scope: 'Real muted AudioWorklet, JASSUB screenshot witness across cue end/backward seek, and IMSC text update. No native-reference subtitle pixel fidelity, physical audio or combined player qualification.',
-    result, subtitles: { ass: { status: subtitleStatus, activeScreenshotSha256: assActive, afterEndScreenshotSha256: assAfterEnd, afterSeekScreenshotSha256: assAfterSeek }, imsc } };
+    result, subtitles: { ass: { status: subtitleStatus, activeScreenshotSha256: assActive, afterEndScreenshotSha256: assAfterEnd, afterSeekScreenshotSha256: assAfterSeek, missingBundledFont }, imsc } };
   await mkdir('evidence', { recursive: true }); await writeFile('evidence/presentation-browser.json', JSON.stringify(evidence, null, 2) + '\n');
   console.log('Real AudioWorklet, ASS raster and IMSC timed-cue checks passed.');
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }
