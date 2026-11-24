@@ -14,8 +14,10 @@ export abstract class BoundedSource implements RandomAccessSource {
   readonly #active = new Set<Promise<unknown>>();
   readonly #abort = new AbortController();
   #shutdown: Promise<void> | null = null;
+  #invalidated: EngineError | null = null;
   constructor(options: SourceOptions = {}) {
     const maximum = options.maxReadBytes ?? 32 * 1024 * 1024;
+    if (options.maxConcurrentReads !== undefined && (!Number.isSafeInteger(options.maxConcurrentReads) || options.maxConcurrentReads < 1)) throw new EngineError('INVALID_ARGUMENT', 'Invalid source concurrency limit');
     this.maxConcurrentReads = options.maxConcurrentReads ?? 2;
     this.ledger = new BudgetLedger({ bytes: byteLength(options.maxOwnedBytes ?? 64 * 1024 * 1024), items: 256, maxSingleItemBytes: byteLength(maximum) });
   }
@@ -45,7 +47,8 @@ export abstract class BoundedSource implements RandomAccessSource {
     catch (error) { reservation.release(); throw error; }
     finally { this.#active.delete(work); this.stats.activeReads--; }
   }
-  protected invalidate(reason: EngineError): void { this.closed = true; this.#abort.abort(reason); }
+  assertReadable(): void { if (this.closed) throw this.#invalidated ?? new EngineError('DISPOSED', 'Source has been closed'); }
+  protected invalidate(reason: EngineError): void { this.#invalidated = reason; this.closed = true; this.#abort.abort(reason); }
   close(): Promise<void> {
     if (this.#shutdown) return this.#shutdown;
     this.closed = true; this.#abort.abort(new EngineError('DISPOSED', 'Source closed'));
@@ -106,6 +109,7 @@ export class SourceCache {
     // Serial copies ensure eviction cannot release a page another read is borrowing.
     const run = async () => {
       if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed while parser read was queued');
+      if (this.source instanceof BoundedSource) this.source.assertReadable();
       checkOperation(operation, browserScheduler);
       const reservation = this.#results.tryReserve(byteLength(end - start));
       if (!reservation) throw new EngineError('BACKPRESSURE', 'Parser read-result ownership exceeds 64 MiB', 'retry-when-capacity');
@@ -120,6 +124,7 @@ export class SourceCache {
       }
       checkOperation(operation, browserScheduler);
       if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed before parser result delivery');
+      if (this.source instanceof BoundedSource) this.source.assertReadable();
       return OwnedLease.adopt<Uint8Array>(reservation, result);
       } catch (error) { reservation.release(); throw error; }
     };

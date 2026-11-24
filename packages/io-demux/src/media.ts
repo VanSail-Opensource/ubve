@@ -1,11 +1,12 @@
 import { ALL_FORMATS, CustomSource, EncodedPacketSink, Input, type InputTrack } from 'mediabunny';
 import { BudgetLedger, EngineError, OwnedLease, byteLength, byteRange, sessionStamp, timeBase, type EncodedPacket, type RandomAccessSource, type SessionStamp } from '@ubve/core';
 import { BlobSource, SourceCache } from './source.js';
+import { HttpRangeSource } from './http.js';
 import { operationContext } from './operations.js';
 import { preflightMetadata, type MetadataPreflight } from './preflight.js';
 import { matroskaPackets, readMatroskaMetadata, type MatroskaMetadata, type MatroskaTrack, type MediaAttachment } from './matroska.js';
 
-export type MediaInput = Blob | RandomAccessSource;
+export type MediaInput = Blob | { readonly url: string } | RandomAccessSource;
 export interface MediaTrack {
   readonly id: string; readonly kind: 'video' | 'audio' | 'subtitle'; readonly codec: string; readonly codecString: string | null;
   readonly language: string; readonly name: string | null; readonly default: boolean; readonly forced: boolean;
@@ -100,7 +101,7 @@ const MKV_CODECS: Record<string, string> = { V_AV1: 'av1', V_VP9: 'vp9', V_VP8: 
 export async function openMedia(value: MediaInput, options: OpenMediaOptions = {}): Promise<MediaSourceSession> {
   const stamp = options.stamp ?? sessionStamp(crypto.randomUUID(), 0), signal = options.signal; let count = 0;
   const op = () => operationContext(stamp, `open-${++count}`, signal, 10000);
-  const source = value instanceof Blob ? new BlobSource(value) : value;
+  const source = value instanceof Blob ? new BlobSource(value) : 'url' in value ? await HttpRangeSource.open(value.url, op()) : value;
   const cache = new SourceCache(source, options.cacheBytes);
   let input: Input | null = null;
   try {
