@@ -10,3 +10,4 @@ export * from './packet.js';
 export * from './output.js';
 export * from './codec.js';
 export * from './session.js';
+export * from './metadata.js';
