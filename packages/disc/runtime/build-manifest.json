@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.0 (afa15e0c56d1292e073c2c91bafc1d5e0cdf0dd3)",
+  "sources": {
+    "libudfread": {
+      "version": "1.2.0",
+      "url": "https://download.videolan.org/pub/videolan/libudfread/libudfread-1.2.0.tar.xz",
+      "sha512": "e3ed8dc7fab472ad382b1b6cd068f1dc0084c34e5ec2c460c1dd84fa14a9d368c4d7af08a23efc5057e7f021f5812222c01247d5f304632716c94fc8c689a1a2"
+    },
+    "libbluray": {
+      "version": "1.5.0",
+      "url": "https://download.videolan.org/pub/videolan/libbluray/1.5.0/libbluray-1.5.0.tar.xz",
+      "sha256": "f676408e91a5d321abf8b8d4dfdae36205c297dab5c54c3ec519639025f474a2"
+    },
+    "toolchain": {
+      "emscripten": "6.0.0",
+      "emsdkTagCommit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+      "emscriptenRevision": "afa15e0c56d1292e073c2c91bafc1d5e0cdf0dd3",
+      "meson": "1.10.0",
+      "ninja": "1.13.0"
+    },
+    "patches": [
+      "Replace dl_posix.c with no-dynamic-loading.c: no decryptor/JVM/dlopen resolution",
+      "Replace Meson thread dependency with declare_dependency for one synchronous owning Worker; no pthread pool"
+    ],
+    "profile": "read-only-local-udf-linear-angle0",
+    "qualification": "UNQUALIFIED"
+  },
+  "shimSha256": "a86ef524640b75ab080be9b9c65e7ec39c83de7da20fb8b49908286c1dcaa7fd",
+  "patches": [
+    {
+      "path": "packages/disc/native/no-dynamic-loading.c",
+      "upstreamPath": "src/file/dl_posix.c",
+      "sha256": "257881c4068874f855c0381aaf589b2b8449b3a4597c56f63b35fd396d30520c"
+    },
+    {
+      "path": "packages/disc/native/no-persistent-properties.c",
+      "upstreamPath": "src/libbluray/disc/properties.c",
+      "sha256": "ef2fd645649f5437c09537b5c96b788fc01be58ad61e3f68d2ea851f014db21e"
+    }
+  ],
+  "assets": [
+    {
+      "path": "packages/disc/runtime/ubve-disc.mjs",
+      "bytes": 36042,
+      "sha256": "97354574707f73ee6d68b636a63abda8da22679877c4f302678e898f4d426e44"
+    },
+    {
+      "path": "packages/disc/runtime/ubve-disc.wasm",
+      "bytes": 114814,
+      "sha256": "92fd445d419e9ad11f37a415f8540d5c0d9282896a907796e7a9df0759989833"
+    }
+  ],
+  "memoryMaximumBytes": 134217728,
+  "pthreadPoolSize": 0,
+  "assertions": true,
+  "publicAbiAudit": "unminified WASM imports and exports",
+  "qualification": "UNQUALIFIED"
+}
