@@ -1,0 +1,11 @@
+{
+  "case_id": "implementation-N1-performance-120",
+  "mode": "performance-120",
+  "route": "N1",
+  "evidence_class": "proposal",
+  "validity": "unverified",
+  "trials": [],
+  "qualification": "NOT_QUALIFIED",
+  "implementation_status": "DEFERRED_NOT_QUALIFIED",
+  "execution_policy": "deferred-native-gpu-by-user"
+}

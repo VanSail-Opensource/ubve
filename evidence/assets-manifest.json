@@ -1,0 +1,107 @@
+{
+  "schema": "ubve-built-assets-v1",
+  "integrity": "VERIFIED_BUILD_ASSETS",
+  "qualification": "NOT_QUALIFIED",
+  "files": [
+    {
+      "path": "av1/av1-atomic.wasm",
+      "bytes": 844881,
+      "sha256": "9a3048be7f159a6e8976349045a296c7c14a5a3d91f4e2cf52e42c2214025a63"
+    },
+    {
+      "path": "av1/dav1d.worker.js",
+      "bytes": 124271,
+      "sha256": "adda7863211d0fec12625b22594d78b62b4139c8eb3837f5a4c02e152b36f0db"
+    },
+    {
+      "path": "av1/WebAssemblyRunnerWorker.js",
+      "bytes": 78793,
+      "sha256": "3ff6b1522a06d8385e2429179a91f43c4412632333705d3f4e4c287981322043"
+    },
+    {
+      "path": "codecs-manifest.json",
+      "bytes": 1030,
+      "sha256": "086c4453e45edb19c89da8885e26327783f5f1a34c5aaae7e71dd2fa2fa7f64b"
+    },
+    {
+      "path": "disc/build-manifest.json",
+      "bytes": 1882,
+      "sha256": "a5039d96be3247430bea2fce8e92f6488cda1dfc8c146f60a70d06b4a1ac9bd6"
+    },
+    {
+      "path": "disc/disc-worker.mjs",
+      "bytes": 6283,
+      "sha256": "d54e62b582a758a77367ef3f4d11348646d45bc1b873266c022ad9bf86bc9646"
+    },
+    {
+      "path": "disc/ubve-disc.mjs",
+      "bytes": 36371,
+      "sha256": "de7c7bd9621e4f4f750105d037d995a9b3715cf9b69a9b3d547bee82ed030fd7"
+    },
+    {
+      "path": "disc/ubve-disc.wasm",
+      "bytes": 115814,
+      "sha256": "6040c470f0a46c2918970ad1afe0ad13fcc3b580655f5fcb6f379fee6e09add5"
+    },
+    {
+      "path": "flac.worker.js",
+      "bytes": 269042,
+      "sha256": "8edfe2bd841e97cf2b012cf49062027f7eb93d5babd9a56e81d08d9dda981b43"
+    },
+    {
+      "path": "jassub/default.woff2",
+      "bytes": 145972,
+      "sha256": "886929903707c5bb28b07cd2eed69921b3d5ef5c49c73a0dd1e187ebf6546a4c"
+    },
+    {
+      "path": "jassub/IMSC-LICENSE",
+      "bytes": 1322,
+      "sha256": "81bbb080c29a28aa09fa9a6343de035c5ab272e8dd8dc07585b075557ae64a4c"
+    },
+    {
+      "path": "jassub/jassub-worker-modern.js",
+      "bytes": 83152,
+      "sha256": "46707ef34e97e49282c80bd079206514b7cb1700ba90340d9817767e259f8059"
+    },
+    {
+      "path": "jassub/jassub-worker-modern.wasm",
+      "bytes": 2198354,
+      "sha256": "8707827c9063ba67742a3d85e6b6062e55aee9ac01395831b5c94d1b12d0f612"
+    },
+    {
+      "path": "jassub/jassub-worker.js",
+      "bytes": 80424,
+      "sha256": "ef9e38e7b4cdd7eb13eb6be40319048bef00c8225c263525c47d0f93962c0a21"
+    },
+    {
+      "path": "jassub/jassub-worker.wasm",
+      "bytes": 2054361,
+      "sha256": "314197e1d0ea9baca8b8605247f02a61789fd835c700c2d426de2d872829d3ab"
+    },
+    {
+      "path": "jassub/LICENSE",
+      "bytes": 1167,
+      "sha256": "f300758600ecf59b736407f80f6dc8338a9879a062c6bcb16cc739d14814ec75"
+    },
+    {
+      "path": "jassub/worker.js",
+      "bytes": 125160,
+      "sha256": "72f33d5d6fc3272eea23021fba7709cc0863b28c956f63d1d44817ed8f729429"
+    },
+    {
+      "path": "presentation-manifest.json",
+      "bytes": 2087,
+      "sha256": "0468e65f2afc424df03bb5f4607a19b3c065144d4ddee2f3553e4f785d77f0e7"
+    },
+    {
+      "path": "truehd.worker.js",
+      "bytes": 604716,
+      "sha256": "3fa0dc0059531678080b4f35198b5ceec59c42e223e5fe14ef239a4e212cf11d"
+    },
+    {
+      "path": "ubve/pcm-worklet.js",
+      "bytes": 10617,
+      "sha256": "9a12bd5bc614d129c5e13a92107d9a2eed3c0a4946a7e9074496bb48626e495d"
+    }
+  ]
+}

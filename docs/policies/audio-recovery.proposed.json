@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-production-integration; isolated-protocol-v2-tested",
+  "sampleRate": 48000,
+  "channelLabels": [
+    "L",
+    "R"
+  ],
+  "blockFrames": 960,
+  "primeFrames": 9600,
+  "lowWaterFrames": 4800,
+  "capacityFrames": 15360,
+  "poolBlocks": 16,
+  "minimumFutureAnchorMs": 50,
+  "lateAnchorRetries": 1,
+  "rebuffer": {
+    "maximumRecoveries": 2,
+    "windowMs": 30000,
+    "primeMs": 200,
+    "onExhaustion": "render-budget-error"
+  },
+  "supervisor": {
+    "maximumRecoveriesPerOpen": 6,
+    "readyDeadlineMs": 5000,
+    "maximumDeclaredResolutionFallbacks": 1,
+    "fallbackMustAlreadyBeQualified": true,
+    "automaticReturnToFailedHigherProfile": false,
+    "fallbackFailureIsTerminal": true
+  },
+  "protocol": {
+    "version": 1,
+    "transport": "dedicated-feeder-worker-direct-message-port-transferable-pool",
+    "sharedRing": "separate-disabled-until-qualified-lane",
+    "primeFirstVideoFrameBeforeSchedulingAudio": true,
+    "playResolvesOn": "actual-started-ack-not-schedule-ack",
+    "pauseResolvesOn": "stopped-ack-with-next-expected-media-sample",
+    "underrun": "stop-consumption-in-worklet-and-latch-until-new-epoch",
+    "resumePosition": "next-expected-media-sample",
+    "clockWhileStarved": "frozen-media-independent-of-advancing-graph",
+    "validEndOfStream": "explicit-exact-final-media-sample-not-underrun",
+    "quantumLength": "observed-per-process-call-not-hardcoded"
+  },
+  "runtimeSink": "default-user-output; experiment-silent-sink-is-not-product-default"
+}

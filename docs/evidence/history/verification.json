@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-24T12:35:18.437044+00:00",
+  "evidenceClass": "IMPLEMENTATION_CORRECTNESS_ONLY",
+  "toolchain": {
+    "node": "24.22.3",
+    "npm": "11.19.1",
+    "typescript": "5.9.3"
+  },
+  "attempts": [
+    {
+      "command": "npm install --ignore-scripts --no-audit --no-fund",
+      "exitCode": 0,
+      "result": "installed one pinned external development dependency plus three workspace links; lockfile generated"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 2,
+      "log": "validation-attempt1.log",
+      "result": "strict type check found typed-array generic invariance at two OwnedLease.adopt calls; fixed by explicit payload generic parameters without loosening strictness"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "log": "validation.log",
+      "checks": [
+        "strict core compilation without DOM/Node",
+        "workspace TypeScript check",
+        "TypeScript AST import boundaries",
+        "project-reference JS/declaration build",
+        "Node unit/race tests"
+      ],
+      "tests": {
+        "total": 17,
+        "passed": 17,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "testRunnerDurationMs": 117.389659
+    },
+    {
+      "command": "npm ci --ignore-scripts --no-audit --no-fund",
+      "exitCode": 0,
+      "log": "validation-clean-install-v7.log",
+      "recordedAtUtc": "2026-11-24T12:35:13.956962+00:00"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "log": "validation-final-v7.log",
+      "recordedAtUtc": "2026-11-24T12:35:18.436784+00:00",
+      "tests": {
+        "tests": 23,
+        "pass": 23,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "limits": [
+    "No actual media codec or complete player is implemented by this starter.",
+    "The fake codec and manual clock establish contract invariants only.",
+    "Unit test duration is runner metadata, not playback or throughput evidence.",
+    "Budget ledger covers explicitly adopted resources, not all JS/WASM/browser allocations.",
+    "Marker codec tests do not exercise true media-delayed/EOS-only output or asynchronously pending provider reset/shutdown; I03 adds those conformance fixtures.",
+    "Final boundary regression tests inspect type imports and package aliases/relative targets; newly introduced packages must extend the integrator-owned package graph."
+  ],
+  "validatedSourceSha256": {
+    "package-lock.json": "18836bd5a378cf864888ad1c5888423d248faf6bb1d51b66f48bd899fd9f36ca",
+    "package.json": "3eb5ce023ef535f0f65216b5b4f2919ed7c7ecb1e1375605383aec5dc279c7ee",
+    "packages/browser/package.json": "1fb1813737b67255ce492f47707ce281b6f6956955b0753bc60e79901e625f54",
+    "packages/browser/src/index.ts": "95b974a4d64ebd602a98f4b9e7e05518d00a86ea2ee4375e61fbfa93c2983dea",
+    "packages/browser/tsconfig.json": "d25ff379542a498448dd8d2d528f0870d83f0865410a053d2f52286f1dd038bd",
+    "packages/core/package.json": "963c4addd2d17219c7278f834928340260794ed92a6ecc6b108a066d8ef8b7a2",
+    "packages/core/src/codec.ts": "07d92243733a6de83a24641c570686c6ba45c753cd01d9af281f3b2bd759f9ba",
+    "packages/core/src/epoch.ts": "5b8d32c705b68d9e5c650856cf887a350532ebd105a8a3316c912069e25e6070",
+    "packages/core/src/errors.ts": "c48a77a6b3905b2223baff889ebbb55bc4152cb62ae3c5e5b6fb422d664a47ae",
+    "packages/core/src/index.ts": "fce3a31c44d94d84fbaff36ac23463fd540446cbb67fe13656c675430fa969da",
+    "packages/core/src/operation.ts": "47b0c424b75c21ca8518868037a0814866aadae9c0e171a1b3b6fdfe8be1168f",
+    "packages/core/src/output.ts": "3515e24e8557f319ba6b865b2454dc894b0bb65b1c73fbbbdd752de4ed9e9b58",
+    "packages/core/src/ownership.ts": "87c461938cd33a942a308f703a1da741b0bfe458cb74801a965c8e234c120fed",
+    "packages/core/src/packet.ts": "18b5f7c732f743490566b48759281146e87634601255ad744c75da083c3b2ec9",
+    "packages/core/src/queue.ts": "a6600ecd289b7cad4d01cf2b4bb54a49ae55cf8afe0b688d8a34c8c389add19f",
+    "packages/core/src/session.ts": "1ac618ccc7501ded6d12e8c088f8f962cc758cc617ae6f8a524774440915e418",
+    "packages/core/src/source.ts": "1ab3985e8810b102cd0dc79a57ebc5e890a2c001cb5e251347c7ce99ede5a538",
+    "packages/core/src/timeline.ts": "4e88d5859a9ebb81bf2c3f9f9fc5ba06701f9f0ff7c9fdf1ab39c1522301509f",
+    "packages/core/src/units.ts": "931fb15622991440848565e2996bc7c40f9d27da0e8feaba4ae4035ccbe0acdd",
+    "packages/core/tsconfig.json": "1e43ae450133307ff0a59047e7d3355541b0860fefa249be504c70cd0184768c",
+    "packages/testkit/package.json": "5a1b79952cc432306a03ea7f68bd500d678e81285faaa3c85cf49cdbc6c011ed",
+    "packages/testkit/src/fake-codec.ts": "1424d1563e40eac08a9553a0bdb850c640612602b52420c8137bda4f03164f45",
+    "packages/testkit/src/index.ts": "c3076708e84bd9fcdff0461cd6eb3228d166338d773156229c444c59d5038920",
+    "packages/testkit/src/manual-scheduler.ts": "1f164c919d01cc813b4c04c3ddf06588052d4ca34744cd83219e48fd761fb626",
+    "packages/testkit/src/memory-source.ts": "a2446b253c34aad1f5f1d8a4ca23266733881d1c045f59d1dde0a1e1e6b61a8b",
+    "packages/testkit/tsconfig.json": "fbfb2bcc601cff4bbc13160493efa20c8996b77b7445c7b14ee1d3bc4e97896f",
+    "scripts/check-boundaries.mjs": "7f8829744ba7f3f1985757ee52388183829cf08d26d615bb5c6bb1f1a76d9e26",
+    "test/boundaries.test.mjs": "8d990fb3c331b30b6d9eba975e712008bedf45bf861fb4691fdc03c69d275c99",
+    "test/contracts.test.mjs": "03fb4983b3c23facc1d0c06a862b1df83dbb0434da0fc6582efc1008f0a77f03",
+    "tsconfig.base.json": "dd4c46a7141b18c5fad9d5a8334cb745aadcef5907ec8fdaced69d3e28e7045f",
+    "tsconfig.check.json": "756dabc93b9ad0f91e81bf63d5cde938316d9f46048988477fa619666c8bb4e9"
+  },
+  "postValidationDocumentationEdits": [
+    {
+      "path": "packages/core/src/session.ts",
+      "beforeSha256": "1ac618ccc7501ded6d12e8c088f8f962cc758cc617ae6f8a524774440915e418",
+      "afterSha256": "b1deb0a5608a88498c89e70ce892aecb2a259796d835cfc0fe91b4205a7732f5",
+      "scope": "Comment-only clarification of preserved seek intent and start acknowledgement; no signatures or executable statements changed. The validated source map retains the exact tested bytes."
+    }
+  ]
+}

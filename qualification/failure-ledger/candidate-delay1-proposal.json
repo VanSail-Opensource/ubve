@@ -1,0 +1,16 @@
+{
+  "component": "libmedia-av1-wasm",
+  "binary_sha256": "8764bd672a8999ed311b41814b09f62c0633d7c991d6489d1d6e2479286adb7e",
+  "variant": "simd",
+  "threads": 4,
+  "decoder_options": {
+    "max_frame_delay": 1
+  },
+  "runtime_id": "@libmedia/cheap@1.3.1;@libmedia/common@2.3.0",
+  "pixel_format": "yuv420p10le",
+  "adapter_cohort_sha256": "ebaac54626454b94746594643653740223f94521eabc5e5609efd3d9468c32df",
+  "fixture_sha256": "f3e940e21f5748d9d2e49392912fb91622fae6779bb23da79054639027edd1d3",
+  "fixture_name": "av1-hdr10-pattern-1280x720-120fps-limited-textured-20M.mkv",
+  "evidence_status": "PROPOSED_SETTING_NOT_EXECUTED_BY_THIS_HELPER_AUTHOR",
+  "decoder_options_consumed": false
+}

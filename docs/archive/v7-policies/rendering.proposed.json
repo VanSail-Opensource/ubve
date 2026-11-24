@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-unqualified-render-policy",
+  "candidateOrder": [
+    "canvas-raw-videoframe",
+    "webgl2-qualified-raw-planes",
+    "canvas-q16-qualified-sdr"
+  ],
+  "attemptRules": {
+    "newCanvasForEveryAttempt": true,
+    "maximumAttemptsPerCandidatePerOpen": 1,
+    "completeFailureLedger": true,
+    "disposeFailedContextAndResourcesBeforeNextAttempt": true,
+    "requireExactFormatAndColorProbe": true,
+    "apiAvailabilityIsQualification": false,
+    "firstFrameSubmittedBeforeAudioAnchor": true,
+    "physicalPresentationClaimFromDrawReturn": false
+  },
+  "sourceColor": {
+    "missingMetadata": "reject-unless-explicit-caller-source-interpretation-override",
+    "overrideFieldsRequired": [
+      "primaries",
+      "transfer",
+      "matrix",
+      "range"
+    ],
+    "recordOriginalAndOverride": true,
+    "overrideDiagnosticVisible": true,
+    "assumeBt709FromResolution": false,
+    "benchmarkFixtureOverrideIsProductionConformance": false
+  },
+  "initialFormat": {
+    "pixelFormat": "I422P10",
+    "progressive": true,
+    "sampleAspectRatio": "1:1",
+    "rotationDegrees": 0,
+    "inputColor": {
+      "primaries": "bt709",
+      "transfer": "bt709",
+      "matrix": "bt709",
+      "range": "limited"
+    },
+    "output": "8-bit-sRGB-Canvas-with-declared-browser-conversion"
+  },
+  "layoutChecks": [
+    "checked-coded-dimensions",
+    "checked-plane-strides-and-rows",
+    "nonoverlapping-valid-plane-extents",
+    "visible-rect-in-coded-bounds",
+    "10-bit-sample-range",
+    "required-format-and-color-metadata"
+  ],
+  "rawVideoFrame": {
+    "constructorInput": "copy-without-transfer",
+    "closeAfterDrawInFinally": true,
+    "maximumApplicationOpenHandles": 1,
+    "browserInternalCopiesAndGpuBytes": "unknown-unless-separately-measured",
+    "chromaFilter": "browser-selected-not-claimed-nearest"
+  },
+  "q16": {
+    "enabledInProduction": false,
+    "maximumRgb8DifferenceFromExactFloatingBaseline": 1,
+    "toleranceAppliesToBrowserVideoFrameConversion": false
+  },
+  "webgl": {
+    "enabledFromCurrentEvidence": false,
+    "gpuTiming": "asynchronous-query-only-when-supported; invalidate-all-pending-on-disjoint",
+    "hardwareGpuClaimFromContextSuccess": false
+  },
+  "optionalOutputResolutionFallback": {
+    "enabledByDefault": false,
+    "maximumVisibleWidth": 1920,
+    "maximumVisibleHeight": 1080,
+    "requiresExplicitPolicyAndQualifiedRendererProfile": true,
+    "sourceDecodePrecisionAndChannelSemanticsUnchanged": true
+  }
+}

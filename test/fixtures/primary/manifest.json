@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "path": "test/fixtures/primary/combined-720p60.mkv",
+  "sha256": "4e681a037ee5a4fdf57ac7512e702012d15b986133e27410e826c45fe76ad187",
+  "bytes": 4536776,
+  "origin": "User-supplied v8 media11 current combined fixture, not historical snapshot",
+  "video": {
+    "codec_name": "av1",
+    "profile": "Main",
+    "pix_fmt": "yuv420p10le",
+    "width": 1280,
+    "height": 720,
+    "r_frame_rate": "60/1",
+    "nb_read_frames": "48",
+    "color_range": "tv",
+    "color_space": "bt2020nc",
+    "color_transfer": "smpte2084",
+    "color_primaries": "bt2020"
+  },
+  "audio": {
+    "codec_name": "truehd",
+    "sample_rate": "48000",
+    "channels": 6,
+    "channel_layout": "5.1(side)",
+    "bits_per_raw_sample": "24"
+  },
+  "subtitle": {
+    "codec_name": "ass",
+    "nb_read_frames": "24"
+  },
+  "scope": "0.8-second correctness/startup fixture; not sustained qualification or 120fps source"
+}

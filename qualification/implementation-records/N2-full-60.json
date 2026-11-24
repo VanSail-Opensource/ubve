@@ -1,0 +1,11 @@
+{
+  "case_id": "implementation-N2-full-60",
+  "mode": "full-60",
+  "route": "N2",
+  "evidence_class": "proposal",
+  "validity": "unverified",
+  "trials": [],
+  "qualification": "NOT_QUALIFIED",
+  "implementation_status": "DEFERRED_NOT_QUALIFIED",
+  "execution_policy": "deferred-native-gpu-by-user"
+}

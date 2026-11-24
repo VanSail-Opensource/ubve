@@ -1,0 +1,54 @@
+{
+  "name": "ubve",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": ">=24.12.0 <25",
+    "npm": ">=11 <12"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "check": "npm run check:types && npm run check:boundaries",
+    "check:types": "tsc -p packages/core --noEmit --pretty false && npm run build:packages && tsc -p packages/presentation/tsconfig.worklet.json --pretty false && vue-tsc -p apps/vue-player/tsconfig.json --noEmit --pretty false",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "build": "npm run build:packages && npm run build:assets && npm run build -w @ubve/vue-player",
+    "test:unit": "npm run build:packages && node --test test/*.test.mjs",
+    "test": "npm run check && npm run test:unit && npm run test:qualification",
+    "build:packages": "tsc -b packages/core packages/testkit packages/io-demux packages/wasm-adapters packages/native-bridge packages/presentation packages/disc packages/browser --pretty false",
+    "build:assets": "node scripts/build-codecs.mjs && node scripts/prepare-presentation-assets.mjs && node scripts/prepare-disc-assets.mjs && python3 scripts/generate-support.py && node scripts/check-assets.mjs",
+    "dev": "npm run build:assets && npm run dev -w @ubve/vue-player",
+    "test:qualification": "python3 -m unittest discover -s qualification -p 'test_*.py' -v",
+    "test:disc": "tsc -b packages/disc --pretty false && node --test test/disc.test.mjs",
+    "test:pipeline:browser": "node test/pipeline-browser.mjs",
+    "test:presentation:browser": "node test/presentation-browser.mjs",
+    "check:assets": "node scripts/check-assets.mjs",
+    "support:generate": "python3 scripts/generate-support.py",
+    "release:check": "python3 scripts/generate-support.py --require-release"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/node": "24.10.1",
+    "@vitejs/plugin-vue": "6.0.11",
+    "@webgpu/types": "0.1.74",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.8",
+    "vue-tsc": "3.3.14"
+  },
+  "dependencies": {
+    "@libmedia/avutil": "1.3.1",
+    "@libmedia/cheap": "1.3.1",
+    "@libmedia/common": "2.3.0",
+    "@mediabunny/flac-encoder": "1.66.4",
+    "@mediabunny/truehd": "1.66.4",
+    "imsc": "2.0.0",
+    "jassub": "2.5.38",
+    "mediabunny": "1.66.4",
+    "vue": "3.5.46"
+  }
+}

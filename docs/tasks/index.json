@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 2,
+  "canonicalNamespace": "I00-I12",
+  "date": "2026-11-24",
+  "tasks": [
+    {
+      "id": "I00",
+      "card": "I00-bootstrap.md",
+      "dependsOn": [],
+      "status": "historical-v7-bootstrap-validated; v8-documentation-only"
+    },
+    {
+      "id": "I01",
+      "card": "I01-contracts.md",
+      "dependsOn": [
+        "I00"
+      ],
+      "status": "historical-helpers-validated; v8-media-descriptor-migrations-pending"
+    },
+    {
+      "id": "I02",
+      "card": "I02-source-demux.md",
+      "dependsOn": [
+        "I01"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "I03",
+      "card": "I03-codecs.md",
+      "dependsOn": [
+        "I01"
+      ],
+      "status": "pending",
+      "primary": "AV1-dav1d-and-conventional-TrueHD-owned-adapters"
+    },
+    {
+      "id": "I04",
+      "card": "I04-presentation.md",
+      "dependsOn": [
+        "I01"
+      ],
+      "status": "pending-isolated-protocol-evidence-exists"
+    },
+    {
+      "id": "I05",
+      "card": "I05-player-ui.md",
+      "dependsOn": [
+        "I02",
+        "I03",
+        "I04"
+      ],
+      "status": "pending-common-container-prototype-exists"
+    },
+    {
+      "id": "I06",
+      "card": "I06-browser-evidence.md",
+      "dependsOn": [
+        "I05"
+      ],
+      "status": "pending-integrated-player"
+    },
+    {
+      "id": "I07",
+      "card": "I07-http.md",
+      "dependsOn": [
+        "I02"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "I08",
+      "card": "I08-native-remux.md",
+      "dependsOn": [
+        "I01",
+        "I02"
+      ],
+      "status": "priority-implementation-design; native-GPU-qualification-deferred",
+      "n2DependsOn": [
+        "I03"
+      ]
+    },
+    {
+      "id": "I09",
+      "card": "I09-cinema.md",
+      "dependsOn": [
+        "I05"
+      ],
+      "status": "pending-source-selected-disabled",
+      "componentStartDependsOn": [
+        "I01"
+      ],
+      "primarySubset": "ASS/PGS and exact selected channel/output contracts; player completion depends on I05"
+    },
+    {
+      "id": "I10",
+      "card": "I10-index-disc.md",
+      "dependsOn": [
+        "I02",
+        "I09"
+      ],
+      "status": "pending-index-subpart-may-start-after-I02"
+    },
+    {
+      "id": "I11",
+      "card": "I11-optimization.md",
+      "dependsOn": [
+        "I06"
+      ],
+      "status": "pending-integrated-player"
+    },
+    {
+      "id": "I12",
+      "card": "I12-release.md",
+      "dependsOn": [
+        "I06",
+        "I11"
+      ],
+      "status": "pending"
+    }
+  ],
+  "conditionalReleaseDependencies": {
+    "http": [
+      "I07"
+    ],
+    "cinema": [
+      "I09"
+    ],
+    "local-disc-and-large-index": [
+      "I10"
+    ],
+    "native": [
+      "I08"
+    ],
+    "primary-required-subtitles": [
+      "I09"
+    ]
+  },
+  "nativeBranchBlocksManaged": false,
+  "revision": "v8-source-only-migration",
+  "productionPlayerImplemented": false,
+  "historicalCoreTests": 23,
+  "nativePriorityDoesNotMeanNativeQualification": true,
+  "conditionalReleaseEvidenceRequirements": {
+    "native": "Exact native/device/output evidence is required for activation and deferred by the user in this work.",
+    "primary-required-subtitles": "The selected primary subset of I09 is required in I05/I06; unrelated optional cinema providers do not delay that subset."
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "status": "source-selection-not-production-support",
+  "defaultLoaderRule": "Reject unless binarySha256 and ABI identity are recorded and an exact input/output/environment profile has qualifying evidence. Experimental harness evidence alone does not populate production qualifiedProfiles.",
+  "providers": [
+    {
+      "id": "mediabunny-demux",
+      "version": "1.66.4",
+      "sourceStatus": "component-experiment-used",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I02"
+    },
+    {
+      "id": "turbores-prores",
+      "version": "1.2.6",
+      "sourceStatus": "component-and-browser-experiment-used; owned-adapter-pending",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I03"
+    },
+    {
+      "id": "mediabunny-ac3",
+      "version": "1.66.4",
+      "sourceStatus": "component-and-browser-experiment-used; owned-factory-patch-pending",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I03"
+    },
+    {
+      "id": "mediabunny-dts",
+      "version": "1.66.4",
+      "sourceRevision": "2953e86300eb0b086a7e7e4aeaa0d9afd345339e",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09"
+    },
+    {
+      "id": "mediabunny-truehd",
+      "version": "1.66.4",
+      "sourceRevision": "2953e86300eb0b086a7e7e4aeaa0d9afd345339e",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09"
+    },
+    {
+      "id": "libav-legacy-and-pgs",
+      "version": "6.10.9.0",
+      "sourceRevision": "c80e885c3461f7bb7ea565c9631b34243ae0dbf1",
+      "ffmpegVersion": "9.0",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09",
+      "toolchain": "emscripten-6.0.0"
+    },
+    {
+      "id": "jassub",
+      "version": "2.5.14",
+      "sourceRevision": "275384767f22f3ee4866614b6a33c33b1e08b554",
+      "npmIntegrity": "sha512-r50p9+SwC+A/I5/5qWFpuo7mpY+b16SiUyykWwjTuiLqwuSiUds9HEFrBUE1a1VjidqS2XtHfUwhGJz3Zm7nYQ==",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09",
+      "toolchain": "upstream-emscripten-6.0.4"
+    },
+    {
+      "id": "libudfread",
+      "version": "1.2.0",
+      "sourceSha512": "e3ed8dc7fab472ad382b1b6cd068f1dc0084c34e5ec2c460c1dd84fa14a9d368c4d7af08a23efc5057e7f021f5812222c01247d5f304632716c94fc8c689a1a2",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I10",
+      "toolchain": "emscripten-6.0.0"
+    },
+    {
+      "id": "libbluray",
+      "version": "1.5.0",
+      "sourceSha256": "f676408e91a5d321abf8b8d4dfdae36205c297dab5c54c3ec519639025f474a2",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I10",
+      "toolchain": "emscripten-6.0.0"
+    },
+    {
+      "id": "libsamplerate",
+      "version": "0.2.2",
+      "sourceRevision": "c96f5e3de9c4488f4e6c97f59f5245f22fda22f7",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09",
+      "toolchain": "emscripten-6.0.0"
+    },
+    {
+      "id": "libiamf-research",
+      "version": "2.0.1",
+      "sourceRevision": "63cafdd9b2d7bdba08cfeec2f008718198d7362e",
+      "oarRevision": "a7a5cc890ee088e71ff6dc13628e6e7fe74a1481",
+      "sourceStatus": "research-disabled",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I12",
+      "toolchain": "emscripten-6.0.0"
+    }
+  ],
+  "unselected": [
+    "second-general-ffmpeg-wasm-stack",
+    "libmedia",
+    "moving-ffmpeg-head",
+    "unqualified-dtsx-height-renderer",
+    "automatic-joc-or-truehd-object-rendering",
+    "remote-iso",
+    "native-decryption-or-menu-runtime"
+  ]
+}

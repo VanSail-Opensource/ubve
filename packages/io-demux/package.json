@@ -1,0 +1,16 @@
+{
+  "name": "@ubve/io-demux",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@ubve/core": "0.0.0",
+    "mediabunny": "1.66.4"
+  }
+}

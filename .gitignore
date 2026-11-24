@@ -1,0 +1,13 @@
+node_modules/
+**/dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.local/
+.env
+.env.*
+!*.example
+apps/vue-player/public/vendor/
+
+__pycache__/
+*.pyc
