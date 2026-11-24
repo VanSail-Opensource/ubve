@@ -1,0 +1,17 @@
+{
+  "name": "@ubve/presentation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@ubve/core": "0.0.0",
+    "jassub": "2.5.38",
+    "imsc": "2.0.0"
+  }
+}

@@ -16,16 +16,19 @@
     "check": "npm run check:types && npm run check:boundaries",
     "check:types": "tsc -p packages/core --noEmit --pretty false && npm run build",
     "check:boundaries": "node scripts/check-boundaries.mjs",
-    "build": "tsc -b packages/core packages/testkit packages/browser packages/io-demux --pretty false",
+    "build": "tsc -b packages/core packages/testkit packages/browser packages/io-demux packages/presentation --pretty false && tsc -p packages/presentation/tsconfig.worklet.json --pretty false",
     "test:unit": "npm run build && node --test test/*.test.mjs",
     "test": "npm run check && npm run test:unit",
     "test:io": "tsc -b packages/io-demux --pretty false && node --test test/io-demux.test.mjs",
-    "test:http": "tsc -b packages/io-demux --pretty false && node --test test/http-source.test.mjs"
+    "test:http": "tsc -b packages/io-demux --pretty false && node --test test/http-source.test.mjs",
+    "build:presentation": "node scripts/prepare-presentation-assets.mjs",
+    "test:presentation:browser": "node test/presentation-browser.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
     "@types/node": "24.10.1",
     "@vitejs/plugin-vue": "6.0.11",
+    "@webgpu/types": "0.1.74",
     "esbuild": "0.28.2",
     "typescript": "5.9.3",
     "vite": "8.3.8",

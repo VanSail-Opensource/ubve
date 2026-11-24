@@ -21,3 +21,22 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
+  browser-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm run build:presentation
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:presentation:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-candidate-evidence
+          path: evidence/
