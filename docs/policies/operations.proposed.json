@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-engineering-defaults-not-measured-targets",
+  "deadlineMs": {
+    "localRead": 5000,
+    "httpHeaders": 10000,
+    "httpCompleteAttempt": 30000,
+    "moduleInitialization": 10000,
+    "workerStartup": 5000,
+    "decoderOrdinaryOperation": 2000,
+    "rebufferReady": 5000,
+    "indexedSeek": 10000,
+    "gracefulShutdown": 1000,
+    "terminationCompletion": 1000
+  },
+  "httpRetry": {
+    "maximumAttempts": 3,
+    "delaysBeforeAttemptsMs": [
+      0,
+      200,
+      800
+    ],
+    "retryable": [
+      "transient-transport",
+      "http-5xx"
+    ],
+    "notRetryable": [
+      "authentication",
+      "cors",
+      "malformed-range",
+      "truncated-success",
+      "source-changed",
+      "cancelled"
+    ],
+    "respectOriginalOperationDeadline": true
+  },
+  "operationRules": {
+    "checkDeadlineBeforeWork": true,
+    "checkDeadlineAtCompletion": true,
+    "sameOperationSettlesOnce": true,
+    "cancelUnderlyingWorkWhereSupported": true,
+    "releaseStaleResults": true,
+    "resetInvalidatesSynchronously": true,
+    "disposeInvalidatesSynchronously": true,
+    "maximumEquivalentStateRebuildsPerOpen": 1
+  }
+}

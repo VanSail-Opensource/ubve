@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 2,
+  "date": "2026-11-24",
+  "status": "proposed-unqualified-profile-selection-not-runtime-config",
+  "historicalProfiles": "docs/archive/v7-policies/managed-profiles.proposed.json; no automatic v8 promotion",
+  "primaryProfile": {
+    "video": "AV1 Main/Profile0 10-bit",
+    "pixelFormat": "I420P10 with exact16-bit storage",
+    "hdr": "genuine PQ/BT.2020 HDR10 with actual static metadata",
+    "audio": "conventional TrueHD channel PCM, exact original rate/precision/layout",
+    "subtitles": [
+      "ASS required when selected",
+      "PGS only after its own exact adapter/profile passes"
+    ],
+    "containers": [
+      "exact admitted Matroska",
+      "native-accepted fMP4 after qualified remux/FLAC bridge"
+    ],
+    "resolutions": [
+      [
+        1280,
+        720
+      ],
+      [
+        1920,
+        1080
+      ],
+      [
+        2560,
+        1440
+      ],
+      [
+        3840,
+        2160
+      ]
+    ],
+    "modes": [
+      "full-60",
+      "performance-120"
+    ],
+    "qualifiedProfiles": []
+  },
+  "route": {
+    "priority": [
+      "N0",
+      "N1",
+      "N2",
+      "C0",
+      "N3",
+      "C1"
+    ],
+    "allowUnqualifiedRemux": false,
+    "productionRequiresQualifiedProfile": true,
+    "nativeGpuExecutionDeferred": true,
+    "qualityChangingFallbackByDefault": false,
+    "equivalentStateRebuildsPerOpen": 1
+  },
+  "resourceAdmission": {
+    "perEndpointEnvelopeBytes": null,
+    "nullEnvelopeAllowsProduction": false,
+    "hardWasmHeapCapClaimWithoutAdapterEnforcement": false,
+    "opaqueBrowserGpuStorage": "record separately as unknown or justified estimate",
+    "countUniqueBackingStores": true,
+    "reserveBeforeAllocation": true,
+    "decoderReferenceStorageIncluded": true,
+    "workerCounts": "Count coordinator, all decoder/subtitle children, idle pools and retained application runtimes; requested codec thread count is not the worker total"
+  },
+  "proposedSourceLimits": {
+    "maximumTracks": 32,
+    "maximumContainerDepth": 32,
+    "maximumUnpagedMoovBytes": 16777216,
+    "maximumAggregateExpandedTableEntries": 262144,
+    "ordinaryCompressedPacketItems": 128,
+    "exceptionalAccessUnitBytes": 33554432,
+    "exceptionalAccessUnitAdmission": "one exclusive packet after ordinary queue drain and global reservation; larger extreme tuples require a separately admitted profile",
+    "maximumLocalSourceCacheBytes": 8388608
+  },
+  "outputAccounting": {
+    "maximumApplicationFrameSlotsIncludingInFlight": 3,
+    "actualStridesUsedForBytes": true,
+    "correctnessHashBufferOutsidePerformance": "Temporarily adds a full canonical plane buffer; never claim it is free",
+    "sixChannelTransportExample": {
+      "blockFrames": 960,
+      "poolBlocks": 12,
+      "channels": 6,
+      "bytesPerScalar": 4,
+      "transportBytes": 276480,
+      "excludes": "decoder heaps, encoded source, producer/reference buffers and runtime objects"
+    },
+    "flacAggregationSampleFrames": 4096,
+    "flacAggregationIsFixedUniversalOptimum": false
+  },
+  "performanceTransformCandidates": {
+    "subtitleRasterCapAt4K": [
+      1920,
+      1080
+    ],
+    "videoOutputDownscale": "Explicitly declared per profile; does not automatically reduce source AV1 entropy/reference decoding",
+    "temporalDropsAllowedToClaim120": false,
+    "forcedSubtitleOmissionAllowed": false
+  },
+  "extremeCases": "Source validity/native absence/automatic demux/decoded fidelity/streaming performance are separate records. NUT FFV1+TrueHD and AVI+ASS are not invented into validity.",
+  "admissionRule": "Exact profile, artifact and budget must exist before production activation. These proposed controls cannot guarantee all valid bitrates, resolutions, codec profiles or subtitle programs."
+}

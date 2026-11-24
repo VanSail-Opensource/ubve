@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-engineering-defaults-not-runtime-config",
+  "date": "2026-11-24",
+  "units": "bytes and sample frames; MiB = 1048576 bytes",
+  "profiles": [
+    {
+      "status": "proposed-unqualified",
+      "sourceKinds": [
+        "local-file",
+        "local-blob"
+      ],
+      "containerProfiles": [
+        "progressive-mov-prores-ac3",
+        "progressive-mov-prores-eac3"
+      ],
+      "video": {
+        "codec": "prores-422-hq",
+        "inputPixelFormat": "I422P10",
+        "maximumFramesPerSecond": 30,
+        "progressiveOnly": true,
+        "sampleAspectRatio": "1:1",
+        "orientationDegrees": 0,
+        "color": {
+          "primaries": "bt709",
+          "transfer": "bt709",
+          "matrix": "bt709",
+          "range": "limited"
+        },
+        "output": "declared-8bit-srgb-canvas",
+        "maximumVisibleWidth": 1920,
+        "maximumVisibleHeight": 1080,
+        "maximumCodedWidth": 1920,
+        "maximumCodedHeight": 1088
+      },
+      "audio": {
+        "codecs": [
+          "ac3",
+          "eac3"
+        ],
+        "sampleRate": 48000,
+        "channelLabels": [
+          "L",
+          "R"
+        ],
+        "pcmFormat": "f32-interleaved"
+      },
+      "workers": {
+        "ceiling": 7,
+        "withoutCustomSubtitle": 6,
+        "withOneCustomSubtitle": 7,
+        "audioWorkletProcessors": 1,
+        "videoDecoderChildren": 2,
+        "roles": {
+          "ioDemuxAndAdmittedLocalDiscOwner": 1,
+          "audioFeederHost": 1,
+          "nestedAudioCodec": 1,
+          "videoCoordinatorHost": 1,
+          "nestedTurboResDecoders": 2,
+          "optionalAssOrPgsHost": 1
+        },
+        "chooseFromHardwareConcurrency": false
+      },
+      "selectedTracks": {
+        "video": 1,
+        "audio": 1,
+        "subtitle": 1
+      },
+      "metadata": {
+        "maximumTracks": 32,
+        "maximumContainerDepth": 32,
+        "maximumUnpagedMoovBytes": 16777216,
+        "maximumAggregateExpandedTableEntries": 262144,
+        "countAllExpandedTablesBeforeUpstreamConstruction": true
+      },
+      "queues": {
+        "compressedPacketItems": 128,
+        "exceptionalAccessUnitBytes": 33554432,
+        "exceptionalAccessUnitAdmission": "one-exclusive-after-ordinary-queue-drain-and-global-budget-reservation",
+        "rawVideoFramesIncludingInFlight": 3,
+        "rawAudioQueueBytes": 262144,
+        "pcmBlockFramesAt48000": 960,
+        "pcmPoolBlocks": 16,
+        "pcmLowWaterFramesAt48000": 4800,
+        "pcmTargetFramesAt48000": 9600,
+        "pcmCapacityFramesAt48000": 15360,
+        "compressedQueueBytes": 8388608,
+        "rawVideoQueueBytes": 33554432
+      },
+      "io": {
+        "localCacheBytes": 8388608,
+        "maximumConcurrentRemoteReads": 2,
+        "remoteCacheBytesWhenI07Qualified": 16777216
+      },
+      "diagnostics": {
+        "visibleSnapshotsPerSecond": 3,
+        "automaticUploads": false
+      },
+      "route": {
+        "allowNative": false,
+        "allowUnqualifiedRemux": false,
+        "productionRequiresQualifiedProfile": true,
+        "equivalentStateRebuildsPerOpen": 1,
+        "qualityChangingFallbackByDefault": false
+      },
+      "id": "managed-hd-256",
+      "envelopeBytes": 268435456,
+      "unallocatedReserveBytes": 33554432,
+      "maximumExplicitAndModeledReservationsBytes": 234881024
+    },
+    {
+      "status": "proposed-unqualified",
+      "sourceKinds": [
+        "local-file",
+        "local-blob"
+      ],
+      "containerProfiles": [
+        "progressive-mov-prores-ac3",
+        "progressive-mov-prores-eac3"
+      ],
+      "video": {
+        "codec": "prores-422-hq",
+        "inputPixelFormat": "I422P10",
+        "maximumFramesPerSecond": 30,
+        "progressiveOnly": true,
+        "sampleAspectRatio": "1:1",
+        "orientationDegrees": 0,
+        "color": {
+          "primaries": "bt709",
+          "transfer": "bt709",
+          "matrix": "bt709",
+          "range": "limited"
+        },
+        "output": "declared-8bit-srgb-canvas",
+        "maximumVisibleWidth": 3840,
+        "maximumVisibleHeight": 2160,
+        "maximumCodedWidth": 4096,
+        "maximumCodedHeight": 2304
+      },
+      "audio": {
+        "codecs": [
+          "ac3",
+          "eac3"
+        ],
+        "sampleRate": 48000,
+        "channelLabels": [
+          "L",
+          "R"
+        ],
+        "pcmFormat": "f32-interleaved"
+      },
+      "workers": {
+        "ceiling": 7,
+        "withoutCustomSubtitle": 6,
+        "withOneCustomSubtitle": 7,
+        "audioWorkletProcessors": 1,
+        "videoDecoderChildren": 2,
+        "roles": {
+          "ioDemuxAndAdmittedLocalDiscOwner": 1,
+          "audioFeederHost": 1,
+          "nestedAudioCodec": 1,
+          "videoCoordinatorHost": 1,
+          "nestedTurboResDecoders": 2,
+          "optionalAssOrPgsHost": 1
+        },
+        "chooseFromHardwareConcurrency": false
+      },
+      "selectedTracks": {
+        "video": 1,
+        "audio": 1,
+        "subtitle": 1
+      },
+      "metadata": {
+        "maximumTracks": 32,
+        "maximumContainerDepth": 32,
+        "maximumUnpagedMoovBytes": 16777216,
+        "maximumAggregateExpandedTableEntries": 262144,
+        "countAllExpandedTablesBeforeUpstreamConstruction": true
+      },
+      "queues": {
+        "compressedPacketItems": 128,
+        "exceptionalAccessUnitBytes": 33554432,
+        "exceptionalAccessUnitAdmission": "one-exclusive-after-ordinary-queue-drain-and-global-budget-reservation",
+        "rawVideoFramesIncludingInFlight": 3,
+        "rawAudioQueueBytes": 262144,
+        "pcmBlockFramesAt48000": 960,
+        "pcmPoolBlocks": 16,
+        "pcmLowWaterFramesAt48000": 4800,
+        "pcmTargetFramesAt48000": 9600,
+        "pcmCapacityFramesAt48000": 15360,
+        "compressedQueueBytes": 16777216,
+        "rawVideoQueueBytes": 134217728
+      },
+      "io": {
+        "localCacheBytes": 8388608,
+        "maximumConcurrentRemoteReads": 2,
+        "remoteCacheBytesWhenI07Qualified": 33554432
+      },
+      "diagnostics": {
+        "visibleSnapshotsPerSecond": 3,
+        "automaticUploads": false
+      },
+      "route": {
+        "allowNative": false,
+        "allowUnqualifiedRemux": false,
+        "productionRequiresQualifiedProfile": true,
+        "equivalentStateRebuildsPerOpen": 1,
+        "qualityChangingFallbackByDefault": false
+      },
+      "id": "managed-4k-screen-512",
+      "envelopeBytes": 536870912,
+      "unallocatedReserveBytes": 67108864,
+      "maximumExplicitAndModeledReservationsBytes": 469762048
+    }
+  ],
+  "additionalExtensionProfile": {
+    "id": "legacy-extension-1g",
+    "status": "proposed-unqualified",
+    "envelopeBytes": 1073741824,
+    "unallocatedReserveBytes": 134217728,
+    "legacyDecoderHeapReservationBytes": 536870912,
+    "remainingForAllOtherReservationsBytes": 402653184,
+    "automaticExpansionFromManagedProfiles": false
+  },
+  "admissionRule": "Sum unique live explicit backing stores, granted worker/module reservations and declared estimates; fit below envelope minus reserve before allocation. Category maxima are not free additive allowances. Opaque browser/GPU heaps remain separately disclosed and do not become hard-bounded by this ledger."
+}

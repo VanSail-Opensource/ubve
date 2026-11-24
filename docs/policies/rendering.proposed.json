@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 2,
+  "date": "2026-11-24",
+  "status": "v8-proposed-output-policy-not-qualified",
+  "candidateOrder": [
+    "native-encoded-HDR-video-with-eligible-overlay",
+    "WebCodecs-plus-qualified-WebGPU",
+    "WASM-original-planes-plus-qualified-output",
+    "explicitly-declared-qualified-reduced-output"
+  ],
+  "nativeGpuExecution": "deferred-native-gpu-by-user",
+  "sourceColor": {
+    "primary": {
+      "primaries": "bt2020",
+      "transfer": "pq",
+      "matrix": "bt2020-ncl",
+      "range": "actual-source-range"
+    },
+    "staticMetadata": [
+      "mastering-display-rational-values",
+      "MaxCLL",
+      "MaxFALL"
+    ],
+    "missingMetadata": "unknown or conflicting until explicitly resolved; no silent BT709/PQ defaults",
+    "preserveOriginalAndOverride": true
+  },
+  "raw10Bit": {
+    "pixelFormat": "I420P10",
+    "storage": "little-endian16-bit elements containing10-bit values; not unchanged P010",
+    "bounds": [
+      "coded dimensions",
+      "visible rect",
+      "every plane offset/stride/extent",
+      "sample range",
+      "decode error flags"
+    ],
+    "sixteenBitArchivalSamples": "Keep original raw planes or declare precision reduction; no mislabeled I444P10",
+    "videoFrameStaticHdrMetadataInjection": "No standardized mastering/CLL/FALL fields; maintain engine descriptor"
+  },
+  "webgpu": {
+    "isFixedFunctionBitstreamDecoder": false,
+    "candidateFormat": "rgba16float",
+    "candidateColorSpace": "display-p3-linear where accepted",
+    "candidateToneMapping": "extended",
+    "acceptedConfigurationMustBeChecked": true,
+    "physicalHdrFromContextSuccess": false,
+    "externalTextureContainsUntouchedRawPlanes": false
+  },
+  "presentationModes": [
+    "inline",
+    "document-fullscreen",
+    "native-video-fullscreen",
+    "video-PiP",
+    "document-PiP"
+  ],
+  "requiredSubtitlesMustSurviveSelectedMode": true,
+  "attemptRules": {
+    "maximumAttemptsPerCandidatePerOpen": 1,
+    "newCanvasForEachCanvasAttempt": true,
+    "completeFailureLedger": true,
+    "disposeFailedResourcesBeforeNextAttempt": true,
+    "physicalPresentationFromSubmission": false,
+    "firstPictureBeforeManagedAudioStart": true
+  },
+  "qualityModes": {
+    "full-60": "Preserve source detail,10-bit samples,HDR mapping and required subtitle semantics",
+    "performance-120": "Named reference-validated transform; retain120 unique source pictures, exact decoded channel PCM and required subtitle content/timing"
+  },
+  "historicalSdrPolicy": "docs/archive/v7-policies/rendering.proposed.json; the old8-bit Canvas candidate is not full HDR10"
+}
