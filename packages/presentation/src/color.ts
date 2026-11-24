@@ -52,66 +52,112 @@ export interface RgbaTransform {
   readonly transform: 'sdr-bt709' | 'pq-bt2020-to-sdr';
 }
 
-/** Reference/fallback renderer, deliberately not advertised as 4K60. PQ output
- * uses one declared luminance-preserving Reinhard operator followed by gamut
- * clipping to sRGB. It is an explicit reduced-output transform, never full HDR. */
-export function rawToRgba(frame: RawPlaneFrame, options: { readonly allowSdrToneMap?: boolean; readonly maximumHeight?: number; readonly targetWhiteNits?: number } = {}): RgbaTransform {
+// Uniform Float64 transfer tables replace the nonlinear per-pixel power calls.
+// The scalar ST2084/sRGB functions above remain the reference. Interpolation
+// affects only explicitly reduced RGB8 output, not source planes or HDR routes.
+const TRANSFER_STEPS = 8192;
+let pqTable: Float64Array | undefined;
+let srgb8Table: Float64Array | undefined;
+function transferTable(transform: (value: number) => number): Float64Array {
+  return Float64Array.from({ length: TRANSFER_STEPS + 1 }, (_, i) => transform(i / TRANSFER_STEPS));
+}
+function sampleTransfer(table: Float64Array, value: number): number {
+  if (value <= 0) return table[0]!;
+  if (value >= 1) return table[TRANSFER_STEPS]!;
+  const position = value * TRANSFER_STEPS;
+  const index = Math.floor(position), low = table[index]!;
+  return low + (table[index + 1]! - low) * (position - index);
+}
+
+/** Bounded CPU fallback. PQ output uses a declared luminance-preserving
+ * Reinhard operator followed by clipping/quantization to sRGB. Transfer table
+ * interpolation is an RGB8 approximation and is never used for full HDR. The
+ * optional reuse buffer is caller-owned and overwritten only if it fits. */
+export function rawToRgba(frame: RawPlaneFrame, options: { readonly allowSdrToneMap?: boolean; readonly maximumHeight?: number; readonly targetWhiteNits?: number } = {},
+  reuse?: Uint8ClampedArray<ArrayBuffer>): RgbaTransform {
   validateRawFrame(frame);
+  const rect = frame.visibleRect, format = frame.format;
   const hdr = frame.color.transfer === 'pq' || frame.color.transfer === 'smpte2084';
   if (hdr && !options.allowSdrToneMap) throw new Error('Full HDR cannot be preserved by the SDR fallback renderer');
-  if (hdr && (frame.color.primaries !== 'bt2020' || frame.color.matrix !== 'bt2020-ncl')) throw new Error('PQ fallback requires explicitly declared BT.2020 nonconstant-luminance metadata');
-  if (!hdr && frame.format !== 'RGBA8' && (!['bt709', 'smpte170m', 'bt470bg'].includes(frame.color.matrix ?? '')
+  if (hdr && (format === 'RGBA8' || frame.color.primaries !== 'bt2020' || frame.color.matrix !== 'bt2020-ncl')) throw new Error('PQ fallback requires planar samples with explicitly declared BT.2020 nonconstant-luminance metadata');
+  if (!hdr && format !== 'RGBA8' && (!['bt709', 'smpte170m', 'bt470bg'].includes(frame.color.matrix ?? '')
     || !['bt709', 'smpte170m', 'iec61966-2-1', 'srgb'].includes(frame.color.transfer ?? ''))) throw new Error('Unknown SDR matrix/transfer needs an explicit interpretation');
-  if (frame.format !== 'RGBA8' && frame.color.range === null) throw new Error('Raw sample range is unknown');
+  if (format !== 'RGBA8' && frame.color.range === null) throw new Error('Raw sample range is unknown');
   const targetWhite = options.targetWhiteNits ?? 203;
   if (!Number.isFinite(targetWhite) || targetWhite < 80 || targetWhite > 500) throw new Error('Invalid SDR reference white');
-  const maximumHeight = options.maximumHeight ?? frame.visibleRect.height;
+  const maximumHeight = options.maximumHeight ?? rect.height;
   if (!Number.isSafeInteger(maximumHeight) || maximumHeight < 1) throw new Error('Invalid output raster cap');
-  const scale = Math.min(1, maximumHeight / frame.visibleRect.height);
-  const width = Math.max(1, Math.round(frame.visibleRect.width * scale));
-  const height = Math.max(1, Math.round(frame.visibleRect.height * scale));
-  const data = new Uint8ClampedArray(width * height * 4);
-  const high = frame.format !== 'I420P8' && frame.format !== 'RGBA8';
-  const depth = frame.format === 'I444P16' ? 16 : high ? 10 : 8;
-  const mul = 2 ** (depth - 8);
-  const max = 2 ** depth - 1;
-  const sample = (plane: number, x: number, y: number): number => {
-    const layout = frame.planes[plane]!;
-    const at = layout.offsetBytes + layout.strideBytes * y + x * (high ? 2 : 1);
-    return high ? frame.data[at]! | (frame.data[at + 1]! << 8) : frame.data[at]!;
-  };
-  for (let y = 0; y < height; y++) {
-    const sy = frame.visibleRect.y + Math.min(frame.visibleRect.height - 1, Math.floor((y + 0.5) / scale));
-    for (let x = 0; x < width; x++) {
-      const sx = frame.visibleRect.x + Math.min(frame.visibleRect.width - 1, Math.floor((x + 0.5) / scale));
-      const out = (y * width + x) * 4;
-      if (frame.format === 'RGBA8') {
-        const start = frame.planes[0]!.offsetBytes + sy * frame.planes[0]!.strideBytes + sx * 4;
-        for (let c = 0; c < 4; c++) data[out + c] = frame.data[start + c]!;
-        continue;
+  const scale = Math.min(1, maximumHeight / rect.height);
+  const width = Math.max(1, Math.round(rect.width * scale));
+  const height = Math.max(1, Math.round(rect.height * scale));
+  const size = width * height * 4;
+  const data = reuse?.byteLength === size && reuse.buffer !== frame.data.buffer ? reuse : new Uint8ClampedArray(size);
+  const src = frame.data, yPlane = frame.planes[0]!;
+  const sourceX = scale === 1 ? null : Uint16Array.from({ length: width }, (_, x) => rect.x + Math.min(rect.width - 1, Math.floor((x + 0.5) / scale)));
+
+  if (format === 'RGBA8') {
+    for (let y = 0; y < height; y++) {
+      const sy = rect.y + Math.min(rect.height - 1, Math.floor((y + 0.5) / scale));
+      const row = yPlane.offsetBytes + yPlane.strideBytes * sy;
+      let out = y * width * 4;
+      if (sourceX === null) data.set(src.subarray(row + rect.x * 4, row + (rect.x + width) * 4), out);
+      else for (let x = 0; x < width; x++) {
+        const at = row + sourceX[x]! * 4;
+        data[out++] = src[at]!; data[out++] = src[at + 1]!; data[out++] = src[at + 2]!; data[out++] = src[at + 3]!;
       }
-      const cx = frame.format === 'I444P16' ? sx : Math.floor(sx / 2);
-      const cy = frame.format === 'I422P10' || frame.format === 'I444P16' ? sy : Math.floor(sy / 2);
-      const limited = frame.color.range === 'limited';
-      const yy = limited ? (sample(0, sx, sy) - 16 * mul) / (219 * mul) : sample(0, sx, sy) / max;
-      const cb = (sample(1, cx, cy) - 128 * mul) / (limited ? 224 * mul : max);
-      const cr = (sample(2, cx, cy) - 128 * mul) / (limited ? 224 * mul : max);
-      const kr = hdr ? 0.2627 : frame.color.matrix === 'bt709' ? 0.2126 : 0.299;
-      const kb = hdr ? 0.0593 : frame.color.matrix === 'bt709' ? 0.0722 : 0.114;
-      let r = yy + 2 * (1 - kr) * cr;
-      let b = yy + 2 * (1 - kb) * cb;
-      let g = (yy - kr * r - kb * b) / (1 - kr - kb);
-      if (hdr) {
-        r = pqToNits(r) / targetWhite; g = pqToNits(g) / targetWhite; b = pqToNits(b) / targetWhite;
+    }
+    return { width, height, data, transform: 'sdr-bt709' };
+  }
+
+  const high = format !== 'I420P8', fullChromaWidth = format === 'I444P16';
+  const halfChromaHeight = format === 'I420P8' || format === 'I420P10';
+  const depth = fullChromaWidth ? 16 : high ? 10 : 8;
+  const mul = 2 ** (depth - 8), max = 2 ** depth - 1, limited = frame.color.range === 'limited';
+  const sampleBytes = high ? 2 : 1;
+  const yOffset = limited ? 16 * mul : 0, chromaOffset = 128 * mul;
+  const yDiv = limited ? 219 * mul : max, cDiv = limited ? 224 * mul : max;
+  const kr = hdr ? 0.2627 : frame.color.matrix === 'bt709' ? 0.2126 : 0.299;
+  const kb = hdr ? 0.0593 : frame.color.matrix === 'bt709' ? 0.0722 : 0.114;
+  const kg = 1 - kr - kb, crGain = 2 * (1 - kr), cbGain = 2 * (1 - kb);
+  const uPlane = frame.planes[1]!, vPlane = frame.planes[2]!;
+  const toNits = hdr ? (pqTable ??= transferTable(pqToNits)) : null;
+  const toSrgb8 = hdr ? (srgb8Table ??= transferTable(value => linearToSrgb(value) * 255)) : null;
+  for (let y = 0; y < height; y++) {
+    const sy = rect.y + Math.min(rect.height - 1, Math.floor((y + 0.5) / scale));
+    const cy = halfChromaHeight ? Math.floor(sy / 2) : sy;
+    const yRow = yPlane.offsetBytes + yPlane.strideBytes * sy;
+    const uRow = uPlane.offsetBytes + uPlane.strideBytes * cy;
+    const vRow = vPlane.offsetBytes + vPlane.strideBytes * cy;
+    let out = y * width * 4;
+    for (let x = 0; x < width; x++) {
+      const sx = sourceX === null ? rect.x + x : sourceX[x]!;
+      const cxBytes = (fullChromaWidth ? sx : Math.floor(sx / 2)) * sampleBytes;
+      const ya = yRow + sx * sampleBytes, ua = uRow + cxBytes, va = vRow + cxBytes;
+      // Both sample bytes are significant. Offsets remain checked Number
+      // arithmetic; only individual 16-bit little-endian samples use shifts.
+      const ySample = high ? src[ya]! | (src[ya + 1]! << 8) : src[ya]!;
+      const uSample = high ? src[ua]! | (src[ua + 1]! << 8) : src[ua]!;
+      const vSample = high ? src[va]! | (src[va + 1]! << 8) : src[va]!;
+      const yy = (ySample - yOffset) / yDiv, cb = (uSample - chromaOffset) / cDiv, cr = (vSample - chromaOffset) / cDiv;
+      let r = yy + crGain * cr, b = yy + cbGain * cb;
+      let g = (yy - kr * r - kb * b) / kg;
+      if (toNits && toSrgb8) {
+        r = sampleTransfer(toNits, r) / targetWhite;
+        g = sampleTransfer(toNits, g) / targetWhite;
+        b = sampleTransfer(toNits, b) / targetWhite;
         // ITU BT.2020 RGB -> BT.709 RGB in linear light.
         const rr = 1.660491 * r - 0.587641 * g - 0.07285 * b;
         const gg = -0.12455 * r + 1.1329 * g - 0.008349 * b;
         const bb = -0.018151 * r - 0.100579 * g + 1.11873 * b;
         const luminance = Math.max(0, 0.2126 * rr + 0.7152 * gg + 0.0722 * bb);
         const tone = 1 / (1 + luminance);
-        r = linearToSrgb(rr * tone); g = linearToSrgb(gg * tone); b = linearToSrgb(bb * tone);
+        data[out++] = Math.round(sampleTransfer(toSrgb8, rr * tone));
+        data[out++] = Math.round(sampleTransfer(toSrgb8, gg * tone));
+        data[out++] = Math.round(sampleTransfer(toSrgb8, bb * tone));
+      } else {
+        data[out++] = Math.round(r * 255); data[out++] = Math.round(g * 255); data[out++] = Math.round(b * 255);
       }
-      data[out] = Math.round(r * 255); data[out + 1] = Math.round(g * 255); data[out + 2] = Math.round(b * 255); data[out + 3] = 255;
+      data[out++] = 255;
     }
   }
   return { width, height, data, transform: hdr ? 'pq-bt2020-to-sdr' : 'sdr-bt709' };
