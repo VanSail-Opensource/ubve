@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UBVE packet codec evidence</title>
+<style>body{font:16px system-ui;max-width:960px;margin:40px auto;padding:0 24px;background:#10151f;color:#e5edf7}button{padding:12px 24px;font:inherit}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#1c2533;padding:20px}label{display:block;margin:16px 0}input{width:100%;padding:8px;box-sizing:border-box}</style>
+<h1>Packet codec evidence</h1>
+<p>This development harness disables native decoder entry points, reads the retained 720p60 combined fixture, and records exact software pixels and integer PCM. It checks component decoding, EOS, seek restart, and disposal. It does not establish browser playback performance or physical HDR/audio output.</p>
+<label>Fixture URL <input id="fixture" value="/__fixtures/combined-720p60.mkv"></label>
+<button id="run">Run software codec checks</button>
+<p id="status" role="status">Ready. The document requires cross-origin isolation.</p>
+<pre id="results">{ "status": "NOT_RUN" }</pre>
+<script type="module" src="./codecs.ts"></script></html>

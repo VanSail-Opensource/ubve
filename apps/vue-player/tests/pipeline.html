@@ -1,0 +1,5 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>UBVE managed pipeline evidence</title></head>
+<body><h1>Managed pipeline evidence</h1><p>Select the pinned short combined AV1/TrueHD/ASS fixture. This exercises an explicit SDR/stereo candidate and does not qualify full HDR or sustained 60/120 playback.</p>
+<label>Fixture <input id="fixture" type="file" accept=".mkv"></label><button id="run" type="button">Run managed pipeline</button>
+<div style="position:relative;width:640px;height:360px"><video id="video" playsinline style="width:100%;height:100%"></video><div id="overlay" style="position:absolute;inset:0;pointer-events:none"></div></div><pre id="result" aria-live="polite">Not run</pre>
+<script type="module" src="./pipeline.ts"></script></body></html>

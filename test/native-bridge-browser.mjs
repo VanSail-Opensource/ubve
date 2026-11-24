@@ -4,7 +4,13 @@ import { createServer } from 'vite';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-const fixture = JSON.parse(await readFile('test/fixtures/primary/manifest.json', 'utf8'));
+const fixture = JSON.parse(await readFile(process.env.UBVE_NATIVE_TEST_MANIFEST ?? 'test/fixtures/primary/manifest.json', 'utf8'));
+const expected = {
+  width: fixture.video.width, height: fixture.video.height, videoFrames: Number(fixture.video.nb_read_frames ?? 48),
+  subtitlePackets: Number(fixture.subtitle.nb_read_frames),
+  cueDurationsNs: fixture.subtitle.cueDurationsNs ?? ['800000000'],
+  pcmFrames: fixture.audio.decodedFrames ?? 38400,
+};
 const evidenceDirectory = process.env.UBVE_EVIDENCE_DIR ?? 'evidence';
 const evidencePath = join(evidenceDirectory, `native-bridge-browser-${new Date().toISOString().replaceAll(':', '-')}.json`);
 await mkdir(evidenceDirectory, { recursive: true });
@@ -33,9 +39,10 @@ try {
   assert.equal(record.status, 'SHORT_NATIVE_CANDIDATE_EXECUTED_NOT_QUALIFIED', JSON.stringify(record));
   assert.deepEqual(
     [record.initialPlayback.width, record.initialPlayback.height, record.initialPlayback.forwardedSubtitlePackets, record.initialPlayback.stats.pcmFrames],
-    [1280, 720, 24, 38400],
+    [expected.width, expected.height, expected.subtitlePackets, expected.pcmFrames],
   );
-  assert.ok(record.initialPlayback.totalVideoFrames > 0);
+  assert.equal(record.initialPlayback.totalVideoFrames, expected.videoFrames);
+  assert.deepEqual(record.initialPlayback.cueDurationsNs, expected.cueDurationsNs);
   assert.equal(record.initialPlayback.stats.heldBytes, 0);
   assert.equal(record.preloadRestored, true);
   console.log(`Native candidate evidence saved at ${evidencePath}; no strict gate, physical output or subtitle-render pass claimed.`);

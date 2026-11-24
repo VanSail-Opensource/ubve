@@ -28,6 +28,11 @@ The check does not establish physical speaker routing or subtitle composition.
 A browser smoke is available with `npm run build:assets`, followed by
 `node test/native-bridge-browser.mjs`. It records the exact combined MIME
 response, decoded readiness, reported frame counts and non-autoplay seek.
+Set `UBVE_NATIVE_TEST_MANIFEST` to check another compatible fixture. It must use
+the primary manifest's path/hash, video dimensions/frame count, subtitle
+packet count, and provide `audio.decodedFrames` and
+`subtitle.cueDurationsNs` when they differ from the default values. The
+fixture must contain the fixed 0.213-second seek target.
 Set `UBVE_CHROMIUM` to use an installed executable. For an authorized hosted
 browser, use `UBVE_CDP_URL` and set `UBVE_TEST_ORIGIN` to a reachable Vite test
 origin that serves the identical assets. The system Chromium build stopped at

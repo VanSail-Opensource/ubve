@@ -8,3 +8,9 @@ test-results/
 .env.*
 !*.example
 apps/vue-player/public/vendor/
+
+/evidence/assets-manifest.json
+/evidence/presentation-browser.json
+/evidence/disc-browser.json
+/evidence/pipeline-browser-*.json
+/evidence/native-bridge-browser-*.json
