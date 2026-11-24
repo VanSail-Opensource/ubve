@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>UBVE Native bridge candidate</title></head>
+<body>
+  <label>Exact AV1/TrueHD/ASS fixture <input id="fixture" type="file"></label>
+  <button id="run">Run native bridge candidate</button>
+  <video id="video" muted playsinline preload="metadata"></video>
+  <pre id="result" data-status="idle"></pre>
+  <script type="module" src="./native-bridge.ts"></script>
+</body>
+</html>
