@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -11,7 +12,11 @@ const bundle = outputFiles[0].contents;
 const server = createServer(async (request, response) => {
   response.setHeader('Cross-Origin-Opener-Policy', 'same-origin'); response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
   const url = new URL(request.url, 'http://127.0.0.1');
-  if (url.pathname === '/') { response.setHeader('Content-Type', 'text/html'); response.end('<!doctype html><html><body><h1>UBVE presentation checks</h1></body></html>'); return; }
+  if (url.pathname === '/') {
+    response.setHeader('Content-Type', 'text/html');
+    response.end('<!doctype html><html><body><h1>UBVE presentation checks</h1><div id="stage" style="position:relative;width:640px;height:360px;background:#000"><video playsinline></video><div id="overlay"></div></div></body></html>');
+    return;
+  }
   if (url.pathname === '/presentation.js') { response.setHeader('Content-Type', 'text/javascript'); response.end(bundle); return; }
   const asset = path.resolve(root, 'apps/vue-player/public', '.' + decodeURIComponent(url.pathname));
   if (!asset.startsWith(path.join(root, 'apps/vue-player/public') + path.sep)) { response.writeHead(403); response.end(); return; }
@@ -74,10 +79,45 @@ try {
   assert.equal(result.final.nextMediaSample, 1024); assert.equal(result.final.underruns, 1);
   assert.equal(result.paused, '10000'); assert.equal(result.disposed, 'closed');
   assert.equal(result.events.filter(e => e.type === 'disposed').length, 1);
+  const assFixture = await readFile('test/fixtures/sample.ass', 'utf8');
+  const subtitleStatus = await page.evaluate(async fixture => {
+    const { SubtitleController } = await import('/presentation.js');
+    const video = document.querySelector('video'), overlay = document.querySelector('#overlay');
+    const subtitles = new SubtitleController({ video, overlay });
+    window.__ubveSubtitleProbe = subtitles;
+    subtitles.setExternalClock(true);
+    await subtitles.load({ kind: 'ass', data: fixture });
+    return subtitles.getStatus();
+  }, assFixture);
+  assert.equal(subtitleStatus.renderer, 'jassub-2.5.38');
+  const capture = async time => {
+    await page.evaluate(async time => {
+      await window.__ubveSubtitleProbe.renderAt(time, 640, 360);
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }, time);
+    return createHash('sha256').update(await page.locator('#stage').screenshot({ animations: 'disabled' })).digest('hex');
+  };
+  const assActive = await capture(0.1), assAfterEnd = await capture(0.6), assAfterSeek = await capture(0.1);
+  assert.notEqual(assActive, assAfterEnd, 'Real ASS raster must differ during the cue');
+  assert.equal(assAfterSeek, assActive, 'Real ASS raster must restore on backward seek');
+  const ttml = '<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xml:lang="en"><head><layout><region xml:id="bottom" tts:origin="10% 65%" tts:extent="80% 25%"/></layout></head><body region="bottom"><div><p begin="0s" end="1s">Timed IMSC cue</p><p begin="1s" end="2s">Next IMSC cue</p></div></body></tt>';
+  const imsc = await page.evaluate(async ttml => {
+    const subtitles = window.__ubveSubtitleProbe, overlay = document.querySelector('#overlay');
+    try {
+      await subtitles.load({ kind: 'imsc', data: ttml });
+      await subtitles.renderAt(0.5, 640, 360); const first = overlay.textContent;
+      await subtitles.renderAt(1.5, 640, 360); const second = overlay.textContent;
+      return { first, second, status: subtitles.getStatus() };
+    } finally { await subtitles.dispose(); }
+  }, ttml);
+  assert.equal(imsc.status.renderer, 'imsc-2.0.0');
+  assert.match(imsc.first, /Timed IMSC cue/); assert.match(imsc.second, /Next IMSC cue/);
+  assert.doesNotMatch(imsc.second, /Timed IMSC cue/);
   assert.equal(errors.length, 0, errors.join('\n'));
   const evidence = { schema: 'ubve-presentation-browser-v1', recordedAt: new Date().toISOString(),
     status: 'COMPONENT_VERIFIED', qualifiedPlayback: false, gpuExecuted: false, nativeDecoderExecuted: false,
-    scope: 'Real AudioWorklet/transferable pool; controlled starvation, frozen media sample, new-epoch reprime, paused seek, exact EOS and graph disposal. Muted output; no physical audio or combined player qualification.', result };
+    scope: 'Real muted AudioWorklet, JASSUB screenshot witness across cue end/backward seek, and IMSC text update. No native-reference subtitle pixel fidelity, physical audio or combined player qualification.',
+    result, subtitles: { ass: { status: subtitleStatus, activeScreenshotSha256: assActive, afterEndScreenshotSha256: assAfterEnd, afterSeekScreenshotSha256: assAfterSeek }, imsc } };
   await mkdir('evidence', { recursive: true }); await writeFile('evidence/presentation-browser.json', JSON.stringify(evidence, null, 2) + '\n');
-  console.log('Real AudioWorklet checks passed: startup, starvation latch, late block, reprime, seek, EOS, disposal.');
+  console.log('Real AudioWorklet, ASS raster and IMSC timed-cue checks passed.');
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }
