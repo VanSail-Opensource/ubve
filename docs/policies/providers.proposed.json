@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 2,
+  "status": "v8-source-selection-and-component-evidence-not-production-support",
+  "defaultLoaderRule": "Reject production activation unless the exact owned artifact/ABI and input/output/environment profile have qualifying evidence. Existing component hashes, source selection and capability probes do not populate qualifiedProfiles. Browser-native routes record endpoint builds and application asset identity instead of inventing an opaque native-decoder binary hash.",
+  "providers": [
+    {
+      "id": "mediabunny-demux",
+      "version": "1.66.4",
+      "sourceStatus": "component-experiment-used",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I02"
+    },
+    {
+      "id": "libmedia-dav1d-av1",
+      "version": "1.3.1",
+      "sourceRevision": "152f629d3021fd8013efa464fcb7b55f9fbe7753",
+      "packages": {
+        "@libmedia/avcodec": "1.3.1",
+        "@libmedia/avformat": "1.3.1",
+        "@libmedia/avutil": "1.3.1",
+        "@libmedia/cheap": "1.3.1",
+        "@libmedia/common": "2.3.0"
+      },
+      "npmIntegrities": {
+        "@libmedia/avcodec": "sha512-NtuVxz2eANARdl/53P6sHma2NSrgtCiV08TQN5w2yNYrcaPWv61fxa23kHaVoYdWw+pzcbiNHGPIAM8Mt4+mQQ==",
+        "@libmedia/avformat": "sha512-pWvtbKvfxRcU5PPb6KWzphZkz4jeLxHU46hGTdEGdZvPLeiEcrTy94UEoF8pYQ4/CGqjQ5YL8hxjfEm2FyR9LQ==",
+        "@libmedia/avutil": "sha512-JIucrOKVKA5sacC3X21GxWTrO//QG0Vl665dLRvNWJZUH0Bb56jQWzVkcWKB8+JX8Dt74IidbwXJ1JsdyGSVSg==",
+        "@libmedia/cheap": "sha512-bCbYDCBinaVlaTy4vBjUoIJyCThK9JzVWEPZYZeJkHUxNKZ5g5BZ5hlft/nmS/c7ojaEyHMaRGOUNZ72nA7f6A==",
+        "@libmedia/common": "sha512-fD8v6oDs2EeD+/BU6jhsuPF5MTJx2f18+avhTB7gTgkpQDPzrgpCz6e8qHJDuWA+rbNQA89hwMTBOhzL6b8HEQ=="
+      },
+      "sourceStatus": "real-browser-CPU-component-experiment; production-adapter-pending",
+      "task": "I03",
+      "priority": "primary-managed-candidate",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "experimentalArtifacts": [
+        {
+          "variant": "atomic",
+          "source": "https://raw.githubusercontent.com/zhaohappy/libmedia/152f629d3021fd8013efa464fcb7b55f9fbe7753/dist/decode/av1-atomic.wasm",
+          "file": "wasm/av1-atomic.wasm",
+          "bytes": 844881,
+          "sha256": "9a3048be7f159a6e8976349045a296c7c14a5a3d91f4e2cf52e42c2214025a63",
+          "customSections": [
+            {
+              "name": "dylink.0"
+            }
+          ]
+        },
+        {
+          "variant": "simd",
+          "source": "https://raw.githubusercontent.com/zhaohappy/libmedia/152f629d3021fd8013efa464fcb7b55f9fbe7753/dist/decode/av1-simd.wasm",
+          "file": "wasm/av1-simd.wasm",
+          "bytes": 917671,
+          "sha256": "8764bd672a8999ed311b41814b09f62c0633d7c991d6489d1d6e2479286adb7e",
+          "customSections": [
+            {
+              "name": "dylink.0"
+            }
+          ]
+        }
+      ],
+      "abi": {
+        "codecIdAv1": 225,
+        "pixelFormatYuv420p10le": 62,
+        "receiveZeroConflates": "EAGAIN and EOF; production streaming adapter needs explicit EOS seam"
+      },
+      "embeddedDav1dVersion": "1.4.1-63-g37155c11",
+      "identifiedUpstreamDav1dRevision": "37155c11474c1812de6c96656fb167a67d307a37",
+      "cSourceProvenance": "Upstream version identified; exact custom FFmpeg/dav1d/pthread sources and source-to-binary reproduction remain incomplete",
+      "configurationEvidence": [
+        {
+          "variant": "simd",
+          "requestedThreads": 4,
+          "decoderOptions": {},
+          "status": "BLOCKED_PIXEL_MISMATCH",
+          "evidence": "browser-dav1d-hdr-correctness-attempt2.json and browser-dav1d-held-frame-diagnostic.json",
+          "supersededByFavorableReruns": false
+        },
+        {
+          "variant": "simd",
+          "requestedThreads": [4, 8],
+          "decoderOptions": {"max_frame_delay": "1"},
+          "status": "COMPONENT_CORRECTNESS_PASS_NOT_PLAYBACK_QUALIFIED",
+          "evidence": "browser-dav1d-low-delay-correctness.json",
+          "trials": 96,
+          "orderedFrameHashes": 4608,
+          "allRequestedOptionsConsumed": true,
+          "rootCauseProven": false
+        }
+      ],
+      "sourceScope": "No hardware/GPU/native codec execution; no generic performance promise"
+    },
+    {
+      "id": "turbores-prores",
+      "version": "1.2.6",
+      "sourceStatus": "component-and-browser-experiment-used; owned-adapter-pending",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I03",
+      "priority": "retained-historical-profile-not-primary-v8"
+    },
+    {
+      "id": "mediabunny-ac3",
+      "version": "1.66.4",
+      "sourceStatus": "component-and-browser-experiment-used; owned-factory-patch-pending",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I03",
+      "priority": "retained-historical-profile-not-primary-v8"
+    },
+    {
+      "id": "mediabunny-dts",
+      "version": "1.66.4",
+      "sourceRevision": "2953e86300eb0b086a7e7e4aeaa0d9afd345339e",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09"
+    },
+    {
+      "id": "mediabunny-truehd",
+      "version": "1.66.4",
+      "sourceRevision": "2953e86300eb0b086a7e7e4aeaa0d9afd345339e",
+      "sourceStatus": "v8-PCM-and-lossless-bridge-experiment-used; packet-fed-owned-adapter-pending",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I03",
+      "npmIntegrity": "sha512-JIfPlZH6H+HGSwksp4iSFk395+9eXQ73Q5Mh36baN4ByrQeZgi5omBWiDAhJ2wtg9IRVEd6+i+/AVsMPYXAUqw==",
+      "priority": "primary"
+    },
+    {
+      "id": "libav-legacy-and-pgs",
+      "version": "6.11.9",
+      "sourceRevision": null,
+      "ffmpegVersion": "9.0.2",
+      "sourceStatus": "published-AV1-libaom-baseline-used; custom-legacy-and-PGS-shims-still-pending",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09",
+      "toolchain": "Record exact build toolchain for each selected published/custom artifact; do not infer it from npm version",
+      "generatedAbiVersion": "6.11.9.0.2",
+      "npmIntegrity": "sha512-Z9myfYxtJPdOn7DgN0+oxk3HQJ2DcpnQhnv4IKSXWFFk+gHJAszMhE2yuFhat30CwMMxq1iHqxRFGM5QzvfUTQ==",
+      "sourceRevisionStatus": "The npm integrity pins the inspected source archive; do not reuse the previous 6.10.9.0 git revision."
+    },
+    {
+      "id": "jassub",
+      "version": "2.5.38",
+      "sourceRevision": null,
+      "npmIntegrity": "sha512-JlWOEobmIPLlAquiD3kEdzkyNVh8HH9nFnMhBKHmh7ORPLuqBW9VPFpUDub0rwI7KvHXHF01t7EOWo96YfWsvg==",
+      "sourceStatus": "published-v8-CPU-raster-component-experiment-used; owned-production-adapter-pending",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09",
+      "toolchain": "Published upstream 2.5.38 artifact; record exact rebuild toolchain before a custom build",
+      "priority": "primary",
+      "changeDetectionFixCommit": "7bf3039cffd629c9935994c76c07c98a93bdf040",
+      "rawRenderAbi": "seconds plus repaint; packed Int32Array, eight words per bitmap descriptor; validate exact loaded ABI",
+      "threadPolicy": "Explicit pool size: zero preallocated children for one renderer thread; otherwise record all actual children and combined contention",
+      "previousVersion": "2.5.14 retained only as historical measured baseline"
+    },
+    {
+      "id": "libudfread",
+      "version": "1.2.0",
+      "sourceSha512": "e3ed8dc7fab472ad382b1b6cd068f1dc0084c34e5ec2c460c1dd84fa14a9d368c4d7af08a23efc5057e7f021f5812222c01247d5f304632716c94fc8c689a1a2",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I10",
+      "toolchain": "emscripten-6.0.0"
+    },
+    {
+      "id": "libbluray",
+      "version": "1.5.0",
+      "sourceSha256": "f676408e91a5d321abf8b8d4dfdae36205c297dab5c54c3ec519639025f474a2",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I10",
+      "toolchain": "emscripten-6.0.0"
+    },
+    {
+      "id": "libsamplerate",
+      "version": "0.2.2",
+      "sourceRevision": "c96f5e3de9c4488f4e6c97f59f5245f22fda22f7",
+      "sourceStatus": "source-selected",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I09",
+      "toolchain": "emscripten-6.0.0"
+    },
+    {
+      "id": "libiamf-research",
+      "version": "2.0.1",
+      "sourceRevision": "63cafdd9b2d7bdba08cfeec2f008718198d7362e",
+      "oarRevision": "a7a5cc890ee088e71ff6dc13628e6e7fe74a1481",
+      "sourceStatus": "research-disabled",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "task": "I12",
+      "toolchain": "emscripten-6.0.0"
+    },
+    {
+      "id": "mediabunny-flac-encoder",
+      "version": "1.66.4",
+      "npmIntegrity": "sha512-InoHBS2jYhqdOpCX7Mh9YZ533SAtcqZs0JhcoH+H7KnK/h28YB6aH+OS++sAZrozmlwkm4fF+PqObnFInyiXIw==",
+      "sourceStatus": "lossless-bridge-component-experiment; owned-local-worker-integration-pending",
+      "task": "I03",
+      "priority": "N2-primary-audio-bridge-candidate",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "batchSampleFrames": 4096,
+      "batchIsUniversalOptimum": false,
+      "samplePrecisionClaim": "exact conventional channel PCM after independent round-trip equality; no Atmos object or TrueHD-bitstream preservation"
+    },
+    {
+      "id": "ffmpeg-wasm-extreme-baseline",
+      "version": "0.12.10",
+      "packages": [
+        "@ffmpeg/core@0.12.10",
+        "@ffmpeg/core-mt@0.12.10"
+      ],
+      "ffmpegVersion": "5.1.4",
+      "sourceStatus": "explicit-whole-clip-experimental-baseline; not-production-streaming-architecture",
+      "task": "I09",
+      "binarySha256": null,
+      "qualifiedProfiles": [],
+      "knownAdmissionLimit": "Published core0.12.10 automatically admits the inspected NUT/WavPack wvpk fixture with exact PCM; FFmpeg5.1.4 has the direct mapping in ff_nut_audio_extra_tags. The earlier absence inference was an audit error. Embedded ASS/NUT remains blocked by lost cue durations; no playback promotion."
+    }
+  ],
+  "unselected": [
+    "silent-second-general-engine-production-fallback",
+    "moving-ffmpeg-head",
+    "unqualified-dtsx-height-renderer",
+    "automatic-joc-or-truehd-object-rendering",
+    "remote-iso",
+    "native-decryption-or-menu-runtime",
+    "installed-helper-as-implicit-browser-dependency"
+  ],
+  "date": "2026-11-24",
+  "primaryWorkload": {
+    "video": "AV1 Main/Profile0 10-bit HDR10 with actual parsed level/tier",
+    "audio": "conventional TrueHD channel PCM; Atmos objects are optional and unqualified",
+    "subtitles": "required ASS; exact PGS/profile extensions separately admitted",
+    "modes": [
+      "full-60",
+      "performance-120"
+    ]
+  },
+  "nativeRoutePolicy": {
+    "priority": "preserve admitted native encoded HDR video and one media clock",
+    "routes": [
+      "N0",
+      "N1",
+      "N2",
+      "N3",
+      "C0",
+      "C1"
+    ],
+    "gpuIsBitstreamDecodeApi": false,
+    "nativeAndGpuExecution": "deferred-native-gpu-by-user",
+    "qualifiedProfiles": []
+  }
+}

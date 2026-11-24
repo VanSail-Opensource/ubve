@@ -1,0 +1,49 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 test
+> npm run check && npm run test:unit
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 check
+> npm run check:types && npm run check:boundaries
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 check:types
+> tsc -p packages/core --noEmit --pretty false && tsc -p tsconfig.check.json --pretty false
+
+packages/testkit/src/fake-codec.ts(137,7): error TS2322: Type 'OwnedLease<Readonly<{ kind: "test-marker"; data: Uint8Array<ArrayBuffer>; }>>' is not assignable to type 'OwnedLease<TestMarker>'.
+  Types of property '#cell' are incompatible.
+    Type 'Cell<Readonly<{ kind: "test-marker"; data: Uint8Array<ArrayBuffer>; }>> | null' is not assignable to type 'Cell<TestMarker> | null'.
+      Type 'Cell<Readonly<{ kind: "test-marker"; data: Uint8Array<ArrayBuffer>; }>>' is not assignable to type 'Cell<TestMarker>'.
+        Types of property 'destroy' are incompatible.
+          Type '(value: Readonly<{ kind: "test-marker"; data: Uint8Array<ArrayBuffer>; }>) => void' is not assignable to type '(value: TestMarker) => void'.
+            Types of parameters 'value' and 'value' are incompatible.
+              Type 'TestMarker' is not assignable to type 'Readonly<{ kind: "test-marker"; data: Uint8Array<ArrayBuffer>; }>'.
+                Types of property 'data' are incompatible.
+                  Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'Uint8Array<ArrayBuffer>'.
+                    Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+                      Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+                        Types of property '[Symbol.toStringTag]' are incompatible.
+                          Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+packages/testkit/src/fake-codec.ts(142,44): error TS2345: Argument of type 'Readonly<{ stamp: SessionStamp; operationId: string; sourcePacketId: string; pts: MediaTime; durationTicks: bigint | null; codecConfigEpoch: number; payload: OwnedLease<TestMarker> | null; }>' is not assignable to parameter of type 'OwnedOutput<TestMarker>'.
+  Types of property 'payload' are incompatible.
+    Type 'OwnedLease<TestMarker> | null' is not assignable to type 'OwnedLease<TestMarker>'.
+      Type 'null' is not assignable to type 'OwnedLease<TestMarker>'.
+packages/testkit/src/fake-codec.ts(142,77): error TS2345: Argument of type 'Readonly<{ stamp: SessionStamp; operationId: string; sourcePacketId: string; pts: MediaTime; durationTicks: bigint | null; codecConfigEpoch: number; payload: OwnedLease<TestMarker> | null; }>' is not assignable to parameter of type 'OwnedOutput<TestMarker>'.
+  Types of property 'payload' are incompatible.
+    Type 'OwnedLease<TestMarker> | null' is not assignable to type 'OwnedLease<TestMarker>'.
+      Type 'null' is not assignable to type 'OwnedLease<TestMarker>'.
+packages/testkit/src/memory-source.ts(31,7): error TS2322: Type 'Readonly<{ stamp: SessionStamp; operationId: string; identity: SourceIdentity; range: ByteRange; bytes: OwnedLease<Uint8Array<ArrayBuffer>>; }>' is not assignable to type 'SourceRead'.
+  The types of 'bytes[#cell]' are incompatible between these types.
+    Type 'Cell<Uint8Array<ArrayBuffer>> | null' is not assignable to type 'Cell<Uint8Array<ArrayBufferLike>> | null'.
+      Type 'Cell<Uint8Array<ArrayBuffer>>' is not assignable to type 'Cell<Uint8Array<ArrayBufferLike>>'.
+        Types of property 'destroy' are incompatible.
+          Type '(value: Uint8Array<ArrayBuffer>) => void' is not assignable to type '(value: Uint8Array<ArrayBufferLike>) => void'.
+            Types of parameters 'value' and 'value' are incompatible.
+              Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'Uint8Array<ArrayBuffer>'.
+                Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+                  Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+                    Types of property '[Symbol.toStringTag]' are incompatible.
+                      Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.

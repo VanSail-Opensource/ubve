@@ -1,0 +1,62 @@
+
+> ubve-implementation-starter@0.0.0 test
+> npm run check && npm run test:unit
+
+
+> ubve-implementation-starter@0.0.0 check
+> npm run check:types && npm run check:boundaries
+
+
+> ubve-implementation-starter@0.0.0 check:types
+> tsc -p packages/core --noEmit --pretty false && tsc -p tsconfig.check.json --pretty false
+
+
+> ubve-implementation-starter@0.0.0 check:boundaries
+> node scripts/check-boundaries.mjs
+
+Import boundaries passed for core, testkit and browser.
+
+> ubve-implementation-starter@0.0.0 test:unit
+> npm run build && node --test test/*.test.mjs
+
+
+> ubve-implementation-starter@0.0.0 build
+> tsc -b packages/core packages/testkit packages/browser --pretty false
+
+✔ production rejects testkit package imports, subpaths, exports and import types (8.937976ms)
+✔ production rejects normalized relative paths into testkit source or output (1.132629ms)
+✔ core keeps relative imports within its own source tree (1.610961ms)
+✔ testkit imports only its own package and the admitted core interface (0.505623ms)
+✔ engine imports reject Node, Vue subpaths and computed dynamic imports (0.608999ms)
+✔ browser accepts supported core imports and does not conflate package prefixes (0.359603ms)
+✔ checked offsets preserve 500 GiB and reject unsafe integers and range overflow (1.548116ms)
+✔ rational math preserves negative priming and requires explicit rounding (0.34472ms)
+✔ source-exact packets validate bytes; repacked and API-seconds provenance stay explicit (0.681198ms)
+✔ reservation enforces bytes and count before allocation, and has explicit oversize refusal (0.730021ms)
+✔ lease moves preserve global accounting and destroy exactly once (0.188474ms)
+✔ destructor failure still returns the allocation budget (0.201394ms)
+✔ queue admission moves only admitted items and does not double-count backing stores (0.369598ms)
+✔ stale generations release delivered ownership and disposal is terminal (0.338761ms)
+✔ cancellation notifies all listeners even when one listener fails (0.321395ms)
+✔ exact memory source handles zero-length EOF, cancellation, bounds, and terminal close (0.787578ms)
+✔ decoder output capacity is reserved before consuming input (0.843563ms)
+✔ input consumption and output stream allow out-of-order completion without packet-output waits (0.856051ms)
+✔ decoder cancellation releases accepted input and reserved output (0.295075ms)
+✔ finite deadlines settle never-completed input and empty output waits (0.575138ms)
+✔ reset invalidates pending work and releases queued old-epoch output before ready (0.506805ms)
+✔ dispose settles pending input and reads, releases queued output, and remains terminal (0.436559ms)
+✔ drain waits only for already-accepted input; flush seals admission and exposes EOS (0.387655ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 303.979896
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.

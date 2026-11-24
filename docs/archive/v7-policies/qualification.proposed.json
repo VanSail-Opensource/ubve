@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-acceptance-gates-not-achieved-by-current-player",
+  "screening": {
+    "repetitions": 3,
+    "scheduledMediaSecondsPerRun": 30,
+    "executeSerially": true,
+    "warmupSeparateFromTimedWindow": true,
+    "nativeCodecDecoding": false
+  },
+  "managedSteadyGate": {
+    "repetitions": 3,
+    "scheduledMediaSecondsPerRun": 300,
+    "minimumOnTimeSourceFrameFraction": 0.995,
+    "onTimeNumerator": "submitted-source-frames-with-completion-media-time-within-their-source-presentation-interval",
+    "denominator": "all-source-frame-opportunities-in-declared-timed-media-window-including-dropped-and-unsubmitted",
+    "applicationPcmUnderrunFrames": 0,
+    "unintendedSampleGapsOrOverlaps": 0,
+    "staleOutputsPresented": 0,
+    "unreleasedApplicationLeasesAfterDispose": 0,
+    "allRequiredOperationPromisesSettled": true,
+    "allRunsMustPass": true
+  },
+  "recoveryGate": {
+    "deliberateStarvationRequired": true,
+    "workletLatchesWithoutSupervisorResponse": true,
+    "rejectLateSameEpochAndOldEpochBlocks": true,
+    "exactResumeSampleContinuity": true,
+    "integratedRealCodecAndVideoRequired": true,
+    "passingIsolatedProtocolCompletesIntegratedGate": false
+  },
+  "foreground": {
+    "actualWindowAndTabActivationRequired": true,
+    "documentVisible": true,
+    "documentHasFocus": true,
+    "cadenceControlSeconds": 2,
+    "foregroundTransitionsRecorded": true,
+    "visibilityAloneSufficient": false
+  },
+  "claims": {
+    "native": "separate-authorized-qualification",
+    "gpuOrPhysicalDisplay": "separate-device-evidence",
+    "audibleOrPhysicalAvSync": "separate-device-evidence",
+    "largeRealMedia": "real-file-and-paged-parser-evidence-not-sparse-offset-only",
+    "eightHourEnduranceMinimumSeconds": 28800
+  },
+  "unavailableMetric": {
+    "value": null,
+    "reasonRequired": true
+  },
+  "failedAttempts": "immutable-retained-and-excluded-from-success-promotion-not-erased"
+}

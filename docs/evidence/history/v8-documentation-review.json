@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-24",
+  "kind": "source-and-documentation-review-only",
+  "productionCodeOrDependencyChanges": false,
+  "installsBuildsTestsOrCodecExecution": false,
+  "preservedFilesChecked": 35,
+  "missingPreservedFiles": [],
+  "changedPreservedFiles": [],
+  "jsonFilesParsed": 27,
+  "jsonErrors": [],
+  "taskCardCount": 13,
+  "taskGraphErrors": [],
+  "localMarkdownLinksChecked": 40,
+  "brokenLocalMarkdownLinks": [],
+  "excludedGeneratedOrDependencyDirectories": [],
+  "qualificationAuthorityHash": "af9b96bc98643e7d70e1d4c9eb1cda4163f1ee591f7fe04efba02673a353531f",
+  "qualificationAuthorityHashMatchesPolicy": true,
+  "productionQualifiedProfiles": 0,
+  "platformLedgerSourceCount": 87,
+  "platformLedgerIssues": [],
+  "historicalTestEvidence": "Existing 23-test v7 record preserved unchanged; not rerun by this migration",
+  "limits": [
+    "No claim that production I02-I12 implementation is complete.",
+    "No new browser/native/GPU/physical-output qualification.",
+    "Separate libmedia experiment tests and browser outcomes retain their own evidence records."
+  ],
+  "reviewPassed": true,
+  "sourceCorrections": {
+    "wavpackNut": "Exact n5.1.4 extra audio mapping and published core0.12.10 automatic PCM equality supersede earlier source-audit error; active ADR002/I09/providers and owned research corrected",
+    "noMediaOrBuildJobs": true,
+    "correctionEvidence": "research/wavpack-automatic-admission-correction.md",
+    "additionalSourceNotes": [
+      "research/ffmpeg-wasm-ass-stack-review.md",
+      "research/libmedia-reduced-quality-options.md"
+    ]
+  }
+}

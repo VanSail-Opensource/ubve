@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023", "DOM"],
+    "paths": {
+      "@ubve/core": ["./packages/core/src/index.ts"],
+      "@ubve/testkit": ["./packages/testkit/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts"]
+}

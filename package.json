@@ -1,0 +1,43 @@
+{
+  "name": "ubve",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": ">=24.12.0 <25",
+    "npm": ">=11 <12"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "check": "npm run check:types && npm run check:boundaries",
+    "check:types": "tsc -p packages/core --noEmit --pretty false && tsc -p tsconfig.check.json --pretty false",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "build": "tsc -b packages/core packages/testkit packages/browser --pretty false",
+    "test:unit": "npm run build && node --test test/*.test.mjs",
+    "test": "npm run check && npm run test:unit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@vitejs/plugin-vue": "6.0.11",
+    "vite": "8.3.8",
+    "vue-tsc": "3.3.14",
+    "@playwright/test": "1.62.1",
+    "esbuild": "0.28.2",
+    "@types/node": "24.10.1"
+  },
+  "dependencies": {
+    "mediabunny": "1.66.4",
+    "@mediabunny/truehd": "1.66.4",
+    "@mediabunny/flac-encoder": "1.66.4",
+    "@libmedia/avutil": "1.3.1",
+    "@libmedia/cheap": "1.3.1",
+    "@libmedia/common": "2.3.0",
+    "jassub": "2.5.38",
+    "imsc": "2.0.0",
+    "vue": "3.5.46"
+  }
+}

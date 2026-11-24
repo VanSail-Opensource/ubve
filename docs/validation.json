@@ -1,0 +1,12 @@
+{
+  "kind": "documentation-static-validation",
+  "scope": "No TypeScript/build/test commands run by taskbook author",
+  "markdownFiles": 25,
+  "brokenRelativeLinks": [],
+  "jsonParsePassed": true,
+  "canonicalTaskCount": 13,
+  "dagAcyclic": true,
+  "allTaskCardsPresent": true,
+  "runtimeQualificationClaimsAdded": false,
+  "validatedPolicyAndTaskJsonFiles": 7
+}

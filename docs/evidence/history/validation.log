@@ -1,0 +1,56 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 test
+> npm run check && npm run test:unit
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 check
+> npm run check:types && npm run check:boundaries
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 check:types
+> tsc -p packages/core --noEmit --pretty false && tsc -p tsconfig.check.json --pretty false
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 check:boundaries
+> node scripts/check-boundaries.mjs
+
+Import boundaries passed for core, testkit and browser.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 test:unit
+> npm run build && node --test test/*.test.mjs
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> ubve-implementation-starter@0.0.0 build
+> tsc -b packages/core packages/testkit packages/browser --pretty false
+
+✔ checked offsets preserve 500 GiB and reject unsafe integers and range overflow (1.317799ms)
+✔ rational math preserves negative priming and requires explicit rounding (0.236136ms)
+✔ source-exact packets validate bytes; repacked and API-seconds provenance stay explicit (0.816142ms)
+✔ reservation enforces bytes and count before allocation, and has explicit oversize refusal (0.772476ms)
+✔ lease moves preserve global accounting and destroy exactly once (0.191138ms)
+✔ destructor failure still returns the allocation budget (0.19898ms)
+✔ queue admission moves only admitted items and does not double-count backing stores (0.336708ms)
+✔ stale generations release delivered ownership and disposal is terminal (0.358631ms)
+✔ cancellation notifies all listeners even when one listener fails (0.332472ms)
+✔ exact memory source handles zero-length EOF, cancellation, bounds, and terminal close (0.708419ms)
+✔ decoder output capacity is reserved before consuming input (4.109911ms)
+✔ input consumption and output stream allow out-of-order completion without packet-output waits (0.694047ms)
+✔ decoder cancellation releases accepted input and reserved output (0.283528ms)
+✔ finite deadlines settle never-completed input and empty output waits (0.475467ms)
+✔ reset invalidates pending work and releases queued old-epoch output before ready (0.551562ms)
+✔ dispose settles pending input and reads, releases queued output, and remains terminal (0.407545ms)
+✔ drain waits only for already-accepted input; flush seals admission and exposes EOS (0.386484ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 117.389659

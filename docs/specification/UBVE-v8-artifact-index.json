@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "createdAt": "2026-11-24T19:21:18.477856+00:00",
+  "gateStatus": "NOT_QUALIFIED",
+  "extraction": "Extract every wanted independent ZIP into the same destination. Media parts are not multipart ZIP volumes; each opens independently.",
+  "runtimeCache": "Retained npm package bytes from the Linux preparation host, including exact browser/WASM assets and licenses. Native build-tool executables are host-specific; use the pinned npm lockfiles on other hosts.",
+  "history": "The separate history-v7 archive preserves previous/v7/ companion code, media and recorded tests referenced by the starter. These are historical records, not new v8 executions.",
+  "excluded": "Only generated Python caches and transient .tmp files; original completed cohorts, named failed attempts, historical fixtures and source corrections are retained.",
+  "archives": [
+    {
+      "name": "UBVE-v8-implementation-starter.zip",
+      "scope": "implementation-starter",
+      "bytes": 158976,
+      "sha256": "0c49cce545bd2cf8708d67523130952fe74be90b671c43201976fc03c3ddd07c",
+      "members": 86,
+      "sourceBytes": 313993,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-evidence-and-tools-01.zip",
+      "scope": "evidence-and-tools",
+      "bytes": 299591346,
+      "sha256": "8c866deacdb0abf542e12db7e820fe9c856a46592625fd2f9857bdb78dab2ef3",
+      "members": 113,
+      "sourceBytes": 471859199,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-evidence-and-tools-02.zip",
+      "scope": "evidence-and-tools",
+      "bytes": 12439747,
+      "sha256": "3ece0a7727a00969684234e403a901a4b2f22f32b3ab8fd6be549e96763f6c7a",
+      "members": 1660,
+      "sourceBytes": 70775856,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-runtime-cache.zip",
+      "scope": "runtime-cache",
+      "bytes": 172892124,
+      "sha256": "b7c593b0236ef795a2b1e6d64960ee30c314022ec85551259152fbbaf5210007",
+      "members": 4320,
+      "sourceBytes": 429977730,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-history-v7.zip",
+      "scope": "history-v7",
+      "bytes": 223341897,
+      "sha256": "03ed70d98e38dc2767283f5fe3741fd4d79ba668c23a7fdc0a8dbc102024988a",
+      "members": 298,
+      "sourceBytes": 245330627,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-01.zip",
+      "scope": "media",
+      "bytes": 471592746,
+      "sha256": "cb355f16a2489652380450fd4355f91378645749cb1a72d73d1eddee0824fc57",
+      "members": 5,
+      "sourceBytes": 471851415,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-02.zip",
+      "scope": "media",
+      "bytes": 457614246,
+      "sha256": "9d5d5b2ef7c605f5b668bc2d217dece3159bc7bfb6db2a80915ca41a617beed9",
+      "members": 4,
+      "sourceBytes": 471824228,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-03.zip",
+      "scope": "media",
+      "bytes": 458880347,
+      "sha256": "003a596d28efe5869d25ac66fd1b99a044778c8cae6ff0796811727d756b6957",
+      "members": 5,
+      "sourceBytes": 471853002,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-04.zip",
+      "scope": "media",
+      "bytes": 469628611,
+      "sha256": "84e349497feac8e72a69a027007337018d2b4929ea6c6095c72bbb74f05be664",
+      "members": 5,
+      "sourceBytes": 471852968,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-05.zip",
+      "scope": "media",
+      "bytes": 471993618,
+      "sha256": "051738670f494f7b7d77ca3f9649e84164fa32628ef33faf75434527a4e8497f",
+      "members": 6,
+      "sourceBytes": 471856012,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-06.zip",
+      "scope": "media",
+      "bytes": 471595110,
+      "sha256": "7a62d779b5ade1209ed6005c95f348fe8a8572b122f4eec5391106f5b7f25fe7",
+      "members": 6,
+      "sourceBytes": 471858146,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-07.zip",
+      "scope": "media",
+      "bytes": 257583670,
+      "sha256": "b13d18e552f7679c357d2e8816d8d3436140e2dfafb1ed9beb37aa6e0684db19",
+      "members": 9,
+      "sourceBytes": 471836296,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-08.zip",
+      "scope": "media",
+      "bytes": 278954430,
+      "sha256": "baddfac25d49293ad4294aefc9bacf7b132002fa50a21dc7c435a743e0894393",
+      "members": 11,
+      "sourceBytes": 471854042,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-09.zip",
+      "scope": "media",
+      "bytes": 176910252,
+      "sha256": "a5dc3f27f396f42b01ff4dfdf4ccb17581a002f26cd9a75403860f083bb1c02d",
+      "members": 17,
+      "sourceBytes": 471855952,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-10.zip",
+      "scope": "media",
+      "bytes": 274257792,
+      "sha256": "050bef273dafcc166245e69a32e994889920fa3415fe69e2e60b9efe6afafe1f",
+      "members": 29,
+      "sourceBytes": 471815916,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "name": "UBVE-v8-media-11.zip",
+      "scope": "media",
+      "bytes": 303397265,
+      "sha256": "8cc745b48e2778eddf4dbb4628697982d11207df24b9684236d924f48809a46e",
+      "members": 113,
+      "sourceBytes": 409753829,
+      "memberSha256Verified": true,
+      "zipCrcVerified": true
+    }
+  ],
+  "complete": true,
+  "finishedAt": "2026-11-24T19:24:21.701616+00:00"
+}
