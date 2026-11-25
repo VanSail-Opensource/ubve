@@ -1,0 +1,10 @@
+{
+  "case_id": "implementation-C1-performance-120",
+  "mode": "performance-120",
+  "route": "C1",
+  "evidence_class": "proposal",
+  "validity": "unverified",
+  "trials": [],
+  "qualification": "NOT_QUALIFIED",
+  "implementation_status": "SHORT_BROWSER_FUNCTIONAL_SCREEN_PASSED_WITH_LATE_SUBMISSIONS"
+}

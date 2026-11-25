@@ -1,0 +1,27 @@
+/*
+  Cross-Origin-Resource-Policy: same-origin
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' blob: https: http:; media-src 'self' blob: https: http:; img-src 'self' blob: data:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+
+# Shared-memory codecs require an isolated document. Do not impose COEP on /.
+/isolated/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+/
+  Cache-Control: no-cache
+
+/isolated/
+  Cache-Control: no-cache
+
+/vendor/*
+  Cross-Origin-Embedder-Policy: require-corp
+  Cache-Control: no-cache
+
+/support-status.json
+  Cache-Control: no-cache
+
+/assets/*
+  Cross-Origin-Embedder-Policy: require-corp
+  Cache-Control: public, max-age=31536000, immutable

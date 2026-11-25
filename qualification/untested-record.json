@@ -1,0 +1,8 @@
+{
+  "case_id": "priority-4k-av1-hdr10-truehd-ass",
+  "mode": "full-60",
+  "evidence_class": "proposal",
+  "validity": "unverified",
+  "execution_policy": "deferred-native-gpu-by-user",
+  "trials": []
+}

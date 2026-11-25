@@ -37,6 +37,10 @@ export async function preparePlayback(input: MediaInput, video: HTMLVideoElement
   managed?: { readonly overlay: HTMLElement; readonly quality: QualityMode; readonly allowStereoFoldDown: boolean; readonly preferWebGpu?: boolean }): Promise<PreparedPlayback> {
   describeInput(input);
   assetBaseUrl = assetBaseUrl.endsWith('/') ? assetBaseUrl : `${assetBaseUrl}/`;
+  // The pinned AV1 atomic ABI uses shared memory even with one codec thread.
+  if (preference === 'managed' && (globalThis.crossOriginIsolated !== true || typeof SharedArrayBuffer === 'undefined')) {
+    throw new EngineError('UNSUPPORTED_PROFILE', 'Managed AV1 requires shared memory. Open the isolated player and reselect this source.', 'caller-fix');
+  }
   if (preference !== 'managed') subtitles?.followVideo();
   // An opaque native URL need not offer readable CORS byte access. It remains opaque.
   if (!(input instanceof File) && (preference === 'automatic' || preference === 'native')) return prepareDirectPlayback(input, signal);

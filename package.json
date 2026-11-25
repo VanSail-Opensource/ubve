@@ -18,7 +18,7 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "build": "npm run build:packages && npm run build:assets && npm run build -w @ubve/vue-player",
     "test:unit": "npm run build:packages && node --test test/*.test.mjs",
-    "test": "npm run check && npm run test:unit",
+    "test": "npm run check && npm run test:unit && npm run test:qualification",
     "test:io": "tsc -b packages/io-demux --pretty false && node --test test/io-demux.test.mjs",
     "test:http": "tsc -b packages/io-demux --pretty false && node --test test/http-source.test.mjs",
     "build:presentation": "node scripts/prepare-presentation-assets.mjs",
@@ -30,10 +30,16 @@
     "build:disc": "node scripts/prepare-disc-assets.mjs",
     "test:disc": "tsc -b packages/disc packages/io-demux --pretty false && node --test test/disc.test.mjs test/mp4-index.test.mjs",
     "build:packages": "tsc -b packages/core packages/testkit packages/io-demux packages/wasm-adapters packages/native-bridge packages/presentation packages/disc packages/browser --pretty false",
-    "build:assets": "npm run build:codecs && npm run build:presentation && npm run build:disc && npm run check:assets",
+    "build:assets": "npm run build:codecs && npm run build:presentation && npm run build:disc && npm run build:notices && npm run support:generate && npm run check:assets",
     "dev": "npm run build:assets && npm run dev -w @ubve/vue-player",
     "test:pipeline:browser": "node test/pipeline-browser.mjs",
-    "check:assets": "node scripts/check-assets.mjs"
+    "check:assets": "node scripts/check-assets.mjs",
+    "build:notices": "node scripts/prepare-notices.mjs",
+    "test:qualification": "python3 -m unittest discover -s qualification -v",
+    "support:generate": "python3 scripts/generate-support.py",
+    "release:check": "python3 scripts/generate-support.py --require-release",
+    "check:static": "node scripts/check-static.mjs",
+    "audit:assets": "node scripts/audit-distributed-assets.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

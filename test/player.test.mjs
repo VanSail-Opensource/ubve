@@ -252,6 +252,14 @@ test('malformed escape sequences do not make a valid media URL unopenable', () =
   assert.equal(describeInput({ url: 'https://example.test/space%20movie.webm' }).name, 'space movie.webm');
 });
 
+test('managed atomic AV1 refuses a standard document before parsing or mounting media', async () => {
+  const { preparePlayback } = await import('../packages/browser/dist/index.js');
+  assert.notEqual(globalThis.crossOriginIsolated, true);
+  await assert.rejects(preparePlayback(file('unreadable.mkv'), new MediaHost(), new AbortController().signal, 'managed'), {
+    code: 'UNSUPPORTED_PROFILE', message: /Open the isolated player/,
+  });
+});
+
 test('managed WebGPU distinguishes a full HDR candidate from an explicit SDR transform', () => {
   const known = value => ({ state: 'known', value, origin: 'decoder' });
   const unknown = { state: 'unknown', reason: 'missing from signal' };

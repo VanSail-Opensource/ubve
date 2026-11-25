@@ -1,0 +1,22 @@
+{
+  "status": "ALL_PROPOSALS_UNTESTED",
+  "primary_hdr": "HDR10",
+  "priority_cases": 7560,
+  "optional_dv_cases": 30,
+  "axes": {
+    "platforms": 5,
+    "resolutions": 4,
+    "modes": 2,
+    "bitrate_targets": 7,
+    "video_complexity": 3,
+    "subtitle_complexity": 3,
+    "truehd_profiles": 3
+  },
+  "video_profile_rows": 59,
+  "audio_profile_rows": 60,
+  "subtitle_profile_rows": 26,
+  "container_rows": 30,
+  "minimum_measurement_hours_serial": 30240.0,
+  "additional_cost": "Browser-engine variants, repeated trials after fixes, setup, source generation, output verification and the long-tail corpus are additional.",
+  "not_claimed": "All formats, all integer dimensions, all browsers/devices within the five OS families, physical compatibility or any performance pass."
+}

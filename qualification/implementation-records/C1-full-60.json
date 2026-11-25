@@ -1,0 +1,10 @@
+{
+  "case_id": "implementation-C1-full-60",
+  "mode": "full-60",
+  "route": "C1",
+  "evidence_class": "proposal",
+  "validity": "unverified",
+  "trials": [],
+  "qualification": "NOT_QUALIFIED",
+  "implementation_status": "FULL_HDR_ROUTE_UNQUALIFIED"
+}

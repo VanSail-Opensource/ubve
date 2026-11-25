@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-11-24T14:40:03.990186+00:00",
+  "evidence": "EXECUTED_SYNTHETIC_FAILURE_GUARD_VALIDATION",
+  "executionAuthorization": "Parent released untimed prep window before these runs; all completed before next CPU reservation",
+  "tests": {
+    "command": "python -m unittest -v test_failure_guard.py",
+    "cwd": "evidence-kit/qualification",
+    "exitCode": 0,
+    "runCount": 12,
+    "failures": 0,
+    "errors": 0,
+    "reportedSeconds": 0.004,
+    "result": "OK",
+    "testFileSha256": "f62ecf958b704aa04d78cc783efb2b04034772fac07dbba4c0d141a39a730461",
+    "helperSha256": "c18b524c49c36fa57c81de64b983090aad7f87b2d18497a29b7785ad95fcfbe5"
+  },
+  "guardCli": {
+    "command": "python evidence-kit/qualification/failure_guard.py evidence-kit/qualification/failure-ledger/candidate-default-simd4.json",
+    "exitCode": 0,
+    "status": "BLOCKED_UNRESOLVED_FIDELITY_FAILURE",
+    "blockingEventCount": 3,
+    "admitted": false
+  },
+  "ledgerSha256": "0435ad14453158b463980f18df2ee683af371178ed8a738789f981e98a43f733",
+  "previousVerdictTests": {
+    "runCount": 22,
+    "rerunDuringThisCheck": false,
+    "scope": "Previously executed synthetic verdict.py tests; no gate code changed"
+  },
+  "aggregatorCheck": {
+    "command": "python bench-v8/scripts/aggregate-av1-timings.py bench-v8/results/browser-av1-hdr-timing-final.json --out bench-v8/results/av1-aggregate-review-check.json",
+    "exitCode": 0,
+    "groups": 48,
+    "warmupTrials": 48,
+    "measuredTrials": 144,
+    "scriptSha256": "376f462a447375b9e708e61215814f6adcb9c07c8afb67a728502c1f1761292a",
+    "resultSha256": "ed8b21b4adce8266e20bf64c4eb7444dd0a893a71c7fc54c16cc6a79e99ea0cf"
+  },
+  "mediaPerformanceEvidence": false,
+  "physicalOrPlaybackQualification": false,
+  "frozenLedgerCreationStatusPreserved": "Original snapshot truthfully records helper untested at snapshot creation; this later validation record supersedes only the helper test status, not any media failure."
+}

@@ -280,7 +280,7 @@ export class ManagedPlayback implements ManagedTransport {
       if (this.#videoTrack) {
         const track = this.#videoTrack;
         if (!track.width || !track.height) throw new EngineError('INVALID_PACKET', 'AV1 source dimensions are missing');
-        epoch.video = await Av1Decoder.create({ width: track.width, height: track.height, description: track.codecPrivate, stamp, threads: crossOriginIsolated ? 4 : 1, assetBaseUrl: this.#options.assetBaseUrl, outputFrames: 8 });
+        epoch.video = await Av1Decoder.create({ width: track.width, height: track.height, description: track.codecPrivate, stamp, threads: 4, assetBaseUrl: this.#options.assetBaseUrl, outputFrames: 8 });
       }
       if (this.#audioTrack) {
         const count = this.#audioTrack.channelCount;

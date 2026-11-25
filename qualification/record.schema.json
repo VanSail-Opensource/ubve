@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UBVE exact configuration evidence record",
+  "description": "A valid shape is not a pass. verdict.py also checks semantics; external provenance review remains necessary.",
+  "type": "object",
+  "required": ["case_id", "mode", "evidence_class", "validity", "trials"],
+  "properties": {
+    "case_id": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["full-60", "performance-120"]},
+    "evidence_class": {"enum": ["proposal", "node-component", "browser-component", "browser-full-pipeline", "physical-full-pipeline"]},
+    "validity": {"enum": ["unverified", "conformance-verified", "invalid-combination"]},
+    "execution_policy": {"type": "string"},
+    "fixture_sha256": {"$ref": "#/$defs/hash"},
+    "harness_sha256": {"$ref": "#/$defs/hash"},
+    "module_manifest_sha256": {"$ref": "#/$defs/hash"},
+    "browser_build": {"type": "string"},
+    "os_build": {"type": "string"},
+    "device": {"type": "string"},
+    "route": {"type": "string"},
+    "output_description": {"type": "string"},
+    "raw_evidence_path": {"type": "string"},
+    "platform": {"enum": ["windows", "macos", "ios", "ipados", "android"]},
+    "source_fps": {"type": "object", "required": ["num", "den"], "properties": {"num": {"type": "integer", "minimum": 1}, "den": {"type": "integer", "minimum": 1}}},
+    "playback_rate": {"type": "number", "exclusiveMinimum": 0},
+    "counting_basis": {"type": "string"},
+    "display_refresh_hz": {"type": "number", "exclusiveMinimum": 0},
+    "physical_output_verified": {"type": "boolean"},
+    "optional_features": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "declared_performance_transform": {"type": "string"},
+    "fidelity_checks": {"type": "object", "additionalProperties": {"type": ["boolean", "null"]}},
+    "trials": {"type": "array", "items": {"$ref": "#/$defs/trial"}}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "trial": {
+      "type": "object",
+      "required": ["trial_id", "active_seconds", "eligible_source_frames", "unique_on_time_frames", "late_frames", "dropped_frames", "audio_underrun_samples", "max_freeze_ms", "final_window_fps", "memory_within_admitted_budget", "foreground_continuously"],
+      "properties": {
+        "trial_id": {"type": "string", "minLength": 1},
+        "active_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "eligible_source_frames": {"type": "integer", "minimum": 0},
+        "unique_on_time_frames": {"type": "integer", "minimum": 0},
+        "late_frames": {"type": "integer", "minimum": 0},
+        "dropped_frames": {"type": "integer", "minimum": 0},
+        "audio_underrun_samples": {"type": "integer", "minimum": 0},
+        "max_freeze_ms": {"type": "number", "minimum": 0},
+        "final_window_fps": {"type": "number", "minimum": 0},
+        "memory_within_admitted_budget": {"type": "boolean"},
+        "foreground_continuously": {"type": "boolean"},
+        "av_sync_p95_ms": {"type": "number", "minimum": 0},
+        "av_sync_max_ms": {"type": "number", "minimum": 0}
+      }
+    }
+  }
+}
