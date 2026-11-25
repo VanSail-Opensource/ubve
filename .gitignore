@@ -14,3 +14,9 @@ apps/vue-player/public/vendor/
 /evidence/disc-browser.json
 /evidence/pipeline-browser-*.json
 /evidence/native-bridge-browser-*.json
+
+/apps/vue-player/public/support-status.json
+/evidence/support-status.json
+/evidence/static-asset-audit.json
+__pycache__/
+*.pyc

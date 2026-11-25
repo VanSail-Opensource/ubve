@@ -2,9 +2,9 @@
 
 ## Deliver the assigned slice
 
-This workspace contains implemented core resource/math helpers, a deterministic test codec, and frozen interface candidates. It does not contain a playable SDK. Read `README.md`, `docs/START-HERE.md`, the assigned I00–I12 task card and referenced ADRs before editing. Discover and read each applicable nested `AGENTS.md` along the paths you will change. Use `rg` to locate contracts and tests. Inspect existing changes and preserve other agents' work.
+This workspace contains a browser SDK candidate, bundled media adapters, the Vue reference player and executable evidence tools. Read `README.md`, [current phase status](docs/IMPLEMENTATION-STATUS.md), the assigned I00–I12 task card and the relevant ADRs. The [historical starter handoff](docs/START-HERE.md) is useful context, not the current checkout status. Discover and read each applicable nested `AGENTS.md` along the paths you will change. Preserve other owners' work and report precise evidence boundaries.
 
-One integrator owns public core contracts, workspace manifests, and `package-lock.json`. Assign files before parallel editing. Propose interface migrations to dependent owners before changing signatures. Independent coding may proceed during browser measurements; installs, builds, tests, codec workloads and benchmarks wait until the coordinator releases the measurement window.
+One integrator owns public core contracts, workspace manifests and the lockfile. Coordinate before changing shared signatures. During a reserved performance window only the timing owner runs builds/tests/codec jobs; other work may continue independently.
 
 ## v8 priority and evidence boundary
 
@@ -12,23 +12,12 @@ Primary work is AV1 10-bit HDR10, conventional TrueHD channel PCM and required A
 
 ## Existing command contract
 
-Use Node 24.22.3 and npm 11.19.1. TypeScript is pinned to 5.9.3. After bootstrap, use the committed lockfile with `npm ci --ignore-scripts`.
-
-| Command | Actual scope |
-| --- | --- |
-| `npm run check:types` | Strict core compilation without DOM/Node globals, then workspace contract type checking |
-| `npm run check:boundaries` | TypeScript-AST import boundary checks for the three existing packages |
-| `npm run check` | Both checks above |
-| `npm run build` | Emit JavaScript and declarations for core, testkit and browser contracts using TypeScript project references |
-| `npm run test:unit` | Build, then run Node's real test runner against correctness/ownership/race fixtures |
-| `npm test` | Check, build and unit tests |
-
-No browser, fixture-hash, license, lint or performance script is advertised before it exists. Add the relevant real tool and a failing fixture when introducing such a lane. A successful testkit check is never browser or decoder qualification. Report the command actually executed and its outcome; pending, skipped and blocked checks are not successes.
+Use Node 24.22.3 and npm 11.19.1 with `npm ci --ignore-scripts`. Run `npm test`, `npm run build`, and applicable commands from [the command reference](docs/commands.md). The browser component/short-playback lanes are not qualification runs. Ensure future production packages remain in the strict type and boundary checks.
 
 ## Architecture and invariants
 
 - `@ubve/core` owns pure contracts and helpers. It has no DOM, Node, Vue, concrete parser, codec or renderer imports.
-- `@ubve/browser` is the composition root. It owns browser-host integration, adapter registration/default selection and the future public player implementation. Vue will import that public SDK. A disposed Session is terminal; another Player.open creates a fresh Session.
+- `@ubve/browser` is the composition root. It owns browser-host integration, adapter registration/default selection and the public player implementation. Vue imports that public SDK. A disposed Session is terminal; another Player.open creates a fresh Session.
 - `@ubve/testkit` is development-only. Never put its marker codec or memory fixture source into the production registry.
 - Keep exact checked byte offsets and half-open range semantics. Parse large integers as BigInt, reject values beyond an explicitly admitted Number boundary, and never use 32-bit offset arithmetic.
 - Preserve signed rational timing, unknown DTS as null, configuration epochs, source-span availability and representation/timing provenance. Repacked bytes need not equal original span lengths. Floating API timestamps do not become exact container evidence through conversion to bigint.

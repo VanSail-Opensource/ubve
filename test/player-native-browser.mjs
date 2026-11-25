@@ -1,22 +1,17 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 
-// Run after npm ci with FFmpeg and Playwright's Chromium installed, or set
+// Run after npm ci with Playwright's Chromium installed, or set
 // UBVE_CHROMIUM to a real compatible Chrome/Chromium binary. This lane tests
 // native element and UI behavior, not hardware acceleration or real display.
-const scratch = await mkdtemp(path.join(tmpdir(), 'ubve-native-smoke-'));
+const media = await readFile(new URL('./fixtures/native-vp9-opus.webm', import.meta.url));
+const fixtureSha256 = createHash('sha256').update(media).digest('hex');
+assert.equal(fixtureSha256, 'ed6464c20dcec96e0f1aa6be8baa194b2f7688616b53752e304957fcdbfaeaa2');
 let server, browser;
 try {
-  const fixture = path.join(scratch, 'clip.webm');
-  execFileSync('ffmpeg', ['-nostdin', '-loglevel', 'error', '-i', 'test/fixtures/vp9-opus-ass.mkv', '-map', '0:v:0', '-map', '0:a:0',
-    '-c', 'copy', '-map_metadata', '-1', '-fflags', '+bitexact', fixture], { timeout: 15_000 });
-  const media = await readFile(fixture);
   server = await createServer({ configFile: 'apps/vue-player/vite.config.ts', root: 'apps/vue-player', server: { port: 0, strictPort: false } });
   await server.listen();
   browser = await chromium.launch({ ...(process.env.UBVE_CHROMIUM ? { executablePath: process.env.UBVE_CHROMIUM } : {}), headless: true, args: ['--disable-gpu'] });
@@ -24,7 +19,11 @@ try {
   page.setDefaultTimeout(15_000);
   const errors = [];
   page.on('pageerror', error => errors.push(String(error)));
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}`);
+  const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
+  await page.goto(`${origin}/isolated/`);
+  assert.equal(await page.evaluate(() => crossOriginIsolated), true, 'Isolated document must actually expose shared-memory eligibility');
+  await page.goto(`${origin}/`);
+  assert.equal(await page.evaluate(() => crossOriginIsolated), false, 'Standard document must stay non-isolated');
   await page.locator('input[type=file]').first().setInputFiles({ name: 'native-smoke.webm', mimeType: 'video/webm', buffer: media });
   await page.waitForFunction(() => document.querySelector('.session-state')?.textContent.trim() === 'Ready');
   assert.equal(await page.locator('.stage-label').innerText(), 'N0 · 128 × 72');
@@ -49,10 +48,9 @@ try {
   assert.equal(await page.evaluate(() => document.body.scrollWidth > window.innerWidth), false);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ evidenceClass: 'FUNCTIONAL_BROWSER_SMOKE', browser: await browser.version(), viewport: '390x844', route: 'N0',
-    fixtureSha256: createHash('sha256').update(media).digest('hex'), actions: ['open without autoplay', 'play', 'pause', 'seek while paused', 'live Traditional Chinese labels'],
+    fixtureSha256, actions: ['standard/isolated document admission', 'open without autoplay', 'play', 'pause', 'seek while paused', 'live Traditional Chinese labels'],
     horizontalOverflow: false, pageErrorCount: 0, physicalOutputVerified: null, qualified: false }, null, 2));
 } finally {
   await browser?.close();
   await server?.close();
-  await rm(scratch, { force: true, recursive: true });
 }

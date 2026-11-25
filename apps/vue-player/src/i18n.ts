@@ -25,6 +25,7 @@ export const messages = {
     webGpuOutput: 'Try WebGPU presentation', webGpuOutputHint: 'Applies on next open. AV1 decode still uses WASM. HDR is unverified and no fallback is selected.', webGpuUnavailable: 'The WebGPU API is unavailable in this browser or document.', reopenGpuQuality: 'Close this source before changing the WebGPU output mode.',
     invalidUrl: 'Enter a valid HTTP or HTTPS media URL.', managedRate: 'Managed audio uses a fixed 1× sample clock.', customControlsRequired: 'This output requires the player’s own controls.',
     pgsPalette: 'PGS palette interpretation', submitted: 'Draws submitted', deliberateDrops: 'Deliberate drops',
+    openIsolated: 'Open the isolated player', reselectAfterSwitch: 'to try managed AV1. Reselect your source after switching.', isolationUnavailable: 'Managed AV1 is unavailable because this document does not have shared memory.',
     unsupported: 'Unavailable for this source', subtitleOffsetHint: 'Positive values show subtitles later.',
   },
   'zh-CN': {
@@ -52,6 +53,7 @@ export const messages = {
     webGpuOutput: '尝试 WebGPU 画面输出', webGpuOutputHint: '下次打开时生效。AV1 仍由 WASM 解码。HDR 未验证，不自动回退。', webGpuUnavailable: '当前浏览器或页面不提供 WebGPU API。', reopenGpuQuality: '请关闭当前媒体后，再切换 WebGPU 输出模式。',
     invalidUrl: '请输入有效的 HTTP 或 HTTPS 媒体链接。', managedRate: '软件解码音频目前使用固定的 1× 采样时钟。', customControlsRequired: '当前输出需要使用播放器的控件。',
     pgsPalette: 'PGS 调色板解读方式', submitted: '已提交绘制', deliberateDrops: '主动丢帧',
+    openIsolated: '打开隔离版播放器', reselectAfterSwitch: '以尝试 AV1 软件解码。切换后需重新选择媒体。', isolationUnavailable: '此页面没有共享内存，无法使用 AV1 软件解码。',
     unsupported: '当前源不可用', subtitleOffsetHint: '正值使字幕延后显示。',
   },
   'zh-TW': {
@@ -79,6 +81,7 @@ export const messages = {
     webGpuOutput: '嘗試 WebGPU 畫面輸出', webGpuOutputHint: '下次開啟時生效。AV1 仍由 WASM 解碼。HDR 未驗證，不自動回退。', webGpuUnavailable: '目前瀏覽器或頁面不提供 WebGPU API。', reopenGpuQuality: '請關閉目前媒體後，再切換 WebGPU 輸出模式。',
     invalidUrl: '請輸入有效的 HTTP 或 HTTPS 媒體連結。', managedRate: '軟體解碼音訊目前使用固定的 1× 取樣時鐘。', customControlsRequired: '目前輸出需要使用播放器的控制項。',
     pgsPalette: 'PGS 調色盤解讀方式', submitted: '已提交繪製', deliberateDrops: '主動捨棄影格',
+    openIsolated: '開啟隔離版播放器', reselectAfterSwitch: '以嘗試 AV1 軟體解碼。切換後需重新選擇媒體。', isolationUnavailable: '此頁面沒有共用記憶體，無法使用 AV1 軟體解碼。',
     unsupported: '目前來源無法使用', subtitleOffsetHint: '正值使字幕延後顯示。',
   },
 } as const;

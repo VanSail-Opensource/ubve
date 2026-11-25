@@ -1,0 +1,7 @@
+{
+  "path": "evidence-kit/qualification/failure-ledger/libmedia-default-simd4-20261124.json",
+  "sha256": "0435ad14453158b463980f18df2ee683af371178ed8a738789f981e98a43f733",
+  "payload_sha256": "9d80ce013f560bbaa40cf593a5431456207be87f36074cb9aba613bb2d32d186",
+  "event_count": 3,
+  "execution_status": "Retained observations transcribed; new admission helper not executed"
+}

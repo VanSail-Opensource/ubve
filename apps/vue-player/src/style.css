@@ -140,6 +140,7 @@ input[type=checkbox] { accent-color: var(--accent); }
 .route-picker { display: block; margin-top: 17px; color: #7f96a8; font-size: 11px; }
 .route-picker select { display: block; width: 100%; margin-top: 7px; font-size: 12px; }
 .route-note { font-size: 11px; color: #c5ad7a; line-height: 1.6; margin: 7px 0 0; }
+.isolation-link { color: var(--accent, #79d8cd); text-underline-offset: .2em; }
 .fold-option { display: flex; align-items: flex-start; gap: 8px; color: #c1cdb4; font-size: 12px; margin-top: 14px; line-height: 1.5; }
 .fold-option input { margin-top: 3px; }
 .fold-option small { display: block; color: #8c9b83; font-size: 11px; margin-top: 4px; }
