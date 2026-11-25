@@ -25,6 +25,18 @@ requires retained rgba16float, display-p3-linear and extended-tone configuration
 Configuration success still does not establish a physical HDR output. GPU
 execution is deferred in this environment.
 
+For aligned little-endian SDR I420P10, the Canvas path reuses the exact luma and
+chroma arithmetic in a small, bounded lookup table, reads sample words directly,
+and writes packed RGBA8. The generic renderer remains available unchanged for
+unaligned planes and other pixel formats. This changes neither sampling nor the
+color transform, and does not infer an absent SDR transfer or affect HDR paths.
+`node test/presentation-sdr10-benchmark.mjs <local-media>` compares the same
+decoded input against the generic path. The timer excludes source decode,
+Canvas upload, playback scheduling and physical output.
+For test files without transfer metadata, the benchmark accepts a recorded
+`UBVE_SDR10_TRANSFER_OVERRIDE` to test an interpretation without changing
+which sources the player admits.
+
 ## Selected subtitles
 
 - ASS/SSA uses pinned JASSUB 2.5.38 and its packed eight-word bitmap ABI. The asset

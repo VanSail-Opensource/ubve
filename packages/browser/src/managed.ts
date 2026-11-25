@@ -280,7 +280,12 @@ export class ManagedPlayback implements ManagedTransport {
       if (this.#videoTrack) {
         const track = this.#videoTrack;
         if (!track.width || !track.height) throw new EngineError('INVALID_PACKET', 'AV1 source dimensions are missing');
-        epoch.video = await Av1Decoder.create({ width: track.width, height: track.height, description: track.codecPrivate, stamp, threads: 4, assetBaseUrl: this.#options.assetBaseUrl, outputFrames: 8 });
+        // The four-thread atomic configuration returned different pixels on
+        // a Jellyfin ISO BMFF source despite emitting the right frame count.
+        // Both native references and the single-thread route matched. Keep
+        // this container family on the checked single-thread candidate.
+        const threads = this.#options.media.preflight.format === 'isobmff' ? 1 : 4;
+        epoch.video = await Av1Decoder.create({ width: track.width, height: track.height, description: track.codecPrivate, stamp, threads, assetBaseUrl: this.#options.assetBaseUrl, outputFrames: 8 });
       }
       if (this.#audioTrack) {
         const count = this.#audioTrack.channelCount;

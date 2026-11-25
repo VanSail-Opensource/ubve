@@ -36,6 +36,8 @@ export interface SubtitleControllerOptions {
   readonly onStatus?: (status: SubtitleStatus) => void;
 }
 
+const nativeVideoEvents = ['loadedmetadata', 'seeked', 'play', 'pause', 'ended', 'ratechange'];
+
 /** One selected subtitle renderer. Renderer initialization, cue admission and
  * replacement serialize, while video callbacks never enqueue an unbounded set
  * of draws. An error is surfaced; required-subtitle policy belongs to Session. */
@@ -91,11 +93,12 @@ export class SubtitleController {
   constructor(options: SubtitleControllerOptions) {
     this.#options = options; this.video = options.video; this.overlay = options.overlay; this.#quality = options.quality ?? 'full';
     Object.assign(this.overlay.style, { position: 'absolute', inset: '0', pointerEvents: 'none', overflow: 'hidden' });
-    this.#videoEvent = () => { if (!this.#externalClock) this.#requestVideoDraw(true); };
-    for (const event of ['loadedmetadata', 'seeked', 'pause', 'ratechange']) this.video.addEventListener(event, this.#videoEvent);
+    this.#videoEvent = () => {
+      if (!this.#externalClock) { this.#requestVideoDraw(true); this.#syncVideoSchedule(); }
+    };
+    for (const event of nativeVideoEvents) this.video.addEventListener(event, this.#videoEvent);
     this.#observer = new ResizeObserver(() => { this.#sizeKey = ''; this.#requestVideoDraw(true); });
     this.#observer.observe(this.overlay);
-    this.#scheduleVideo();
   }
 
   getStatus(): SubtitleStatus { return this.#status; }
@@ -299,12 +302,14 @@ export class SubtitleController {
 
   async renderAt(seconds: number, width: number, height: number): Promise<void> {
     if (this.#track) throw new Error('Managed playback must select external subtitle clock before loading text tracks');
-    this.#externalClock = true;
+    this.setExternalClock(true);
     await this.#render(seconds, width, height, false);
   }
 
-  followVideo(): void { this.#externalClock = false; this.#requestVideoDraw(true); }
-  setExternalClock(enabled = true): void { this.#externalClock = enabled; }
+  followVideo(): void { this.setExternalClock(false); this.#requestVideoDraw(true); }
+  setExternalClock(enabled = true): void {
+    if (this.#externalClock !== enabled) { this.#externalClock = enabled; this.#syncVideoSchedule(); }
+  }
 
   async #render(seconds: number, width: number, height: number, repaint: boolean): Promise<void> {
     if (this.#disposed || this.#status.state !== 'ready') return;
@@ -376,17 +381,28 @@ export class SubtitleController {
     };
   }
 
-  #scheduleVideo(): void {
-    if (this.#disposed) return;
-    if (typeof this.video.requestVideoFrameCallback === 'function') {
+  #syncVideoSchedule(): void {
+    const requestVideo = typeof this.video.requestVideoFrameCallback === 'function';
+    if (this.#disposed || this.#externalClock || this.#status.state !== 'ready' || !this.#status.requiresOverlay
+      || (!requestVideo && (this.video.paused || this.video.ended))) {
+      this.#cancelVideoSchedule(); return;
+    }
+    if (this.#callback !== null || this.#raf !== null) return;
+    if (requestVideo) {
       this.#callback = this.video.requestVideoFrameCallback((_now, data) => {
         this.#callback = null;
         if (!this.#externalClock && !this.#draw) void this.#render(data.mediaTime, data.width, data.height, false).catch(() => undefined);
-        this.#scheduleVideo();
+        this.#syncVideoSchedule();
       });
     } else {
-      this.#raf = requestAnimationFrame(() => { this.#raf = null; this.#requestVideoDraw(false); this.#scheduleVideo(); });
+      this.#raf = requestAnimationFrame(() => { this.#raf = null; this.#requestVideoDraw(false); this.#syncVideoSchedule(); });
     }
+  }
+
+  #cancelVideoSchedule(): void {
+    if (this.#callback !== null) this.video.cancelVideoFrameCallback(this.#callback);
+    if (this.#raf !== null) cancelAnimationFrame(this.#raf);
+    this.#callback = this.#raf = null;
   }
 
   #requestVideoDraw(repaint: boolean): void {
@@ -423,17 +439,18 @@ export class SubtitleController {
   async dispose(): Promise<void> {
     if (this.#disposed) return; this.#disposed = true; ++this.#generation;
     this.#assDefaultFont = null;
-    if (this.#callback !== null) this.video.cancelVideoFrameCallback(this.#callback);
-    if (this.#raf !== null) cancelAnimationFrame(this.#raf);
+    this.#cancelVideoSchedule();
     this.#observer.disconnect();
-    for (const event of ['loadedmetadata', 'seeked', 'pause', 'ratechange']) this.video.removeEventListener(event, this.#videoEvent);
+    for (const event of nativeVideoEvents) this.video.removeEventListener(event, this.#videoEvent);
     await this.#enqueue(() => this.#clearOwned()); this.#update({ state: 'disposed', renderer: 'none', requiresOverlay: false });
   }
 
   #enqueue(operation: () => Promise<void>): Promise<void> {
     const next = this.#serial.then(operation); this.#serial = next.catch(() => undefined); return next;
   }
-  #update(patch: Partial<SubtitleStatus>): void { this.#status = Object.freeze({ ...this.#status, ...patch }); this.#options.onStatus?.(this.#status); }
+  #update(patch: Partial<SubtitleStatus>): void {
+    this.#status = Object.freeze({ ...this.#status, ...patch }); this.#syncVideoSchedule(); this.#options.onStatus?.(this.#status);
+  }
 }
 
 async function loadBundledAssFont(url: string): Promise<Uint8Array<ArrayBuffer>> {

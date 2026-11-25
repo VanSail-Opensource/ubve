@@ -59,11 +59,34 @@ npm run build:packages
 node scripts/build-codecs.mjs
 node --test test/codecs-node.evidence.mjs
 node test/codec-matrix-node.mjs HDR10_CORPUS_DIR evidence.json COMBINED_CORPUS_DIR
+node test/av1-file-node.evidence.mjs "AV1_FIXTURE.mp4" EXPECTED_SHA256
 ```
 
 The matrix records source hashes and actual container bitrate separately from
 encoder targets, and preserves missing sources and failed rows. Its independent
 reference commands use native FFmpeg/libaom. No FPS is inferred from those runs.
+
+The external-file probe accepts a disk-backed Blob, can pin the publisher's
+SHA-256, and checks every decoded AV1 picture against independent libaom hashes.
+It also compares known first-frame color descriptors and static HDR signaling
+when present in the reference. This is the video component only. A soundtrack,
+if present, is listed as untested rather than dropped from a playback claim.
+MP4 timestamps from the current packet adapter remain API-derived.
+The probe defaults to one decoder thread. Set `UBVE_AV1_WORKER_THREADS=4` for a
+separate control. Set `UBVE_AV1_PREFIX_PICTURES` to compare an explicit prefix of
+the original file without claiming EOS or whole-source coverage.
+
+The managed ISO BMFF/MP4 route requests one AV1 decoder thread. On Jellyfin's
+video-only 1080p60 SDR 3 Mbps sample, the unmodified four-thread atomic candidate
+emitted the correct 1,797 frames but differed in decoded pixels starting at
+display index 422. The single-thread candidate matched all 1,797 ordered
+hashes independently produced by both native libaom and native libdav1d.
+This is a tested correctness constraint, not a throughput improvement.
+
+An experimental four-thread atomic schedule that fused submit and frame copy
+skipped most explicit take commands, but one run changed three decoded pictures
+in the same 48-picture reference fixture. A subsequent clean repetition series
+did not clear that failure. This schedule is not enabled by the player.
 
 The upstream dav1d receive ABI conflates empty output and codec EOF. The adapter
 reports accepted flush followed by receive-to-empty, rather than claiming an

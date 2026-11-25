@@ -39,7 +39,8 @@
     "support:generate": "python3 scripts/generate-support.py",
     "release:check": "python3 scripts/generate-support.py --require-release",
     "check:static": "node scripts/check-static.mjs",
-    "audit:assets": "node scripts/audit-distributed-assets.mjs"
+    "audit:assets": "node scripts/audit-distributed-assets.mjs",
+    "test:jellyfin": "node test/jellyfin-browser.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

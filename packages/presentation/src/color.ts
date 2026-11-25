@@ -69,6 +69,78 @@ function sampleTransfer(table: Float64Array, value: number): number {
   return low + (table[index + 1]! - low) * (position - index);
 }
 
+const littleEndian = new Uint8Array(Uint16Array.of(1).buffer)[0] === 1;
+const tenBitValues = 1024;
+interface Sdr10Tables {
+  readonly y: Float64Array;
+  readonly b: Float64Array;
+  readonly r: Float64Array;
+  readonly yOffset: number;
+  readonly yDiv: number;
+  readonly cDiv: number;
+  readonly kr: number;
+  readonly kb: number;
+  readonly kbInv: number;
+  readonly krInv: number;
+  readonly kg: number;
+}
+// Two admitted coefficient sets and two sample ranges, bounded for process
+// lifetime. Preserve the legacy Float64 operation order at each sample value.
+const sdr10Tables = new Map<number, Sdr10Tables>();
+function sdr10Lookup(bt709: boolean, limited: boolean): Sdr10Tables {
+  const key = (bt709 ? 2 : 0) + (limited ? 1 : 0);
+  const found = sdr10Tables.get(key);
+  if (found) return found;
+  const kr = bt709 ? 0.2126 : 0.299, kb = bt709 ? 0.0722 : 0.114;
+  const kg = 1 - kr - kb, krInv = 2 * (1 - kr), kbInv = 2 * (1 - kb);
+  const yOffset = limited ? 64 : 0, yDiv = limited ? 876 : 1023, cDiv = limited ? 896 : 1023;
+  const y = Float64Array.from({ length: tenBitValues }, (_, value) => (value - yOffset) / yDiv);
+  const b = Float64Array.from({ length: tenBitValues }, (_, value) => kbInv * ((value - 512) / cDiv));
+  const r = Float64Array.from({ length: tenBitValues }, (_, value) => krInv * ((value - 512) / cDiv));
+  const tables = { y, b, r, yOffset, yDiv, cDiv, kr, kb, kbInv, krInv, kg };
+  sdr10Tables.set(key, tables);
+  return tables;
+}
+
+function quantizeRgb8(value: number): number {
+  const rounded = Math.round(value * 255);
+  return rounded <= 0 ? 0 : rounded >= 255 ? 255 : rounded;
+}
+
+function convertSdrI420P10(frame: RawPlaneFrame, width: number, height: number, scale: number,
+  sourceX: Uint16Array | null, data: Uint8ClampedArray<ArrayBuffer>): boolean {
+  if (!littleEndian || frame.data.byteOffset % 2 || data.byteOffset % 4
+    || frame.planes.some(plane => plane.offsetBytes % 2 || plane.strideBytes % 2)) return false;
+  const source = new Uint16Array(frame.data.buffer, frame.data.byteOffset, Math.floor(frame.data.byteLength / 2));
+  const output = new Uint32Array(data.buffer, data.byteOffset, data.length / 4);
+  const rect = frame.visibleRect, yPlane = frame.planes[0]!, uPlane = frame.planes[1]!, vPlane = frame.planes[2]!;
+  const { y: luma, b: cb, r: cr, yOffset, yDiv, cDiv, kr, kb, kbInv, krInv, kg } = sdr10Lookup(frame.color.matrix === 'bt709', frame.color.range === 'limited');
+  const yStride = yPlane.strideBytes / 2, uStride = uPlane.strideBytes / 2, vStride = vPlane.strideBytes / 2;
+  const yStart = yPlane.offsetBytes / 2, uStart = uPlane.offsetBytes / 2, vStart = vPlane.offsetBytes / 2;
+  for (let y = 0; y < height; y++) {
+    const sy = rect.y + Math.min(rect.height - 1, Math.floor((y + 0.5) / scale)), cy = Math.floor(sy / 2);
+    const yRow = yStart + yStride * sy, uRow = uStart + uStride * cy, vRow = vStart + vStride * cy;
+    let out = y * width, lastCx = -1, bOffset = 0, rOffset = 0;
+    for (let x = 0; x < width; x++) {
+      const sx = sourceX === null ? rect.x + x : sourceX[x]!, cx = Math.floor(sx / 2);
+      if (cx !== lastCx) {
+        const u = source[uRow + cx]!, v = source[vRow + cx]!;
+        // Unexpected upper bits retain the generic renderer's behavior. They
+        // are not truncated or indexed out of range by the lookup tables.
+        bOffset = u < tenBitValues ? cb[u]! : kbInv * ((u - 512) / cDiv);
+        rOffset = v < tenBitValues ? cr[v]! : krInv * ((v - 512) / cDiv);
+        lastCx = cx;
+      }
+      const sample = source[yRow + sx]!;
+      const yy = sample < tenBitValues ? luma[sample]! : (sample - yOffset) / yDiv;
+      const r = yy + rOffset, b = yy + bOffset, g = (yy - kr * r - kb * b) / kg;
+      // Bitwise operations apply only to packed color bytes, not offsets.
+      output[out++] = 0xff000000 | (quantizeRgb8(b) << 16) | (quantizeRgb8(g) << 8) | quantizeRgb8(r);
+    }
+  }
+  return true;
+}
+
 /** Bounded CPU fallback. PQ output uses a declared luminance-preserving
  * Reinhard operator followed by clipping/quantization to sRGB. Transfer table
  * interpolation is an RGB8 approximation and is never used for full HDR. The
@@ -106,6 +178,10 @@ export function rawToRgba(frame: RawPlaneFrame, options: { readonly allowSdrTone
         data[out++] = src[at]!; data[out++] = src[at + 1]!; data[out++] = src[at + 2]!; data[out++] = src[at + 3]!;
       }
     }
+    return { width, height, data, transform: 'sdr-bt709' };
+  }
+
+  if (!hdr && format === 'I420P10' && convertSdrI420P10(frame, width, height, scale, sourceX, data)) {
     return { width, height, data, transform: 'sdr-bt709' };
   }
 

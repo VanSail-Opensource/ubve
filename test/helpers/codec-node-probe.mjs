@@ -22,7 +22,7 @@ export class CodecNodeProbe {
     const setup = new CodecNodeProbe();
     setup.stamp = sessionStamp(crypto.randomUUID(), 0);
     try {
-      setup.media = await openMedia(new Blob([source]), { stamp: setup.stamp });
+      setup.media = await openMedia(source instanceof Blob ? source : new Blob([source]), { stamp: setup.stamp });
       const options = { stamp: setup.stamp, assetBaseUrl, outputFrames };
       const vt = setup.media.tracks.find(track => track.codec === 'av1');
       const at = setup.media.tracks.find(track => track.codec === 'truehd');
@@ -45,10 +45,13 @@ export class CodecNodeProbe {
     const results = await Promise.allSettled([this.video?.dispose(), this.audio?.dispose(), this.media?.dispose()]);
     for (const result of results) if (result.status === 'rejected') throw result.reason;
   }
-  async run({ expectedVideoFrames = 0, allowUnknownHdrFields = false, expectedStaticHdr } = {}) {
+  async run({ expectedVideoFrames = 0, allowUnknownHdrFields = false, expectedStaticHdr, pixelFormat = 'I420P10', timeoutMs = 20_000, prefixPictures = 0 } = {}) {
+    assert.ok(!prefixPictures || (!expectedVideoFrames && !this.audio), 'Prefix tests are an independent video-only lane');
     const abort = new AbortController(), op = name => operationContext(this.stamp, name, abort.signal, 15_000);
     const pcm = createHash('sha256'), videoSha256 = [], videoOrigins = new Map();
-    let held, hdr, samples = 0, audioNext = null, videoLedgerItemsAtEos, allHdrFieldsAdmitted = true;
+    let held, hdr, firstColor, samples = 0, audioNext = null, videoLedgerItemsAtEos, allHdrFieldsAdmitted = true;
+    let prefixReached = false;
+    const timingProvenance = new Set();
     const consume = Promise.all([...this.routes.values()].map(decoder => (async () => {
       for (;;) {
         const output = await decoder.readOutput(op('read'));
@@ -62,7 +65,8 @@ export class CodecNodeProbe {
             assert.deepEqual(output.pts, { ticks: packet.ptsTicks, timeBase: packet.timeBase });
             assert.equal(output.durationTicks, packet.durationTicks);
             videoOrigins.delete(output.sourcePacketId);
-            assert.equal(payload.format, 'I420P10');
+            assert.equal(payload.format, pixelFormat);
+            firstColor ??= payload.color;
             assert.ok(payload.signalMetadata);
             const metadata = payload.signalMetadata;
             const admission = assessPrimaryHdr10(metadata);
@@ -75,6 +79,11 @@ export class CodecNodeProbe {
               hdr ??= staticHdr;
             }
             videoSha256.push(sha(payload.data));
+            if (prefixPictures && videoSha256.length === prefixPictures) {
+              prefixReached = true;
+              abort.abort();
+              break;
+            }
             if (expectedVideoFrames && videoSha256.length === expectedVideoFrames) {
               held = output.payload.move();
               break;
@@ -92,7 +101,10 @@ export class CodecNodeProbe {
     const produce = (async () => {
       for await (const packet of this.media.packets([...this.routes.keys()], { stamp: this.stamp, signal: abort.signal })) {
         const decoder = this.routes.get(packet.trackId);
-        if (decoder === this.video) videoOrigins.set(packet.id, { ptsTicks: packet.ptsTicks, timeBase: packet.timeBase, durationTicks: packet.durationTicks });
+        if (decoder === this.video) {
+          videoOrigins.set(packet.id, { ptsTicks: packet.ptsTicks, timeBase: packet.timeBase, durationTicks: packet.durationTicks });
+          timingProvenance.add(packet.timingProvenance.kind);
+        }
         try {
           const work = decoder.trySubmit(packet, op('submit'));
           if (work.status !== 'accepted') throw work.error ?? Error(`Unexpected backpressure: ${work.reason}`);
@@ -100,13 +112,13 @@ export class CodecNodeProbe {
         } finally { packet.bytes.release(); }
       }
       await Promise.all([...this.routes.values()].map(decoder => decoder.flushEndOfStream(op('eos'))));
-    })();
+    })().catch(error => { if (!prefixReached) throw error; });
     try {
-      await rejectWithin(Promise.all([produce, consume]), 20_000, 'Component decode transaction did not finish');
-      videoLedgerItemsAtEos = this.video.snapshot().output.items;
+      await rejectWithin(Promise.all([produce, consume]), timeoutMs, 'Component decode transaction did not finish');
+      videoLedgerItemsAtEos = prefixReached ? null : this.video.snapshot().output.items;
       if (held) assert.equal(await this.video.readOutput(op('verify-eos')), null);
       const observedVideoThreads = this.video.diagnostics().environment.childThreads;
-      return { videoSha256, hdr, allHdrFieldsAdmitted, samples, audioSha256: pcm.digest('hex'), videoLedgerItemsAtEos, observedVideoThreads };
+      return { videoSha256, hdr, firstColor, timingProvenance: [...timingProvenance], allHdrFieldsAdmitted, samples, audioSha256: pcm.digest('hex'), videoLedgerItemsAtEos, observedVideoThreads };
     } catch (error) { abort.abort(); throw error; }
     finally { held?.release(); }
   }

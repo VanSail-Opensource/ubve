@@ -1,4 +1,4 @@
-import { BudgetLedger, EngineError, OwnedLease, byteLength, byteRange, checkedSourceRange, checkOperation, sourceIdentity, type ByteRange, type OperationContext, type RandomAccessSource, type SourceRead } from '@ubve/core';
+import { BudgetLedger, CancellationController, EngineError, OwnedLease, byteLength, byteRange, checkedSourceRange, checkOperation, sourceIdentity, type ByteRange, type OperationContext, type RandomAccessSource, type SourceRead } from '@ubve/core';
 import { browserScheduler, withOperation } from './operations.js';
 
 export interface SourceStatistics { requestedBytes: number; deliveredBytes: number; reads: number; activeReads: number; peakActiveReads: number; cacheBytes: number; cacheHits: number; peakCacheBytes: number; }
@@ -87,6 +87,10 @@ export class SourceCache {
   #serial: Promise<unknown> = Promise.resolve();
   readonly #results = new BudgetLedger({ bytes: byteLength(64 * 1024 * 1024), items: 262144, maxSingleItemBytes: byteLength(32 * 1024 * 1024) });
   readonly #retained = new Set<OwnedLease<Uint8Array>>();
+  readonly #providerStreams = new Set<(reason: EngineError) => void>();
+  #providerBytes = 0; #providerPeak = 0; #providerReadBytes = 0; #providerReads = 0;
+  #localMetadata: { start: number; end: number; lease: OwnedLease<Uint8Array> } | null = null;
+  #metadataMovedBytes = 0;
   constructor(source: RandomAccessSource, capacity = 8 * 1024 * 1024, pageBytes = 256 * 1024) {
     if (!Number.isSafeInteger(capacity) || !Number.isSafeInteger(pageBytes) || pageBytes < 1 || capacity < pageBytes) throw new EngineError('INVALID_ARGUMENT', 'Invalid cache bounds');
     this.source = source; this.capacity = capacity; this.pageBytes = pageBytes;
@@ -96,6 +100,108 @@ export class SourceCache {
     const result = await this.readOwned(start, end, operation);
     if (this.#closed) { result.release(); throw new EngineError('DISPOSED', 'Cache closed before retained parser result delivery'); }
     this.#retained.add(result); return result.borrow();
+  }
+  /** One small, exact local moov window. No page-sized read across mdat. */
+  async preloadLocalMetadata(start: number, end: number, operation: OperationContext): Promise<void> {
+    const length = end - start;
+    if (!(this.source instanceof BlobSource) || this.source.size <= this.pageBytes || this.#localMetadata
+      || length < 1 || length > 128 * 1024 || length > this.capacity - this.#bytes) return;
+    const lease = await this.#readLocalOwned(start, end, operation);
+    try {
+      if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed before metadata window delivery');
+      checkOperation(operation, browserScheduler);
+      if (this.#localMetadata || length > this.capacity - this.#bytes) { lease.release(); return; }
+      this.#localMetadata = { start, end, lease };
+    } catch (error) { lease.release(); throw error; }
+  }
+  releaseLocalMetadata(): void { this.#localMetadata?.lease.release(); this.#localMetadata = null; }
+  /** Local index/header probe. No media page is fetched for a few metadata bytes. */
+  async readLocalProbe<T>(start: number, end: number, operation: OperationContext, parse: (bytes: Uint8Array) => T): Promise<T> {
+    if (!(this.source instanceof BlobSource) || this.source.size <= this.pageBytes) return this.readValue(start, end, operation, parse);
+    const window = this.#localMetadata;
+    if (!this.#closed && window && start >= window.start && end <= window.end && start <= end) {
+      byteRange(start, end);
+      checkOperation(operation, browserScheduler);
+      return parse(window.lease.borrow().subarray(start - window.start, end - window.start));
+    }
+    const lease = await this.#readLocalOwned(start, end, operation);
+    try { return parse(lease.borrow()); } finally { lease.release(); }
+  }
+  async #readLocalOwned(start: number, end: number, operation: OperationContext, moveWindow = false): Promise<OwnedLease<Uint8Array>> {
+    if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed');
+    const range = byteRange(start, end);
+    checkedSourceRange(range, this.source.size);
+    if (end - start > 32 * 1024 * 1024) throw new EngineError('ITEM_TOO_LARGE', 'One local parser probe exceeds 32 MiB');
+    const window = this.#localMetadata;
+    if (moveWindow && window?.start === start && window.end === end) {
+      checkOperation(operation, browserScheduler);
+      const lease = window.lease.move();
+      this.#localMetadata = null;
+      this.#metadataMovedBytes += lease.bytes;
+      return lease;
+    }
+    const read = await this.source.readExact(range, operation);
+    try {
+      if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed before local probe delivery');
+      checkOperation(operation, browserScheduler);
+      return read.bytes;
+    } catch (error) { read.bytes.release(); throw error; }
+  }
+  /**
+   * Mediabunny 1.66.4 copies a yielded chunk into its pending parser slice
+   * (provider cache disabled), then issues reader.cancel() when it has the
+   * requested bytes. Keep the stream open to receive that acknowledgement.
+   * The application-owned lease is retired only after that handoff or abort.
+   */
+  readProviderStream(start: number, end: number, operation: OperationContext, localMetadata = false): ReadableStream<Uint8Array> {
+    if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed');
+    checkedSourceRange(byteRange(start, end), this.source.size);
+    if (end <= start || end - start > 32 * 1024 * 1024) throw new EngineError('ITEM_TOO_LARGE', 'Provider stream requires 1 to 32 MiB of source bytes');
+    const cancellation = new CancellationController();
+    const unsubscribe = operation.cancellation.subscribe(reason => cancellation.abort(reason));
+    const guarded = { ...operation, cancellation: cancellation.signal };
+    let outbound: OwnedLease<Uint8Array> | null = null;
+    let started = false, retired = false;
+    let stop: (reason: EngineError) => void;
+    const retire = (reason?: EngineError) => {
+      if (retired) return;
+      retired = true;
+      this.#providerStreams.delete(stop);
+      unsubscribe();
+      cancellation.abort(reason);
+      if (outbound) { this.#providerBytes -= outbound.bytes; outbound.release(); outbound = null; }
+    };
+    return new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        stop = reason => {
+          try { controller.error(reason); } finally { retire(reason); }
+        };
+        this.#providerStreams.add(stop);
+      },
+      pull: async controller => {
+        if (started) {
+          stop(new EngineError('INVALID_PACKET', 'Provider requested data beyond its exact source range'));
+          return;
+        }
+        started = true;
+        try {
+          const lease = localMetadata && this.source instanceof BlobSource
+            ? await this.#readLocalOwned(start, end, guarded, true)
+            : await this.readOwned(start, end, guarded);
+          if (retired) { lease.release(); return; }
+          try { checkOperation(guarded, browserScheduler); } catch (error) { lease.release(); throw error; }
+          outbound = lease;
+          this.#providerBytes += lease.bytes; this.#providerReadBytes += lease.bytes; this.#providerReads++;
+          this.#providerPeak = Math.max(this.#providerPeak, this.#providerBytes);
+          controller.enqueue(lease.borrow());
+        } catch (error) {
+          if (!retired) {
+            try { controller.error(error); } finally { retire(); }
+          }
+        }
+      },
+      cancel: () => { retire(); },
+    }, { highWaterMark: 0 });
   }
   /** Synchronous field parsing cannot retain this lease past the callback. */
   async readValue<T>(start: number, end: number, operation: OperationContext, parse: (bytes: Uint8Array) => T): Promise<T> {
@@ -135,6 +241,7 @@ export class SourceCache {
     if (existing) { this.#pages.delete(page); this.#pages.set(page, existing); this.#hits++; return existing; }
     const pending = this.#pending.get(page); if (pending) return pending;
     const start = page * this.pageBytes, end = Math.min(this.source.size, start + this.pageBytes);
+    if (this.#bytes + end - start + (this.#localMetadata?.lease.bytes ?? 0) > this.capacity) this.releaseLocalMetadata();
     while (this.#bytes + end - start > this.capacity) {
       const first = this.#pages.entries().next().value as [number, OwnedLease<Uint8Array>] | undefined;
       if (!first) break;
@@ -150,10 +257,15 @@ export class SourceCache {
     }).finally(() => this.#pending.delete(page));
     this.#pending.set(page, work); return work;
   }
-  snapshot() { return { bytes: this.#bytes, peakBytes: this.#peak, hits: this.#hits, pages: this.#pages.size, readResults: this.#results.snapshot(), retainedParserResults: this.#retained.size }; }
+  snapshot() { return { bytes: this.#bytes, peakBytes: this.#peak, hits: this.#hits, pages: this.#pages.size, readResults: this.#results.snapshot(), retainedParserResults: this.#retained.size,
+    provider: { activeStreams: this.#providerStreams.size, activeBytes: this.#providerBytes, peakBytes: this.#providerPeak, reads: this.#providerReads, deliveredBytes: this.#providerReadBytes },
+    localMetadataWindow: { heldBytes: this.#localMetadata?.lease.bytes ?? 0, movedToProviderBytes: this.#metadataMovedBytes } };
+  }
   close(): Promise<void> {
     if (this.#shutdown) return this.#shutdown;
     this.#closed = true;
+    this.releaseLocalMetadata();
+    for (const stop of this.#providerStreams) stop(new EngineError('DISPOSED', 'Cache closed'));
     const sourceClose = this.source.close();
     this.#shutdown = (async () => { await this.#serial; await Promise.allSettled([...this.#pending.values()]);
     for (const page of this.#pages.values()) page.release();

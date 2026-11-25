@@ -105,9 +105,10 @@ export async function openMedia(value: MediaInput, options: OpenMediaOptions = {
   const cache = new SourceCache(source, options.cacheBytes);
   let input: Input | null = null;
   try {
-    const preflight = await preflightMetadata(cache, op());
+    const preflight = await preflightMetadata(cache, op(), true);
     const matroska = preflight.format === 'matroska' ? await readMatroskaMetadata(cache, op()) : null;
-    input = new Input({ source: new CustomSource({ getSize: () => source.size, read: (start, end) => cache.read(start, end, op()), maxCacheSize: 0, prefetchProfile: 'none' }), formats: ALL_FORMATS });
+    let localMp4Metadata = preflight.format === 'isobmff' && source instanceof BlobSource && source.size > cache.pageBytes;
+    input = new Input({ source: new CustomSource({ getSize: () => source.size, read: (start, end) => cache.readProviderStream(start, end, op(), localMp4Metadata), maxCacheSize: 0, prefetchProfile: 'none' }), formats: ALL_FORMATS });
     const nativeTracks = await input.getTracks(); if (nativeTracks.length > 32) throw new EngineError('ITEM_TOO_LARGE', 'Track count exceeds 32');
     const tracks: MediaTrack[] = [];
     const rawTracks: (MatroskaTrack | null)[] = matroska ? matroska.tracks : nativeTracks.map(() => null);
@@ -136,6 +137,8 @@ export async function openMedia(value: MediaInput, options: OpenMediaOptions = {
     const duration = matroska?.duration ?? await input.getDurationFromMetadata();
     let mimeType = ''; try { mimeType = await input.getMimeType(); } catch { /* Exact unsupported codec remains in track descriptor. */ }
     const format = await input.getFormat();
+    localMp4Metadata = false;
+    cache.releaseLocalMetadata();
     return new MediaSourceSession(input, source, cache, tracks, duration, mimeType, format.constructor.name.replace('InputFormat', '').toLowerCase(), matroska, preflight, stamp);
   } catch (error) { input?.dispose(); await cache.close(); throw error; }
 }

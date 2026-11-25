@@ -188,6 +188,8 @@ const abortError = (): DOMException => new DOMException('Operation was supersede
 const isAbort = (error: unknown): boolean => error instanceof DOMException && error.name === 'AbortError';
 const finiteTime = (value: number): number => Number.isFinite(value) ? Math.max(0, value) : 0;
 const toMediaTime = (seconds: number) => mediaTime(BigInt(Math.round(finiteTime(seconds) * 1_000_000)), timeBase(1n, 1_000_000n));
+const NATIVE_OBSERVATION_INTERVAL_MS = 250;
+const NATIVE_PLAY_DEADLINE_MS = 15_000;
 
 /** Uses native currentTime as API-derived seconds; never claims recovered container ticks. */
 export class ReferencePlayer {
@@ -200,6 +202,7 @@ export class ReferencePlayer {
   #transportTask: Promise<void> | null = null;
   #transportKind: 'seek' | 'audio' | null = null;
   #playAttempt: { readonly intent: number; readonly done: Promise<void> } | null = null;
+  #nativePlayAbort: AbortController | null = null;
   #playIntent = 0;
   #prepared: PreparedPlayback | null = null;
   #preparedErrorUnsubscribe: (() => void) | null = null;
@@ -221,8 +224,11 @@ export class ReferencePlayer {
   #selectedAudio: string | null = null;
   #desiredPlaying = false;
   #callbackId: number | null = null;
+  #callbackTimer: ReturnType<typeof setTimeout> | null = null;
   #lastCallbackTime: number | null = null;
   #lastPresented: number | null = null;
+  #rateFrameAnchor: number | null = null;
+  #frameObservationSamples = 0;
   #callbackRate: number | null = null;
   #processingMs: number | null = null;
   readonly #timer: ReturnType<typeof setInterval>;
@@ -267,10 +273,14 @@ export class ReferencePlayer {
   snapshot(): PlayerSnapshot {
     const video = this.video;
     const managed = this.#prepared?.driver?.snapshot();
-    const playback = typeof video.getVideoPlaybackQuality === 'function' ? video.getVideoPlaybackQuality() : null;
+    const playback = this.#prepared && !managed && typeof video.getVideoPlaybackQuality === 'function' ? video.getVideoPlaybackQuality() : null;
     let bufferedSeconds = 0;
-    for (let i = 0; i < video.buffered.length; i++) {
-      if (video.buffered.start(i) <= video.currentTime && video.buffered.end(i) >= video.currentTime) bufferedSeconds = video.buffered.end(i) - video.currentTime;
+    if (this.#prepared && !managed) {
+      const buffered = video.buffered, now = video.currentTime;
+      for (let i = 0; i < buffered.length; i++) {
+        const end = buffered.end(i);
+        if (buffered.start(i) <= now && end >= now) { bufferedSeconds = end - now; break; }
+      }
     }
     const subtitleStatus = this.#subtitles?.getStatus();
     const outputSource = this.#prepared?.source;
@@ -291,7 +301,7 @@ export class ReferencePlayer {
       subtitleOffset: this.#subtitleOffset, requiresOverlay: subtitleStatus?.requiresOverlay ?? false,
       transforms: managed?.transforms ?? Object.freeze(this.#quality === 'full' ? ['Original source raster', 'Full subtitle raster', 'Browser output mapping'] :
         ['Original source decode retained', 'Subtitle raster capped at 1080p', 'No temporal frame dropping']),
-      telemetry: Object.freeze({ presentedFrames: playback?.totalVideoFrames ?? this.#lastPresented,
+      telemetry: Object.freeze({ presentedFrames: playback ? Math.max(0, playback.totalVideoFrames - playback.droppedVideoFrames) : this.#lastPresented,
         droppedFrames: playback?.droppedVideoFrames ?? null, callbackRate: this.#callbackRate,
         processingMs: this.#processingMs, bufferedSeconds, explicitBytes: null,
         ...this.#prepared?.telemetry?.(), ...managed?.telemetry, acceleration: 'unknown', hdrOutput: 'unverified',
@@ -367,9 +377,19 @@ export class ReferencePlayer {
   #resumePlayback(intent: number): Promise<void> {
     const generation = this.#generation;
     const driver = this.#prepared?.driver;
+    const sessionSignal = this.#sessionAbort?.signal;
+    const nativeStart = driver ? null : new AbortController();
+    if (nativeStart) {
+      this.#nativePlayAbort?.abort();
+      this.#nativePlayAbort = nativeStart;
+    }
     const done = (async () => {
       try {
-        if (driver) await driver.play(); else await this.video.play();
+        if (driver) await driver.play();
+        else {
+          if (!sessionSignal || !nativeStart) throw abortError();
+          await waitForNativePlay(this.video, AbortSignal.any([sessionSignal, nativeStart.signal]));
+        }
         if (generation !== this.#generation) throw abortError();
         if (intent !== this.#playIntent || !this.#desiredPlaying) return;
         if (this.#state !== 'failed') { this.#state = 'playing'; this.#emit(); }
@@ -377,9 +397,10 @@ export class ReferencePlayer {
         if (generation !== this.#generation) throw abortError();
         if (intent !== this.#playIntent || !this.#desiredPlaying) return;
         this.#desiredPlaying = false;
+        if (!driver && error instanceof EngineError && error.code === 'DEADLINE_EXCEEDED') this.video.pause();
         if (this.#state !== 'failed') this.#state = 'paused';
         this.#emit(); throw error;
-      }
+      } finally { if (this.#nativePlayAbort === nativeStart) this.#nativePlayAbort = null; }
     })();
     const attempt = { intent, done }; this.#playAttempt = attempt;
     const clear = (): void => { if (this.#playAttempt === attempt) this.#playAttempt = null; };
@@ -391,6 +412,7 @@ export class ReferencePlayer {
     this.#assertLive();
     const generation = this.#generation, intent = ++this.#playIntent;
     this.#desiredPlaying = false;
+    this.#nativePlayAbort?.abort();
     // Pause the native host synchronously before an awaited managed completion
     // could outlive this source and pause a newer one.
     this.video.pause();
@@ -428,6 +450,7 @@ export class ReferencePlayer {
     this.#seekAbort?.abort();
     const controller = new AbortController(), signal = AbortSignal.any([sessionSignal, controller.signal]), previous = this.#transportTask;
     this.#seekAbort = controller; this.#transportKind = kind; ++this.#playIntent;
+    this.#nativePlayAbort?.abort();
     this.#epochs?.advance(); this.#state = 'seeking';
     if (atEnd) this.#desiredPlaying = false;
     this.video.pause();
@@ -527,7 +550,11 @@ export class ReferencePlayer {
     });
   }
 
-  diagnostics(): Readonly<Record<string, unknown>> { return { snapshot: this.snapshot(), managed: this.#prepared?.driver?.diagnostics?.() ?? null }; }
+  diagnostics(): Readonly<Record<string, unknown>> {
+    return { snapshot: this.snapshot(), managed: this.#prepared?.driver?.diagnostics?.() ?? null,
+      native: this.#prepared && !this.#prepared.driver ? { frameObservationSamples: this.#frameObservationSamples,
+        lastCompositorReportedFrames: this.#lastPresented, readyState: this.video.readyState, networkState: this.video.networkState } : null };
+  }
 
   /** Adapter error boundary for asynchronous presentation failures. */
   reportOutputFailure(error: unknown): void { if (!this.#disposed && this.#prepared) this.#fail(error); }
@@ -557,8 +584,11 @@ export class ReferencePlayer {
     this.#seekAbort?.abort(); this.#seekAbort = null;
     this.#epochs?.dispose(); this.#epochs = null;
     this.#desiredPlaying = false; ++this.#playIntent;
+    this.#nativePlayAbort?.abort(); this.#nativePlayAbort = null;
     if (this.#callbackId !== null) this.video.cancelVideoFrameCallback(this.#callbackId);
-    this.#callbackId = null; this.#lastCallbackTime = null; this.#lastPresented = null; this.#callbackRate = null; this.#processingMs = null;
+    if (this.#callbackTimer !== null) clearTimeout(this.#callbackTimer);
+    this.#callbackId = null; this.#callbackTimer = null; this.#lastCallbackTime = null; this.#lastPresented = null;
+    this.#rateFrameAnchor = null; this.#frameObservationSamples = 0; this.#callbackRate = null; this.#processingMs = null;
     const prepared = this.#prepared; this.#prepared = null;
     const transport = this.#transportTask;
     this.#transportTask = null; this.#transportKind = null;
@@ -580,23 +610,29 @@ export class ReferencePlayer {
   #beginFrameObservation(): void {
     if (typeof this.video.requestVideoFrameCallback !== 'function') return;
     const generation = this.#generation;
+    const active = (): boolean => !this.#disposed && generation === this.#generation;
+    const schedule = (): void => { if (active()) this.#callbackId = this.video.requestVideoFrameCallback(observe); };
     const observe: VideoFrameRequestCallback = (now, metadata): void => {
-      if (this.#disposed || generation !== this.#generation) return;
-      if (this.#lastCallbackTime !== null && this.#lastPresented !== null && now - this.#lastCallbackTime >= 1000) {
-        this.#callbackRate = (metadata.presentedFrames - this.#lastPresented) * 1000 / (now - this.#lastCallbackTime);
-        this.#lastCallbackTime = now; this.#lastPresented = metadata.presentedFrames;
-      } else if (this.#lastCallbackTime === null) { this.#lastCallbackTime = now; this.#lastPresented = metadata.presentedFrames; }
+      if (!active()) return;
+      this.#callbackId = null; this.#frameObservationSamples++;
+      this.#lastPresented = metadata.presentedFrames;
+      if (this.#lastCallbackTime !== null && this.#rateFrameAnchor !== null && now - this.#lastCallbackTime >= 1000) {
+        this.#callbackRate = Math.max(0, metadata.presentedFrames - this.#rateFrameAnchor) * 1000 / (now - this.#lastCallbackTime);
+        this.#lastCallbackTime = now; this.#rateFrameAnchor = metadata.presentedFrames;
+      } else if (this.#lastCallbackTime === null) { this.#lastCallbackTime = now; this.#rateFrameAnchor = metadata.presentedFrames; }
       this.#processingMs = metadata.processingDuration === undefined ? null : metadata.processingDuration * 1000;
-      this.#callbackId = this.video.requestVideoFrameCallback(observe);
+      // presentedFrames is cumulative. Sample the signal instead of running a
+      // JavaScript callback for every picture on high-refresh native playback.
+      this.#callbackTimer = setTimeout(() => { if (!active()) return; this.#callbackTimer = null; schedule(); }, NATIVE_OBSERVATION_INTERVAL_MS);
     };
-    this.#callbackId = this.video.requestVideoFrameCallback(observe);
+    schedule();
   }
   #fail(error: unknown): void {
     this.#state = 'failed'; this.#desiredPlaying = false; this.video.pause();
     if (!this.#error) this.#error = Object.freeze({ code: error instanceof EngineError ? error.code : 'PLAYBACK_ERROR', message: error instanceof Error ? error.message : String(error) });
     this.#emit();
   }
-  #emit(): void { const snapshot = this.snapshot(); for (const listener of this.#listeners) listener(snapshot); }
+  #emit(): void { if (!this.#listeners.size) return; const snapshot = this.snapshot(); for (const listener of this.#listeners) listener(snapshot); }
   #assertLive(): void { if (this.#disposed) throw new EngineError('DISPOSED', 'Player is disposed', 'new-session'); }
   #requireSource(): void { this.#assertLive(); if (!this.#prepared || this.#state === 'opening' || this.#state === 'failed') throw new EngineError('INVALID_ARGUMENT', 'Open a playable source first'); }
 }
@@ -632,7 +668,19 @@ export async function prepareDirectPlayback(input: MediaInput, signal: AbortSign
 export function mediaElementError(video: HTMLVideoElement): EngineError {
   const code = video.error?.code;
   const explanation = code === 2 ? 'Media download failed. Check the URL, connection and origin permissions.' : code === 3 ? 'The browser could not decode this media profile.' : code === 4 ? 'No available playback route accepts this container or codec profile.' : 'Playback was interrupted.';
-  return new EngineError('UNSUPPORTED_CODEC', video.error?.message ? `${explanation} ${video.error.message}` : explanation, 'caller-fix', { mediaErrorCode: code ?? null });
+  return new EngineError(code === 2 ? 'NETWORK' : code === 1 ? 'CANCELLED' : 'UNSUPPORTED_CODEC', video.error?.message ? `${explanation} ${video.error.message}` : explanation, 'caller-fix', { mediaErrorCode: code ?? null });
+}
+
+function waitForNativePlay(video: HTMLVideoElement, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(abortError());
+  return new Promise((resolve, reject) => {
+    const cleanup = (): void => { clearTimeout(timer); signal.removeEventListener('abort', abort); };
+    const abort = (): void => { cleanup(); reject(abortError()); };
+    const timer = setTimeout(() => { cleanup(); reject(new EngineError('DEADLINE_EXCEEDED', 'Native playback did not start within 15 seconds. Check the source and connection, then retry.', 'caller-fix')); }, NATIVE_PLAY_DEADLINE_MS);
+    signal.addEventListener('abort', abort, { once: true });
+    try { void video.play().then(() => { cleanup(); resolve(); }, error => { cleanup(); reject(error); }); }
+    catch (error) { cleanup(); reject(error); }
+  });
 }
 
 export function waitForMedia(video: HTMLVideoElement, event: string, ready: () => boolean, signal: AbortSignal, deadlineMs: number): Promise<void> {

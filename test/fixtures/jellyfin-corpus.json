@@ -1,0 +1,115 @@
+{
+  "source": "https://syd1.mirror.jellyfin.org/test-videos/",
+  "attribution": "Gnattu / Jellyfin Test Videos, Creative Commons Attribution-ShareAlike",
+  "license": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "cases": [
+    {
+      "id": "sdr-avc-1080p-3m",
+      "path": "SDR/AVC/Test Jellyfin 1080p AVC 3M.mp4",
+      "sha256": "30f19d65b19f606f5352deb956843692cb6cee9a5bcfb43fce549f94e3bd29ce",
+      "bytes": 11302222,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AVC/Test%20Jellyfin%201080p%20AVC%203M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AVC/Test%20Jellyfin%201080p%20AVC%203M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "sdr-av1-1080p-3m",
+      "path": "SDR/AV1/Test Jellyfin 1080p AV1 10bit 3M.mp4",
+      "sha256": "a11793902fdc36012221b05b12ebb5b959fb75b3316bd2723f08b02a7e86f165",
+      "bytes": 11215840,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AV1/Test%20Jellyfin%201080p%20AV1%2010bit%203M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AV1/Test%20Jellyfin%201080p%20AV1%2010bit%203M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "sdr-hevc8-1080p-3m",
+      "path": "SDR/HEVC 8bit/Test Jellyfin 1080p HEVC 8bit 3M.mp4",
+      "sha256": "92f37ccb4b4f50937455a8aadf3a6578faaeb0550b65271777d9537a204cd2ab",
+      "bytes": 11312372,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/HEVC%208bit/Test%20Jellyfin%201080p%20HEVC%208bit%203M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/HEVC%208bit/Test%20Jellyfin%201080p%20HEVC%208bit%203M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "sdr-hevc10-1080p-3m",
+      "path": "SDR/HEVC 10bit/Test Jellyfin 1080p HEVC 10bit 3M.mp4",
+      "sha256": "b4dc866907df217157c53288db95ff22e002ec3e24cd818de6616ff06a1d6cae",
+      "bytes": 11309002,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/HEVC%2010bit/Test%20Jellyfin%201080p%20HEVC%2010bit%203M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/HEVC%2010bit/Test%20Jellyfin%201080p%20HEVC%2010bit%203M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "hdr10-av1-1080p-3m",
+      "path": "HDR/HDR10/AV1/Test Jellyfin 1080p AV1 HDR10 3M.mp4",
+      "sha256": "468c03a1121da1baafd60b43d2eedad2617e0a821f0af98415a5518403e7c999",
+      "bytes": 11211132,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/HDR10/AV1/Test%20Jellyfin%201080p%20AV1%20HDR10%203M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/HDR10/AV1/Test%20Jellyfin%201080p%20AV1%20HDR10%203M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "hdr10-hevc-1080p-3m",
+      "path": "HDR/HDR10/HEVC/Test Jellyfin 1080p HEVC HDR10 3M.mp4",
+      "sha256": "d43f639286308c5f90f79d7df93828e995a674e9bb6cf54653d146bc72d360e9",
+      "bytes": 11298717,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/HDR10/HEVC/Test%20Jellyfin%201080p%20HEVC%20HDR10%203M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/HDR10/HEVC/Test%20Jellyfin%201080p%20HEVC%20HDR10%203M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "sdr-av1-1080p-30m",
+      "path": "SDR/AV1/Test Jellyfin 1080p AV1 10bit 30M.mp4",
+      "sha256": "fe29595a2e601e9801b358fb1593dc6029b4e0e26f64194ca6353a5eece343e4",
+      "bytes": 112231832,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AV1/Test%20Jellyfin%201080p%20AV1%2010bit%2030M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AV1/Test%20Jellyfin%201080p%20AV1%2010bit%2030M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "sdr-avc-4k-40m",
+      "path": "SDR/AVC/Test Jellyfin 4K AVC 40M.mp4",
+      "sha256": "247511299989ae9d194c09012f10740f7d074d0fd7768073f2b8f0424c2060df",
+      "bytes": 147427349,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AVC/Test%20Jellyfin%204K%20AVC%2040M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AVC/Test%20Jellyfin%204K%20AVC%2040M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "sdr-av1-4k-40m",
+      "path": "SDR/AV1/Test Jellyfin 4K AV1 10bit 40M.mp4",
+      "sha256": "fb983a54771f79e2011743a5baf1e89d3db177655801218de1c339e71fa27765",
+      "bytes": 149528369,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AV1/Test%20Jellyfin%204K%20AV1%2010bit%2040M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/SDR/AV1/Test%20Jellyfin%204K%20AV1%2010bit%2040M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "hdr10-av1-4k-40m",
+      "path": "HDR/HDR10/AV1/Test Jellyfin 4K AV1 HDR10 40M.mp4",
+      "sha256": "b103cb6d6bd86750a7c8d79d1b8f1632618ba5c53a82a49d659f81f176f8b55a",
+      "bytes": 149579487,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/HDR10/AV1/Test%20Jellyfin%204K%20AV1%20HDR10%2040M.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/HDR10/AV1/Test%20Jellyfin%204K%20AV1%20HDR10%2040M.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "dv5-1080p",
+      "path": "HDR/Dolby Vision/Test Jellyfin 1080p DV P5.mp4",
+      "sha256": "c0dedeeef7d11c404955e126f9544318cdeb6eab62423528cfde9b567e8ca1a4",
+      "bytes": 50039227,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/Dolby%20Vision/Test%20Jellyfin%201080p%20DV%20P5.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/Dolby%20Vision/Test%20Jellyfin%201080p%20DV%20P5.mp4.sha256sum",
+      "expect": "observe"
+    },
+    {
+      "id": "dv81-1080p",
+      "path": "HDR/Dolby Vision/Test Jellyfin 1080p DV P8.1.mp4",
+      "sha256": "266cda3ffbf46bb73daaf38716ed7dfb2b49e689ca5eb18c585426c1a57957d4",
+      "bytes": 48198953,
+      "sourceUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/Dolby%20Vision/Test%20Jellyfin%201080p%20DV%20P8.1.mp4",
+      "checksumUrl": "https://syd1.mirror.jellyfin.org/test-videos/HDR/Dolby%20Vision/Test%20Jellyfin%201080p%20DV%20P8.1.mp4.sha256sum",
+      "expect": "observe"
+    }
+  ]
+}

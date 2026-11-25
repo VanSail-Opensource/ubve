@@ -80,16 +80,36 @@ try {
   assert.equal(result.paused, '10000'); assert.equal(result.disposed, 'closed');
   assert.equal(result.events.filter(e => e.type === 'disposed').length, 1);
   const assFixture = await readFile('test/fixtures/sample.ass', 'utf8');
-  const subtitleStatus = await page.evaluate(async fixture => {
+  const subtitleStartup = await page.evaluate(async fixture => {
     const { SubtitleController } = await import('/presentation.js');
     const video = document.querySelector('video'), overlay = document.querySelector('#overlay');
-    const subtitles = new SubtitleController({ video, overlay });
-    window.__ubveSubtitleProbe = subtitles;
-    subtitles.setExternalClock(true);
-    await subtitles.load({ kind: 'ass', data: fixture });
-    return subtitles.getStatus();
+    const request = video.requestVideoFrameCallback, cancel = video.cancelVideoFrameCallback;
+    const requested = [], cancelled = [];
+    video.requestVideoFrameCallback = function(callback) {
+      const id = request.call(this, callback); requested.push(id); return id;
+    };
+    video.cancelVideoFrameCallback = function(id) { cancelled.push(id); cancel.call(this, id); };
+    try {
+      const subtitles = new SubtitleController({ video, overlay });
+      window.__ubveSubtitleProbe = subtitles;
+      const noSubtitles = requested.length;
+      subtitles.setExternalClock(true);
+      await subtitles.load({ kind: 'ass', data: fixture });
+      const externalClock = requested.length;
+      subtitles.followVideo();
+      const nativeOverlay = requested.length;
+      subtitles.setExternalClock(true);
+      return { status: subtitles.getStatus(), nativeClock: { noSubtitles, externalClock, nativeOverlay, requested, cancelled } };
+    } finally {
+      video.requestVideoFrameCallback = request; video.cancelVideoFrameCallback = cancel;
+    }
   }, assFixture);
+  const { status: subtitleStatus, nativeClock } = subtitleStartup;
   assert.equal(subtitleStatus.renderer, 'jassub-2.5.38');
+  assert.equal(nativeClock.noSubtitles, 0, 'No subtitle selection should register a native frame callback');
+  assert.equal(nativeClock.externalClock, 0, 'An externally clocked subtitle overlay should not register a native frame callback');
+  assert.equal(nativeClock.nativeOverlay, 1, 'A ready native-clock overlay must register one frame callback');
+  assert.deepEqual(nativeClock.cancelled, nativeClock.requested, 'Switching back to the external clock must cancel the native frame callback');
   const capture = async time => {
     await page.evaluate(async time => {
       await window.__ubveSubtitleProbe.renderAt(time, 640, 360);
@@ -126,7 +146,7 @@ try {
   const evidence = { schema: 'ubve-presentation-browser-v1', recordedAt: new Date().toISOString(),
     status: 'COMPONENT_VERIFIED', qualifiedPlayback: false, gpuExecuted: false, nativeDecoderExecuted: false,
     scope: 'Real muted AudioWorklet, JASSUB screenshot witness across cue end/backward seek, and IMSC text update. No native-reference subtitle pixel fidelity, physical audio or combined player qualification.',
-    result, subtitles: { ass: { status: subtitleStatus, activeScreenshotSha256: assActive, afterEndScreenshotSha256: assAfterEnd, afterSeekScreenshotSha256: assAfterSeek, missingBundledFont }, imsc } };
+    result, subtitles: { ass: { status: subtitleStatus, nativeClock, activeScreenshotSha256: assActive, afterEndScreenshotSha256: assAfterEnd, afterSeekScreenshotSha256: assAfterSeek, missingBundledFont }, imsc } };
   await mkdir('evidence', { recursive: true }); await writeFile('evidence/presentation-browser.json', JSON.stringify(evidence, null, 2) + '\n');
   console.log('Real AudioWorklet, ASS raster and IMSC timed-cue checks passed.');
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }
