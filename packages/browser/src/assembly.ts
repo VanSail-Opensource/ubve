@@ -48,24 +48,43 @@ export async function preparePlayback(input: MediaInput, video: HTMLVideoElement
   try {
     media = await openMedia(input, { signal });
     if (signal.aborted) throw new DOMException('Open was cancelled', 'AbortError');
+    if (media.preflight.dolbyVision.length) {
+      const descriptions = media.preflight.dolbyVision.map(({ sampleEntry, profile, compatibilityId }) => {
+        if (profile === null) return `${sampleEntry} (profile unavailable)`;
+        return `P${profile}${profile === 8 && compatibilityId === 1 ? '.1' : ''}`;
+      });
+      const first = media.preflight.dolbyVision[0]!;
+      throw new EngineError('UNSUPPORTED_PROFILE', `Dolby Vision ${[...new Set(descriptions)].join(', ')} is signaled in this file. Dolby Vision output and an implicit compatibility-base fallback are not admitted by this player.`, 'caller-fix',
+        { sampleEntry: first.sampleEntry, dolbyVisionProfile: first.profile, dolbyVisionLevel: first.level, dolbyVisionCompatibilityId: first.compatibilityId });
+    }
     if (preference === 'managed') {
       if (!managed || !subtitles) throw new EngineError('INVALID_ARGUMENT', 'Managed playback requires an output host and subtitle controller');
       return new ManagedPlayback({ media, video, subtitles, signal, assetBaseUrl, ...managed }).asPrepared();
     }
     if (preference === 'experimental') return prepareNativeCandidate(media, video, signal, assetBaseUrl, subtitles);
-    const audio = selectDefault(media.tracks, 'audio');
+    const primaryVideo = selectDefault(media.tracks, 'video'), audio = selectDefault(media.tracks, 'audio');
     const requiredSubtitle = media.tracks.find(track => track.kind === 'subtitle' && (track.forced || track.default));
-    if (audio && ['truehd', 'dts', 'dts-hd'].includes(audio.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `${audio.codec.toUpperCase()} has no admitted native soundtrack path here. Select Experimental remux / audio bridge to try the lossless candidate.`, 'caller-fix');
+    if (audio?.codec === 'truehd') throw new EngineError('UNSUPPORTED_PROFILE', 'TrueHD has no admitted native soundtrack path here. Select Experimental remux / audio bridge to try the lossless candidate.', 'caller-fix');
+    if (audio && ['dts', 'dts-hd'].includes(audio.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `${audio.codec.toUpperCase()} has no admitted native or lossless bridge soundtrack path here.`, 'caller-fix');
     if (requiredSubtitle) throw new EngineError('UNSUPPORTED_PROFILE', 'The source requires an embedded subtitle track that native direct playback cannot preserve. Select a complete managed/remux route or add an external subtitle track.', 'caller-fix');
-    if (media.mimeType && !video.canPlayType(media.mimeType)) throw new EngineError('UNSUPPORTED_PROFILE', `The browser does not advertise support for ${media.mimeType}. Select an experimental candidate to try stream-copy remux.`, 'caller-fix');
+    const mime = media.mimeType;
+    const details = { mimeType: mime || null, videoCodec: primaryVideo?.codecString ?? null, audioCodec: audio?.codecString ?? null };
+    if (media.preflight.format === 'isobmff' && (!mime.includes('codecs=') || (primaryVideo && !primaryVideo.codecString) || (audio && !audio.codecString))) {
+      throw new EngineError('UNSUPPORTED_PROFILE', 'The exact selected MP4 codec configuration is unknown. Generic container acceptance does not admit this source.', 'caller-fix', details);
+    }
+    const nativeProbe = mime ? video.canPlayType(mime) : null;
+    if (nativeProbe === '') throw new EngineError('UNSUPPORTED_PROFILE', `Native direct playback is not advertised for ${mime} by this browser. Repackaging cannot add a missing decoder.`, 'caller-fix', details);
+    const source = describeMedia(media), tracks = mapTracks(media.tracks, false);
+    // The element owns the original File during native playback. Retain only
+    // the small, inspected metadata projection, not a second byte source/cache.
+    await media.dispose(); media = null;
     const direct = await prepareDirectPlayback(input, signal);
-    const owner = media;
     return {
-      ...direct, tracks: mapTracks(owner.tracks, false), source: describeMedia(owner),
+      ...direct, tracks, source,
       selectedAudio: audio?.id ?? null,
-      notices: [...direct.notices ?? [], 'Native media buffers are opaque; codec/profile acceptance is not full output qualification.'],
-      telemetry: () => ({ explicitBytes: owner.snapshot().cache.bytes }),
-      async dispose() { await direct.dispose(); await owner.dispose(); },
+      notices: [...direct.notices ?? [], ...(nativeProbe ? [`Native MIME probe: ${mime} (${nativeProbe}).`] : []),
+        'Native media buffers are opaque; codec/profile acceptance is not full output qualification.'],
+      telemetry: () => ({ explicitBytes: 0 }),
     };
   } catch (error) { await media?.dispose(); throw error; }
 }

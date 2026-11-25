@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ReferencePlayer, describeInput, prepareDirectPlayback } from '../packages/browser/src/player.ts';
+import { ReferencePlayer, describeInput, mediaElementError, prepareDirectPlayback } from '../packages/browser/src/player.ts';
 import { PacketStage } from '../packages/browser/src/packet-stage.ts';
 import { managedGpuOptions } from '../packages/browser/src/gpu-admission.ts';
 
@@ -31,6 +31,69 @@ function prepared(stats, label = 'route') {
   };
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
+
+test('native quality counts do not report dropped pictures as delivered', async () => {
+  const host = new MediaHost();
+  host.getVideoPlaybackQuality = () => ({ totalVideoFrames: 12, droppedVideoFrames: 4 });
+  const player = new ReferencePlayer({ video: host, prepare: async () => prepared({ attached: 0, disposed: 0 }) });
+  try {
+    const ready = await player.open(file('counts.webm'));
+    assert.equal(ready.telemetry.presentedFrames, 8);
+    assert.equal(ready.telemetry.droppedFrames, 4);
+  } finally { await player.dispose(); }
+});
+
+test('native observation samples the cumulative compositor counter and cancels a pending sampling timer', async context => {
+  const host = new MediaHost();
+  let scheduleCount = 0, observer;
+  host.requestVideoFrameCallback = callback => { observer = callback; return ++scheduleCount; };
+  host.cancelVideoFrameCallback = () => { observer = undefined; };
+  const player = new ReferencePlayer({ video: host, prepare: async () => prepared({ attached: 0, disposed: 0 }) });
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    await player.open(file('sample.webm'));
+    observer(0, { presentedFrames: 1 });
+    assert.equal(scheduleCount, 1);
+    context.mock.timers.tick(249); assert.equal(scheduleCount, 1);
+    context.mock.timers.tick(1); assert.equal(scheduleCount, 2);
+    observer(1_000, { presentedFrames: 61, processingDuration: 0.002 });
+    assert.equal(player.snapshot().telemetry.presentedFrames, 61);
+    assert.equal(player.snapshot().telemetry.callbackRate, 60);
+    assert.equal(player.snapshot().telemetry.processingMs, 2);
+    assert.equal(player.diagnostics().native.frameObservationSamples, 2);
+    await player.close(); context.mock.timers.tick(250);
+    assert.equal(scheduleCount, 2);
+    assert.equal(player.diagnostics().native, null);
+  } finally { await player.dispose(); }
+});
+
+test('finite native play acknowledgement leaves the source paused and retryable', async context => {
+  const host = new MediaHost();
+  let finishStart;
+  host.play = () => { host.paused = false; return new Promise(resolve => { finishStart = resolve; }); };
+  const player = new ReferencePlayer({ video: host, prepare: async () => prepared({ attached: 0, disposed: 0 }) });
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    await player.open(file('stall.webm'));
+    const failed = assert.rejects(player.play(), { code: 'DEADLINE_EXCEEDED' });
+    context.mock.timers.tick(15_000);
+    await failed;
+    assert.equal(host.paused, true);
+    assert.equal(player.snapshot().state, 'paused');
+    assert.equal(player.snapshot().wantsPlayback, false);
+    finishStart();
+    host.play = MediaHost.prototype.play.bind(host);
+    await player.play();
+    assert.equal(player.snapshot().state, 'playing');
+  } finally { finishStart?.(); await player.dispose(); }
+});
+
+test('native network failures are not reported as codec incompatibility', () => {
+  const host = new MediaHost(); host.error = { code: 2, message: 'test interruption' };
+  assert.equal(mediaElementError(host).code, 'NETWORK');
+  host.error = { code: 4, message: '' };
+  assert.equal(mediaElementError(host).code, 'UNSUPPORTED_CODEC');
+});
 
 test('open prepares without autoplay, snapshots stay serializable, and close disposes its owner', async () => {
   const stats = { attached: 0, disposed: 0 };

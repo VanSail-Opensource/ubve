@@ -175,3 +175,135 @@ test('MP4 preflight rejects encrypted descriptions inside stsd and applies versi
     await cache.close();
   }
 });
+
+test('pinned source receives one exact chunk while its lease remains charged until handoff acknowledgement', async () => {
+  const source = new BlobSource(new Blob([Uint8Array.from({ length: 1024 }, (_, index) => index % 251)]));
+  const cache = new SourceCache(source, 256, 64);
+  const reader = cache.readProviderStream(123, 130, op()).getReader();
+  try {
+    const chunk = await reader.read();
+    assert.deepEqual([...chunk.value], [123, 124, 125, 126, 127, 128, 129]);
+    assert.equal(cache.snapshot().provider.activeBytes, 7);
+    assert.equal(cache.snapshot().readResults.bytes, 7);
+    await reader.cancel();
+    assert.deepEqual(cache.snapshot().provider, { activeStreams: 0, activeBytes: 0, peakBytes: 7, reads: 1, deliveredBytes: 7 });
+    assert.equal(cache.snapshot().retainedParserResults, 0);
+    assert.equal(cache.snapshot().readResults.bytes, 0);
+  } finally { await reader.cancel(); reader.releaseLock(); await cache.close(); }
+  assert.equal(source.ledger.snapshot().bytes, 0);
+});
+
+test('provider cancellation retains uninterruptible File bytes only until the read actually settles', async () => {
+  let started, complete;
+  const onStart = new Promise(resolve => { started = resolve; });
+  const allowComplete = new Promise(resolve => { complete = resolve; });
+  class DelayedBlob extends Blob {
+    slice(...args) {
+      const part = super.slice(...args), read = part.arrayBuffer.bind(part);
+      part.arrayBuffer = async () => { started(); await allowComplete; return read(); };
+      return part;
+    }
+  }
+  const source = new BlobSource(new DelayedBlob([Buffer.alloc(1024)]));
+  const cache = new SourceCache(source, 256, 64);
+  const reader = cache.readProviderStream(0, 8, op(), true).getReader();
+  const pending = reader.read();
+  try {
+    await onStart;
+    await reader.cancel();
+    assert.deepEqual(await pending, { value: undefined, done: true });
+    assert.equal(cache.snapshot().provider.activeBytes, 0);
+    assert.equal(source.ledger.snapshot().bytes, 8);
+  } finally {
+    complete();
+    await cache.close();
+    await reader.cancel(); reader.releaseLock();
+  }
+  assert.equal(source.ledger.snapshot().bytes, 0);
+});
+
+test('local fragmented MP4 preflight reads only framed metadata and preserves DV profile declarations', async () => {
+  const box = (type, ...payload) => {
+    const data = Buffer.concat(payload), head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length + 8); head.write(type, 4);
+    return Buffer.concat([head, data]);
+  };
+  const descriptionCount = Buffer.alloc(8); descriptionCount.writeUInt32BE(3, 4);
+  const config = (type, profile, level, compatibility) => box(type,
+    Buffer.of(1, 0, (profile << 1) | (level >>> 5), ((level & 31) << 3) | 5, compatibility << 4));
+  const stsd = box('stsd', descriptionCount,
+    box('hvc1', Buffer.alloc(78), box('hvcC', Buffer.alloc(20)), config('dvvC', 8, 10, 1)),
+    box('dvh1', Buffer.alloc(78), config('dvcC', 5, 9, 0)),
+    box('avc1', Buffer.alloc(78), box('colr', Buffer.from('dvcC is not a framed child box'))));
+  const moov = box('moov', box('trak', box('mdia', box('minf', box('stbl', stsd)))));
+  const fragments = Array.from({ length: 3 }, () => [box('moof', box('traf', box('trun', Buffer.alloc(8)))),
+    box('mdat', Buffer.alloc(512 * 1024, 77))]).flat();
+  const source = new BlobSource(new Blob([box('ftyp', Buffer.from('isom')), ...fragments, moov]));
+  const cache = new SourceCache(source);
+  try {
+    const report = await preflightMetadata(cache, op());
+    assert.equal(report.format, 'isobmff');
+    assert.deepEqual(report.dolbyVision, [
+      { sampleEntry: 'hvc1', profile: 8, level: 10, compatibilityId: 1 },
+      { sampleEntry: 'dvh1', profile: 5, level: 9, compatibilityId: 0 },
+    ]);
+    assert.equal(cache.snapshot().bytes, 0);
+    assert.ok(source.stats.deliveredBytes < 600, `sparse preflight read ${source.stats.deliveredBytes} bytes`);
+    assert.equal(source.ledger.snapshot().bytes, 0);
+  } finally { await cache.close(); }
+});
+
+test('standard ISO leading boxes recognized by the pinned MP4 detector receive bounded table inspection', async () => {
+  const { BufferSource, Input, MP4 } = await import('mediabunny');
+  const u32 = value => { const word = Buffer.alloc(4); word.writeUInt32BE(value); return word; };
+  const box = (type, ...body) => Buffer.concat([u32(8 + body.reduce((size, data) => size + data.length, 0)), Buffer.from(type), ...body]);
+  const timing = box('stts', u32(0), u32(1), u32(1), u32(1000));
+  const movie = box('moov', box('trak', box('mdia', box('minf', box('stbl', timing)))));
+  // Structural recognition fixtures, not complete playable MP4 files.
+  const prefixes = [
+    box('sidx', u32(0), u32(1), u32(1000), u32(0), u32(0), u32(0)),
+    box('moof', box('mfhd', u32(0), u32(1)), box('traf', box('tfhd', u32(0), u32(1)), box('trun', u32(0), u32(0)))),
+    box('emsg', u32(0), Buffer.from('urn:ubve:test\0\0'), u32(1000), u32(0), u32(0), u32(1)),
+    box('prft', u32(0), u32(1), Buffer.alloc(8), u32(0)),
+  ];
+  for (const prefix of prefixes) {
+    const type = prefix.toString('ascii', 4, 8), data = Buffer.concat([prefix, movie]);
+    const upstream = new Input({ source: new BufferSource(data), formats: [MP4] });
+    const source = new BlobSource(new Blob([data])), cache = new SourceCache(source);
+    try {
+      assert.equal(await upstream.getFormat(), MP4, type);
+      const report = await preflightMetadata(cache, op());
+      assert.deepEqual([report.format, report.tracks, report.entries, report.moovBytes], ['isobmff', 1, 1, movie.length], type);
+      assert.ok(source.stats.deliveredBytes <= data.length, type);
+      assert.equal(cache.snapshot().retainedParserResults, 0, type);
+    } finally { upstream.dispose(); await cache.close(); }
+  }
+});
+
+test('local MP4 preflight and the provider reuse one bounded exact moov read', async () => {
+  const box = (type, ...body) => {
+    const length = Buffer.alloc(4); length.writeUInt32BE(8 + body.reduce((sum, bytes) => sum + bytes.length, 0));
+    return Buffer.concat([length, Buffer.from(type), ...body]);
+  };
+  const mdat = box('mdat', Buffer.alloc(512 * 1024));
+  const moov = box('moov', box('trak', box('mdia', box('minf', box('stbl', box('stts', Buffer.alloc(8)))))));
+  const source = new BlobSource(new Blob([mdat, moov])), cache = new SourceCache(source);
+  let reader;
+  try {
+    await cache.preloadLocalMetadata(0, 128 * 1024 + 1, op());
+    assert.equal(source.stats.reads, 0, 'oversized windows are not materialized');
+    const metadata = await preflightMetadata(cache, op(), true), readsAfterPreflight = source.stats.reads;
+    assert.equal(metadata.tracks, 1);
+    assert.equal(readsAfterPreflight, 4);
+    assert.equal(cache.snapshot().localMetadataWindow.heldBytes, moov.length - 8);
+    assert.equal(source.ledger.snapshot().bytes, moov.length - 8);
+    reader = cache.readProviderStream(mdat.length + 8, mdat.length + moov.length, op(), true).getReader();
+    assert.deepEqual((await reader.read()).value, new Uint8Array(moov.subarray(8)));
+    assert.equal(source.stats.reads, readsAfterPreflight, 'the exact provider request moves rather than rereads the window');
+    assert.deepEqual(cache.snapshot().localMetadataWindow, { heldBytes: 0, movedToProviderBytes: moov.length - 8 });
+    assert.equal(cache.snapshot().provider.activeBytes, moov.length - 8);
+    await reader.cancel();
+    assert.equal(source.ledger.snapshot().bytes, 0);
+    assert.equal(cache.snapshot().provider.activeBytes, 0);
+  } finally { await reader?.cancel(); reader?.releaseLock(); await cache.close(); }
+});

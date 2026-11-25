@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import { rawToRgba } from '../packages/presentation/dist/index.js';
 import { compareRgba, scalarToneMap } from './presentation-color-reference.mjs';
 
-function randomFrame(format, range) {
+function randomFrame(format, range, aligned = false) {
   const codedWidth = 259, codedHeight = 127;
   const visibleRect = { x: 3, y: 5, width: 253, height: 121 };
   const subsampleX = format !== 'I444P16', subsampleY = format === 'I420P10';
   const depth = format === 'I444P16' ? 16 : 10;
-  let end = 7;
+  let end = aligned ? 8 : 7;
   const planes = [0, 1, 2].map(index => {
     const width = index && subsampleX ? Math.ceil(codedWidth / 2) : codedWidth;
     const rows = index && subsampleY ? Math.ceil(codedHeight / 2) : codedHeight;
-    const offsetBytes = end + 5, strideBytes = width * 2 + 11;
+    const offsetBytes = end + (aligned ? 6 : 5), strideBytes = width * 2 + (aligned ? 12 : 11);
     end = offsetBytes + strideBytes * rows;
     return { width, rows, offsetBytes, strideBytes };
   });
@@ -26,6 +26,34 @@ function randomFrame(format, range) {
   return { format, codedWidth, codedHeight, visibleRect, planes, data,
     color: { transfer: 'pq', primaries: 'bt2020', matrix: 'bt2020-ncl', range } };
 }
+
+test('aligned SDR I420P10 fast path exactly matches the generic path across matrices and sampling', () => {
+  for (const range of ['limited', 'full']) for (const matrix of ['bt709', 'smpte170m', 'bt470bg']) {
+    const input = randomFrame('I420P10', range, true);
+    const frame = { ...input, color: { transfer: 'bt709', primaries: 'bt709', matrix, range } };
+    const initial = frame.data.slice();
+    const odd = new Uint8Array(initial.length + 1).subarray(1); odd.set(initial);
+    // Force all three uncommon upper-bit branches inside the first selected pixel.
+    for (let plane = 0; plane < frame.planes.length; plane++) {
+      const p = frame.planes[plane];
+      const row = plane === 0 ? frame.visibleRect.y : Math.floor(frame.visibleRect.y / 2);
+      const column = plane === 0 ? frame.visibleRect.x : Math.floor(frame.visibleRect.x / 2);
+      const at = p.offsetBytes + row * p.strideBytes + column * 2;
+      frame.data[at + 1] = 0x8f; odd[at + 1] = 0x8f;
+    }
+    const source = frame.data.slice();
+    for (const maximumHeight of [121, 85, 1]) {
+      const expected = rawToRgba({ ...frame, data: odd }, { maximumHeight });
+      const reuse = new Uint8ClampedArray(expected.data.length);
+      const actual = rawToRgba(frame, { maximumHeight }, reuse);
+      assert.equal(actual.transform, expected.transform);
+      assert.equal(actual.width, expected.width); assert.equal(actual.height, expected.height);
+      assert.equal(actual.data, reuse);
+      assert.deepEqual(actual.data, expected.data);
+    }
+    assert.deepEqual(frame.data, source);
+  }
+});
 
 test('reduced RGB8 PQ transfer tables remain within one quantized scalar of independent pow reference', () => {
   let scalars = 0, changed = 0;

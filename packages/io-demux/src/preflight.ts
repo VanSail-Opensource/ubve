@@ -1,19 +1,33 @@
 import { EngineError, type OperationContext } from '@ubve/core';
 import type { SourceCache } from './source.js';
 
+// Include the pinned MP4 detector's direct matches and bounded skipped
+// boxes, so files it recognizes do not bypass our table inspection.
+const ISO_LEADING_BOXES = new Set(['ftyp', 'styp', 'moov', 'mdat', 'sidx', 'moof', 'emsg', 'prft', 'free', 'skip', 'wide', 'uuid']);
 const CONTAINERS = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl', 'edts', 'mvex', 'moof', 'traf', 'udta']);
 const COUNT_OFFSET = new Map([['stts', 4], ['ctts', 4], ['stsc', 4], ['stco', 4], ['co64', 4], ['stss', 4], ['stsd', 4], ['elst', 4], ['trun', 4], ['sdtp', null]]);
 const PROTECTED = new Set(['encv', 'enca', 'encs', 'enct', 'drms', 'drmi', 'pssh', 'senc']);
+const DOLBY_VISION_VISUAL_ENTRIES = new Set(['dvav', 'dva1', 'dvhe', 'dvh1', 'dav1']);
+const VISUAL_ENTRIES = new Set([...DOLBY_VISION_VISUAL_ENTRIES, 'avc1', 'avc2', 'avc3', 'avc4', 'hvc1', 'hev1', 'av01', 'vp09']);
 const LIMIT = 262144;
 const text = new TextDecoder();
-export interface MetadataPreflight { format: 'isobmff' | 'matroska' | 'other'; boxes: number; entries: number; tracks: number; moovBytes: number; }
+export interface IsoDolbyVisionConfig {
+  readonly sampleEntry: string;
+  readonly profile: number | null;
+  readonly level: number | null;
+  readonly compatibilityId: number | null;
+}
+export interface MetadataPreflight { format: 'isobmff' | 'matroska' | 'other'; boxes: number; entries: number; tracks: number; moovBytes: number;
+  /** ISO VisualSampleEntry declaration only. Empty does not prove the absence of in-band DV metadata. */
+  readonly dolbyVision: readonly IsoDolbyVisionConfig[];
+}
 
 function enforceClear(type: string): void {
   if (PROTECTED.has(type)) throw new EngineError('UNSUPPORTED_CODEC', 'Encrypted media is outside the clear-file profile');
 }
 async function boxHeader(cache: SourceCache, position: number, end: number, operation: OperationContext): Promise<{ type: string; body: number; end: number }> {
   if (end - position < 8) throw new EngineError('INVALID_PACKET', 'Truncated MP4 box header');
-  return cache.readValue(position, Math.min(end, position + 16), operation, head => {
+  return cache.readLocalProbe(position, Math.min(end, position + 16), operation, head => {
     const view = new DataView(head.buffer, head.byteOffset, head.byteLength);
     const type = text.decode(head.subarray(4, 8));
     let length = BigInt(view.getUint32(0)), header = 8;
@@ -25,34 +39,63 @@ async function boxHeader(cache: SourceCache, position: number, end: number, oper
 }
 
 /** Runs before upstream MP4 parsers can expand table counts. */
-export async function preflightMetadata(cache: SourceCache, operation: OperationContext): Promise<MetadataPreflight> {
+export async function preflightMetadata(cache: SourceCache, operation: OperationContext, reuseLocalMoov = false): Promise<MetadataPreflight> {
   const size = cache.source.size;
-  const result: MetadataPreflight = { format: 'other', boxes: 0, entries: 0, tracks: 0, moovBytes: 0 };
-  if (size < 8) return result;
-  const format = await cache.readValue(0, 8, operation, first => new DataView(first.buffer, first.byteOffset).getUint32(0) === 0x1a45dfa3 ? 'matroska' : text.decode(first.subarray(4, 8)));
-  if (format === 'matroska') return { ...result, format: 'matroska' };
-  if (!['ftyp', 'moov', 'free', 'wide', 'mdat', 'skip', 'styp', 'uuid'].includes(format)) return result;
+  const dolbyVision: IsoDolbyVisionConfig[] = [];
+  const result: MetadataPreflight = { format: 'other', boxes: 0, entries: 0, tracks: 0, moovBytes: 0, dolbyVision };
+  const finish = () => { Object.freeze(dolbyVision); return Object.freeze(result); };
+  if (size < 8) return finish();
+  const format = await cache.readLocalProbe(0, 8, operation, first => new DataView(first.buffer, first.byteOffset).getUint32(0) === 0x1a45dfa3 ? 'matroska' : text.decode(first.subarray(4, 8)));
+  if (format === 'matroska') { result.format = 'matroska'; return finish(); }
+  if (!ISO_LEADING_BOXES.has(format)) return finish();
   result.format = 'isobmff';
   const countBox = () => { if (++result.boxes > LIMIT) throw new EngineError('ITEM_TOO_LARGE', 'MP4 box count exceeds admission'); };
+  const readVisualEntry = async (sampleEntry: string, body: number, end: number) => {
+    if (!VISUAL_ENTRIES.has(sampleEntry)) return;
+    const unknown = { sampleEntry, profile: null, level: null, compatibilityId: null };
+    let config: IsoDolbyVisionConfig | null = null;
+    // The fixed ISO VisualSampleEntry fields occupy 78 bytes after the box
+    // header. Search only its framed direct children, never encoded payload.
+    for (let childStart = body + 78; childStart < end;) {
+      const child = await boxHeader(cache, childStart, end, operation);
+      countBox(); enforceClear(child.type); childStart = child.end;
+      if (child.type !== 'dvcC' && child.type !== 'dvvC' && child.type !== 'dvwC') continue;
+      if (config) throw new EngineError('INVALID_PACKET', 'MP4 Dolby Vision sample entry declares multiple configurations');
+      config = await cache.readLocalProbe(child.body, Math.min(child.end, child.body + 5), operation, bytes => {
+        if (bytes.length < 4 || bytes[0] !== 1) return unknown;
+        const profile = bytes[2]! >>> 1, level = ((bytes[2]! & 1) << 5) | (bytes[3]! >>> 3);
+        return { sampleEntry, profile, level, compatibilityId: bytes.length >= 5 ? bytes[4]! >>> 4 : null };
+      });
+    }
+    if (!config && DOLBY_VISION_VISUAL_ENTRIES.has(sampleEntry)) config = unknown;
+    if (config) {
+      if (dolbyVision.length >= 32) throw new EngineError('ITEM_TOO_LARGE', 'MP4 Dolby Vision configuration count exceeds 32');
+      dolbyVision.push(Object.freeze(config));
+    }
+  };
   const scan = async (start: number, end: number, depth: number): Promise<void> => {
     if (depth > 32) throw new EngineError('ITEM_TOO_LARGE', 'MP4 metadata nesting exceeds 32');
     for (let position = start; position < end;) {
       const { type, body, end: boxEnd } = await boxHeader(cache, position, end, operation);
       countBox(); enforceClear(type);
-      if (type === 'moov') { result.moovBytes += boxEnd - position; if (result.moovBytes > 16 * 1024 * 1024) throw new EngineError('ITEM_TOO_LARGE', 'MP4 moov exceeds 16 MiB preflight limit'); }
+      if (type === 'moov') {
+        result.moovBytes += boxEnd - position;
+        if (result.moovBytes > 16 * 1024 * 1024) throw new EngineError('ITEM_TOO_LARGE', 'MP4 moov exceeds 16 MiB preflight limit');
+        if (depth === 0 && reuseLocalMoov) await cache.preloadLocalMetadata(body, boxEnd, operation);
+      }
       if (type === 'trak' && ++result.tracks > 32) throw new EngineError('ITEM_TOO_LARGE', 'MP4 has more than 32 tracks');
       let countAt = COUNT_OFFSET.get(type);
       if (type === 'stsz' || type === 'stz2') countAt = 8;
       if (type === 'sbgp' || type === 'sgpd') {
         if (boxEnd - body < 1) throw new EngineError('INVALID_PACKET', 'Truncated MP4 group table');
-        const version = await cache.readValue(body, body + 1, operation, bytes => bytes[0]!);
+        const version = await cache.readLocalProbe(body, body + 1, operation, bytes => bytes[0]!);
         if (version > (type === 'sbgp' ? 1 : 2)) throw new EngineError('INVALID_PACKET', 'Unknown MP4 group table version');
         countAt = 8 + version * 4;
       }
       if (countAt !== undefined) {
         const minimum = (countAt ?? 0) + 4;
         if (boxEnd - body < minimum) throw new EngineError('INVALID_PACKET', 'Truncated MP4 table count');
-        const count = countAt === null ? boxEnd - body - 4 : await cache.readValue(body + countAt, body + countAt + 4, operation, bytes => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0));
+        const count = countAt === null ? boxEnd - body - 4 : await cache.readLocalProbe(body + countAt, body + countAt + 4, operation, bytes => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0));
         result.entries += count;
         if (result.entries > LIMIT) throw new EngineError('ITEM_TOO_LARGE', 'Expanded MP4 tables exceed 262144 entries; paged profile required');
         if (type === 'stsd') {
@@ -61,7 +104,9 @@ export async function preflightMetadata(cache: SourceCache, operation: Operation
           let entryStart = body + 8;
           for (let i = 0; i < count; i++) {
             const entry = await boxHeader(cache, entryStart, boxEnd, operation);
-            countBox(); enforceClear(entry.type); entryStart = entry.end;
+            countBox(); enforceClear(entry.type);
+            await readVisualEntry(entry.type, entry.body, entry.end);
+            entryStart = entry.end;
           }
           if (entryStart !== boxEnd) throw new EngineError('INVALID_PACKET', 'MP4 sample descriptions do not fill the declared table');
         }
@@ -70,5 +115,5 @@ export async function preflightMetadata(cache: SourceCache, operation: Operation
       position = boxEnd;
     }
   };
-  await scan(0, size, 0); return Object.freeze(result);
+  await scan(0, size, 0); return finish();
 }
