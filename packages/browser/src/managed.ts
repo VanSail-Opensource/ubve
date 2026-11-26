@@ -20,6 +20,8 @@ export interface ManagedPlaybackOptions {
   readonly assetBaseUrl: string;
   /** Explicit output policy, never part of exact decoded-source PCM. */
   readonly allowStereoFoldDown?: boolean;
+  /** With permission above, preserve the requested channels unless they exceed device capacity. */
+  readonly stereoFallbackOnly?: boolean;
   readonly preferWebGpu?: boolean;
   readonly hdr10Base?: { readonly mode: Hdr10BaseMode; readonly label: string };
   readonly portableAv1?: boolean;
@@ -62,6 +64,7 @@ type Epoch = {
 const stampTime = <T>(output: OwnedOutput<T>): number => Number(output.pts.ticks) * Number(output.pts.timeBase.numerator) / Number(output.pts.timeBase.denominator);
 const cancelled = (): DOMException => new DOMException('Managed epoch was cancelled', 'AbortError');
 const isCancellation = (error: unknown): boolean => (error instanceof DOMException && error.name === 'AbortError') || (error instanceof EngineError && ['CANCELLED', 'STALE_EPOCH', 'DISPOSED'].includes(error.code));
+const stereoLabels = ['fold-left', 'fold-right'] as const;
 
 /** Selected packet-fed software decode, paced by the PCM graph. The independently
  * selected SDR or HDR presentation candidate never qualifies physical output. */
@@ -164,11 +167,11 @@ export class ManagedPlayback implements ManagedTransport {
         color: self.#gpuRenderer?.options.output === 'hdr-candidate' ? 'Original decode → extended linear Display P3 HDR candidate · unverified'
           : self.#quality === 'performance' ? 'Original decode → ≤720p SDR / sRGB' : 'Original decode → SDR / sRGB',
         audio: self.#audioTrack ? `${self.#audioTrack.codec.toUpperCase()} · ${self.#audioTrack.channelCount} source channels${self.#sourceChannels > self.#audioChannels ? ' · explicit stereo index fold-down' : ' · discrete channel output'}` : 'No audio track' }; },
-      notices: ['Managed software candidate. Decode, draw submissions and the PCM graph are observed separately; physical output and full 60/120 gates remain unqualified.',
-        ...(this.#options.hdr10Base ? [`Dolby Vision ${this.#options.hdr10Base.label} → HDR10-compatible HEVC base layer only. Dolby Vision metadata and enhancement are not rendered.`] : []),
-        ...(this.#options.preferWebGpu ? ['WebGPU presents decoded planes; bitstream decoding is still WASM. Extended linear HDR presentation does not carry static HDR10 metadata into a native media pipeline. No automatic fallback.'] : []),
-        'Channel-index identity is retained. Speaker mapping and output-device routing are unverified.',
-        ...(this.#options.allowStereoFoldDown ? ['Explicit stereo output transform: even source channel indices average to left, odd indices average to right. This does not preserve a cinema speaker layout.'] : [])],
+      get notices() { return ['Managed software candidate. Decode, draw submissions and the PCM graph are observed separately; physical output and full 60/120 gates remain unqualified.',
+        ...(self.#options.hdr10Base ? [`Dolby Vision ${self.#options.hdr10Base.label} → HDR10-compatible HEVC base layer only. Dolby Vision metadata and enhancement are not rendered.`] : []),
+        ...(self.#options.preferWebGpu ? ['WebGPU presents decoded planes; bitstream decoding is still WASM. Extended linear HDR presentation does not carry static HDR10 metadata into a native media pipeline. No automatic video-output fallback.'] : []),
+        'Speaker mapping and output-device routing are unverified.',
+        ...(self.#sourceChannels > self.#audioChannels ? ['Explicit stereo output transform: even source channel indices average to left, odd indices average to right. This does not preserve a cinema speaker layout.'] : [])]; },
       driver: this,
       async attach() { await self.attach(); },
       async seek(seconds, signal) { await self.seek(seconds, signal); },
@@ -318,12 +321,15 @@ export class ManagedPlayback implements ManagedTransport {
         const count = this.#audioTrack.channelCount;
         if (!count || count > 8 || !this.#audioTrack.sampleRate) throw new EngineError('UNSUPPORTED_PROFILE', 'Software audio channel count or sample rate is unavailable');
         const labels = Array.from({ length: count }, (_, index) => `channel-${index + 1}`);
-        this.#sourceChannels = count;
-        this.#audioChannels = this.#options.allowStereoFoldDown && count > 2 ? 2 : count;
+        const stereoAllowed = this.#options.allowStereoFoldDown && count > 2;
+        const stereoFallback = stereoAllowed && this.#options.stereoFallbackOnly;
         const borrowedContext = this.#options.contextForPcm?.(rate);
-        epoch.pcm = await PcmOutput.create({ sampleRate: rate, channelLabels: this.#audioChannels === count ? labels : ['fold-left', 'fold-right'],
+        epoch.pcm = await PcmOutput.create({ sampleRate: rate, channelLabels: stereoAllowed && !stereoFallback ? stereoLabels : labels,
+          ...(stereoFallback ? { stereoFallbackLabels: stereoLabels } : {}),
           ...(borrowedContext ? { borrowedContext } : {}),
           firstMediaSample: firstSample, blockFrames: Math.round(rate / 50), poolBlocks: 48, primeMs: 240, onEvent: event => this.#audioEvent(epoch, event) });
+        this.#sourceChannels = count;
+        this.#audioChannels = epoch.pcm.config.channels;
         epoch.pcm.setVolume(this.#volume);
         epoch.pendingPcm = new Float32Array(epoch.pcm.config.blockFrames * this.#audioChannels);
         const resolution = this.#options.media.audioTimestampResolutionSeconds;

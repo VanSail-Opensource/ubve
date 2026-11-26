@@ -16,7 +16,8 @@ Snapshots contain immutable metadata and observations, never decoded pictures, a
 
 | Selection | Implementation | Admission boundary |
 |---|---|---|
-| Automatic / Native direct | N0, one browser media element with local object URL or opaque HTTP(S) source | Required known-incompatible soundtrack/subtitle profiles refuse. Exact native fidelity and performance remain unqualified. |
+| Automatic | N0 for admitted native playback, C1 for known local incompatibilities including TrueHD | Remote URLs remain opaque and native-only. No silent stereo remix or HDR downgrade. Exact output remains unqualified. |
+| Native direct | N0, one browser media element with local object URL or opaque HTTP(S) source | Required known-incompatible soundtrack/subtitle profiles refuse. No software fallback under this explicit choice. |
 | Experimental remux / audio bridge | N1 or N2 from the bounded native bridge, selected video/audio/ASS from one provider | Explicit user selection is required. Stream-copy provenance, output format, PCM conversion and exact output device still require qualification. |
 | Managed software decode | C1 AV1 dav1d + TrueHD integer PCM + subtitle output | Only registered source profiles. Native codec APIs are not substituted. Full HDR output is refused by the SDR renderer. |
 
@@ -26,7 +27,9 @@ Performance mode explicitly caps managed video at 720p and allows the declared P
 
 TrueHD is decoded to integer PCM before the exact normalized floating conversion. An epoch-owned accumulator combines decoder output into full 960-frame transport blocks and flushes the final partial block once at EOS. The decoded-sample position and submitted-sample position are tracked separately, preserving continuity across the accumulator. The PCM graph supplies the start acknowledgement and source-sample clock. Graph time is not physical audible time.
 
-Default managed output preserves the decoded channel count with explicit channel-index labels. If the output device cannot accept that count, the route refuses. The user may separately select stereo index fold-down: even source indices average into left, odd into right. The UI explains that this changes spatial layout; it is never presented as exact cinema speaker routing or lossless output.
+Default managed output preserves the decoded channel count with explicit channel-index labels. If a local TrueHD file needs the managed route, leave **Automatic** selected. **Allow stereo output when needed** is a saved opt-in that lets the managed route use stereo only if the current browser output cannot accept the selected channel count. A failed open can be retried with that permission. Explicit **Managed decode** retains its separate forced-stereo option.
+
+With either setting, even source indices average into left and odd indices into right. That changes the spatial layout and is not lossless surround output. HDR output selection is independent. Choose **Performance** for tone-mapped SDR or explicitly enable WebGPU for the Full HDR candidate.
 
 ## Lifecycle and resource boundaries
 
@@ -49,6 +52,8 @@ PGS loading has an explicit BT.709/BT.601 limited-range palette selector. Ordina
 ## Verification
 
 `test/player.test.mjs` exercises nine lifecycle/ownership scenarios, including actual object-URL revocation, using deterministic event-host doubles. These are Node contract/race tests, not evidence of real media decoding, browser rendering, audio output or physical presentation.
+
+`node test/automatic-truehd-browser.mjs` loads the real AV1/TrueHD/ASS MKV through the built reference player. It checks refusal on stereo without permission, successful retry and playback to EOS after permission, persistence across the two documents, and refusal in explicit Native direct. Its device-capacity probe may narrow actual browser output to stereo, but cannot increase it. This screen does not measure physical sound or device-wide compatibility.
 
 The full browser test lane must exercise the real pinned codecs and current target environments. Execution in this session was blocked by the available browser environment; no browser pass, complete combined performance result or target-platform support claim is recorded from that absence.
 

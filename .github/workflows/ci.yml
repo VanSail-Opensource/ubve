@@ -47,6 +47,8 @@ jobs:
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: node test/player-native-browser.mjs
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+      - run: node test/automatic-truehd-browser.mjs
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: node test/mp4-playback-browser.mjs
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: node test/dolby-base-browser.mjs
@@ -73,3 +75,4 @@ jobs:
             .local/paged-mp4-browser/
             .local/dolby-base-browser/
             .local/webgpu-browser/
+            .local/automatic-truehd-browser/

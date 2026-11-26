@@ -31,6 +31,7 @@ const locale = ref<Locale>('en');
 const t = computed(() => messages[locale.value]);
 const routePreference = ref<RoutePreference>('automatic');
 const allowStereoFoldDown = ref(false);
+const allowAutomaticStereoFallback = ref(false);
 const preferWebGpu = ref(false);
 const webGpuApiAvailable = Boolean(navigator.gpu);
 const pgsPalette = ref<'bt709-limited' | 'bt601-limited'>('bt709-limited');
@@ -93,7 +94,11 @@ function metric(value: number | null | undefined, decimals = 0): string {
   return value === null || value === undefined || !Number.isFinite(value) ? '—' : value.toLocaleString(locale.value, { maximumFractionDigits: decimals });
 }
 function savePreferences(): void {
-  try { localStorage.setItem('ubve.preferences.v1', JSON.stringify({ locale: locale.value, quality: snapshot.value?.quality ?? 'full', volume: snapshot.value?.volume ?? 1, muted: snapshot.value?.muted ?? false })); } catch { /* Private contexts may refuse persistence. */ }
+  try { localStorage.setItem('ubve.preferences.v1', JSON.stringify({ locale: locale.value, quality: snapshot.value?.quality ?? 'full', volume: snapshot.value?.volume ?? 1, muted: snapshot.value?.muted ?? false, automaticStereoFallback: allowAutomaticStereoFallback.value })); } catch { /* Private contexts may refuse persistence. */ }
+}
+function setAutomaticStereoFallback(event: Event): void {
+  allowAutomaticStereoFallback.value = (event.target as HTMLInputElement).checked;
+  savePreferences();
 }
 async function openItem(id: string): Promise<void> {
   const input = inputs.get(id); if (!input || !player.value) return;
@@ -227,7 +232,9 @@ function exportDiagnostics(): void {
 
 onMounted(() => {
   if (!media.value || !overlay.value) return;
-  player.value = createReferencePlayer({ video: media.value, overlay: overlay.value, routePreference: () => routePreference.value, allowStereoFoldDown: () => allowStereoFoldDown.value, preferWebGpu: () => preferWebGpu.value });
+  player.value = createReferencePlayer({ video: media.value, overlay: overlay.value, routePreference: () => routePreference.value,
+    allowStereoFoldDown: () => routePreference.value === 'automatic' ? allowAutomaticStereoFallback.value : allowStereoFoldDown.value,
+    preferWebGpu: () => preferWebGpu.value });
   unsubscribe = player.value.subscribe(value => { snapshot.value = value; });
   try {
     const preference = JSON.parse(localStorage.getItem('ubve.preferences.v1') ?? '{}') as Record<string, unknown>;
@@ -235,6 +242,7 @@ onMounted(() => {
     if (preference.quality === 'full' || preference.quality === 'performance') void act(() => player.value?.setQuality(preference.quality as QualityMode));
     if (typeof preference.volume === 'number') player.value.setVolume(preference.volume);
     if (typeof preference.muted === 'boolean') player.value.setMuted(preference.muted);
+    if (typeof preference.automaticStereoFallback === 'boolean') allowAutomaticStereoFallback.value = preference.automaticStereoFallback;
   } catch { /* Keep functional defaults when preferences are unavailable or malformed. */ }
   fullscreenSupported.value = Boolean(document.fullscreenEnabled);
   pipSupported.value = Boolean(document.pictureInPictureEnabled && media.value.requestPictureInPicture);
@@ -291,7 +299,12 @@ onBeforeUnmount(() => { closeDiscDialog(); unsubscribe?.(); document.removeEvent
 
       <aside v-show="showInspector" class="inspector">
         <section class="inspector-section playback-card"><div class="panel-heading"><h2>{{ t.output }}</h2><span class="engine-label">ENGINE v0.1</span></div><div class="quality-switch" role="group" :aria-label="t.quality"><button :class="{ selected: snapshot?.quality !== 'performance' }" :aria-pressed="snapshot?.quality !== 'performance'" :disabled="snapshot?.state === 'opening' || snapshot?.qualityChangeAvailable === false" @click="quality('full')">{{ t.full }}</button><button :class="{ selected: snapshot?.quality === 'performance' }" :aria-pressed="snapshot?.quality === 'performance'" :disabled="snapshot?.state === 'opening' || snapshot?.qualityChangeAvailable === false" @click="quality('performance')">{{ t.performance }}</button></div><p class="mode-description">{{ snapshot?.quality === 'performance' ? ((snapshot.route === 'C1' || routePreference === 'managed') ? t.managedPerfHint : t.perfHint) : t.fullHint }}</p><p v-if="snapshot?.qualityChangeAvailable === false" class="route-note">{{ t.reopenGpuQuality }}</p><div class="target-row"><div><span>{{ t.target }}</span><strong>{{ snapshot?.quality === 'performance' ? '120' : '60' }}<small>{{ t.sourcePictures }}</small></strong></div><span class="target-mark" aria-hidden="true"><Icon name="activity" :size="26" /></span></div><details class="qualification"><summary><Icon name="info" :size="15" />{{ t.qualification }}<Icon name="chevron" :size="14" /></summary><p>{{ t.qualificationHint }}</p></details>
-          <label class="route-picker">{{ t.routeMode }}<select v-model="routePreference"><option v-for="(label, value) in routeNames" :key="value" :value="value">{{ label }}</option></select></label><p class="route-note">{{ routePreference === 'experimental' || routePreference === 'managed' ? t.experimentalRoute : t.routeOnOpen }}</p><label v-if="routePreference === 'managed'" class="fold-option"><input v-model="allowStereoFoldDown" type="checkbox" /><span>{{ t.stereoFold }}<small>{{ t.stereoFoldHint }}</small></span></label><label v-if="routePreference === 'managed' || routePreference === 'automatic'" class="fold-option"><input v-model="preferWebGpu" type="checkbox" :disabled="!webGpuApiAvailable" /><span>{{ t.webGpuOutput }}<small>{{ webGpuApiAvailable ? t.webGpuOutputHint : t.webGpuUnavailable }}</small></span></label><ul v-if="snapshot?.route" class="transform-list"><li v-for="transform in snapshot.transforms" :key="transform">{{ transform }}</li></ul>
+          <label class="route-picker">{{ t.routeMode }}<select v-model="routePreference"><option v-for="(label, value) in routeNames" :key="value" :value="value">{{ label }}</option></select></label>
+          <p class="route-note">{{ routePreference === 'experimental' || routePreference === 'managed' ? t.experimentalRoute : t.routeOnOpen }}</p>
+          <label v-if="routePreference === 'automatic'" class="fold-option"><input :checked="allowAutomaticStereoFallback" type="checkbox" @change="setAutomaticStereoFallback" /><span>{{ t.stereoFallback }}<small>{{ t.stereoFallbackHint }}</small></span></label>
+          <label v-else-if="routePreference === 'managed'" class="fold-option"><input v-model="allowStereoFoldDown" type="checkbox" /><span>{{ t.stereoFold }}<small>{{ t.stereoFoldHint }}</small></span></label>
+          <label v-if="routePreference === 'managed' || routePreference === 'automatic'" class="fold-option"><input v-model="preferWebGpu" type="checkbox" :disabled="!webGpuApiAvailable" /><span>{{ t.webGpuOutput }}<small>{{ webGpuApiAvailable ? t.webGpuOutputHint : t.webGpuUnavailable }}</small></span></label>
+          <ul v-if="snapshot?.route" class="transform-list"><li v-for="transform in snapshot.transforms" :key="transform">{{ transform }}</li></ul>
           <p v-if="!isolatedDocument" class="route-note"><template v-if="!isIsolatedEntry"><a class="isolation-link" :href="isolatedUrl">{{ t.openIsolated }}</a> {{ t.reselectAfterSwitch }}</template><template v-else>{{ t.isolationUnavailable }}</template></p>
         </section>
         <section class="inspector-section"><div class="panel-heading"><h2>{{ t.details }}</h2><Icon name="film" :size="17" /></div><dl v-if="hasSource" class="signal-list"><div><dt>{{ t.format }}</dt><dd>{{ snapshot?.source?.mime || t.unknown }}</dd></div><div><dt>{{ t.resolution }}</dt><dd>{{ snapshot?.source?.width ? `${snapshot.source.width} × ${snapshot.source.height}` : '—' }}</dd></div><div><dt>{{ t.bytes }}</dt><dd>{{ bytes(snapshot?.source?.bytes ?? null) }}</dd></div><div><dt>{{ t.route }}</dt><dd>{{ snapshot?.route || '—' }}<small>{{ snapshot?.routeDescription }}</small></dd></div><div><dt>{{ t.color }}</dt><dd>{{ snapshot?.source?.color }}</dd></div><div><dt>{{ t.audio }}</dt><dd>{{ snapshot?.source?.audio }}</dd></div></dl><p v-else class="muted-copy">{{ t.noSource }}</p><label v-if="audioTracks.some(track => track.selectable)" class="audio-picker">{{ t.audio }}<select :value="snapshot?.selectedAudio" :disabled="!playable || busy" @change="act(() => player?.selectAudio(($event.target as HTMLSelectElement).value))"><option v-for="track in audioTracks" :key="track.id" :value="track.id" :disabled="!track.selectable">{{ track.label }}</option></select></label></section>

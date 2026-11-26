@@ -1,9 +1,12 @@
+import { EngineError } from '@ubve/core';
 import { DEFAULT_PCM_BLOCK_FRAMES, DEFAULT_PCM_POOL_BLOCKS, validatePcmConfiguration } from './audio-protocol.js';
 import type { PcmConfiguration, PcmEvent, PcmSnapshot } from './audio-protocol.js';
 
 export interface PcmOutputOptions {
   readonly sampleRate: number;
   readonly channelLabels: readonly string[];
+  /** When the requested layout will not fit, admit a stereo graph. The caller converts the samples. */
+  readonly stereoFallbackLabels?: readonly [string, string];
   /** The caller retains the lifetime of a previously admitted browser audio context. */
   readonly borrowedContext?: AudioContext;
   readonly workletUrl?: string;
@@ -126,7 +129,7 @@ export class PcmOutput {
     const blockFrames = options.blockFrames ?? DEFAULT_PCM_BLOCK_FRAMES;
     const primeFrames = Math.ceil(options.sampleRate * (options.primeMs ?? 200) / 1000);
     const poolBlocks = options.poolBlocks ?? Math.max(DEFAULT_PCM_POOL_BLOCKS, Math.ceil(primeFrames / blockFrames) + 2);
-    const config: PcmConfiguration = {
+    let config: PcmConfiguration = {
       sampleRate: options.sampleRate, channels: options.channelLabels.length, channelLabels: [...options.channelLabels],
       blockFrames, poolBlocks, primeFrames, epoch: 0, firstMediaSample: checkedSample(options.firstMediaSample ?? 0n),
     };
@@ -145,8 +148,16 @@ export class PcmOutput {
     try {
       if (context.state === 'closed') throw new Error('The borrowed audio context has closed');
       if (context.sampleRate !== options.sampleRate) throw new Error('E_RATE_UNQUALIFIED: browser changed the requested sample rate');
-      if (context.destination.maxChannelCount < config.channels) {
-        throw new Error(`Output supports ${context.destination.maxChannelCount} channels; explicit downmix is required for ${config.channels}`);
+      const outputChannels = context.destination.maxChannelCount;
+      if (outputChannels < config.channels) {
+        const canFoldToStereo = outputChannels >= 2 && config.channels > 2;
+        if (!canFoldToStereo || !options.stereoFallbackLabels) {
+          throw new EngineError('OUTPUT_UNAVAILABLE', `This audio output supports ${outputChannels} channels, but the track needs ${config.channels}.` +
+            (canFoldToStereo ? ' Allow stereo output in Playback and try again, or use a multichannel device.' : ''), 'caller-fix',
+          { outputChannels, requestedChannels: config.channels });
+        }
+        config = { ...config, channels: 2, channelLabels: [...options.stereoFallbackLabels] };
+        validatePcmConfiguration(config);
       }
       context.destination.channelCount = config.channels;
       context.destination.channelCountMode = 'explicit';

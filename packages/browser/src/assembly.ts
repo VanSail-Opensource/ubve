@@ -28,6 +28,7 @@ export interface ReferencePlayerFactoryOptions {
   readonly overlay: HTMLElement;
   readonly routePreference?: () => RoutePreference;
   readonly assetBaseUrl?: string;
+  /** Allow stereo when Automatic cannot output all channels. Explicit Managed selects stereo directly. */
   readonly allowStereoFoldDown?: () => boolean;
   readonly preferWebGpu?: () => boolean;
   readonly portableAv1?: boolean;
@@ -87,7 +88,7 @@ export async function preparePlayback(input: MediaInput, video: HTMLVideoElement
       if (dolby && !baseMode) throw new EngineError('UNSUPPORTED_PROFILE', `Dolby Vision ${label} has no verified HDR10-compatible HEVC base layer for software playback.`, 'caller-fix',
         { sampleEntry: dolby.sampleEntry, dolbyVisionProfile: dolby.profile, dolbyVisionLevel: dolby.level, dolbyVisionCompatibilityId: dolby.compatibilityId });
       if (!managed || !subtitles) throw new EngineError('INVALID_ARGUMENT', 'Managed playback requires an output host and subtitle controller');
-      return new ManagedPlayback({ media: preparedMedia, video, subtitles, signal, assetBaseUrl, ...managed,
+      return new ManagedPlayback({ media: preparedMedia, video, subtitles, signal, assetBaseUrl, ...managed, stereoFallbackOnly: preference === 'automatic',
         ...(baseMode && label ? { hdr10Base: { mode: baseMode, label } } : {}) }).asPrepared();
     };
     if (preference === 'managed' || 'disc' in input) return software();
