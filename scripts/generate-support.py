@@ -69,14 +69,14 @@ def generate():
             'I11 scoped CPU/raster results do not qualify any complete player route',
             'Native MSE short screening does not verify GPU acceleration, target devices or physical output',
             'Exact distributed corresponding-source review and complete notices remain incomplete',
-            'I10 exact large MP4 index and disc title components are not wired to complete playback',
+            'I10 paged MP4 tail screens do not qualify sustained large-file playback, and complete disc title playback remains open',
         ],
         'refusedOrUnavailable':[
             {'feature':'dav1d default SIMD/four-thread route','reason':'Retained unresolved pixel mismatches'},
             {'feature':'Qualified managed full HDR output','reason':'Canvas SDR is not full HDR, and the explicit WebGPU candidate is unqualified'},
             {'feature':'Encrypted/remote ISO, menus, BD-J','reason':'Outside the read-only local disc profile'},
             {'feature':'Atmos/object-audio rendering, Dolby Vision, N3 dual-clock output','reason':'No admitted implementation/reference'},
-            {'feature':'Large MP4 metadata beyond preflight cap','reason':'Paged primitives are not yet connected to the demux path'},
+            {'feature':'Complex or protected paged MP4 profiles','reason':'The paged playback candidate admits static clear audio/video descriptions and the verified edit mappings only'},
         ],
         'scope':'Candidate implementation and evidence status only; API probes and short/component tests do not admit a production profile',
     }

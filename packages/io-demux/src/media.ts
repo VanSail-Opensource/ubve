@@ -3,9 +3,10 @@ import { BudgetLedger, EngineError, OwnedLease, byteLength, byteRange, sessionSt
 import { BlobSource, SourceCache } from './source.js';
 import { HttpRangeSource } from './http.js';
 import { abortForOperation, operationContext } from './operations.js';
-import { preflightMetadata, type MetadataPreflight } from './preflight.js';
+import { preflightForPlayback, type MetadataPreflight } from './preflight.js';
 import { matroskaPackets, readMatroskaMetadata, type MatroskaMetadata, type MatroskaTrack, type MediaAttachment } from './matroska.js';
 import { mp4AudioEditEnd, openClassicAlac } from './mp4-index.js';
+import { openPagedMp4, type PagedMp4Media } from './mp4-playback.js';
 import { mp3AudioEnd, oggAudioEnd } from './audio-end.js';
 import { openPcmFile, type PcmFile } from './pcm-file.js';
 import { openTransportProfile, validateTransportRead, type TransportProfile } from './mpegts.js';
@@ -45,9 +46,11 @@ export class MediaSourceSession {
   readonly #alac: Alac | null;
   readonly #pcmFile: PcmFile | null;
   readonly #timestampOrigin: number;
-  constructor(input: Input | null, source: RandomAccessSource, cache: SourceCache, tracks: readonly MediaTrack[], duration: number | null, mimeType: string, container: string, matroska: MatroskaMetadata | null, preflight: MetadataPreflight, stamp: SessionStamp, alac: Alac | null = null, pcmFile: PcmFile | null = null, timestampOrigin = 0) {
+  readonly #pagedMp4: PagedMp4Media | null;
+  constructor(input: Input | null, source: RandomAccessSource, cache: SourceCache, tracks: readonly MediaTrack[], duration: number | null, mimeType: string, container: string, matroska: MatroskaMetadata | null, preflight: MetadataPreflight, stamp: SessionStamp, alac: Alac | null = null, pcmFile: PcmFile | null = null, timestampOrigin = 0, pagedMp4: PagedMp4Media | null = null) {
     this.input = input; this.source = source; this.cache = cache; this.tracks = Object.freeze(tracks); this.duration = duration; this.mimeType = mimeType; this.container = container; this.matroska = matroska; this.attachments = matroska?.attachments ?? []; this.preflight = preflight; this.stamp = stamp;
     this.#alac = alac; this.#pcmFile = pcmFile; this.#timestampOrigin = timestampOrigin;
+    this.#pagedMp4 = pagedMp4;
     this.audioTimestampResolutionSeconds = container === 'mpegts' ? 1 / 90000 : Number(matroska?.timecodeScaleNs ?? 0n) / 1e9;
   }
   async *packets(trackIds: readonly string[], options: PacketOptions = {}): AsyncGenerator<MediaPacket> {
@@ -81,6 +84,18 @@ export class MediaSourceSession {
             ptsTicks: BigInt(first), dtsTicks: BigInt(first), durationTicks: BigInt(count), recovery: 'key', discardPaddingNs: 0n, codecDelayNs: 0n,
             representation: { kind: 'source-exact' }, sourceSpans: [{ source: this.source.identity, range }],
             timingProvenance: { kind: 'container-exact', originalPtsSeconds: null, transformDescription: 'PCM byte frame index at the declared exact file sample rate' }, bytes };
+        }
+      } else if (this.#pagedMp4) {
+        for await (const { track: { track, timeline, base }, sample } of this.#pagedMp4.samples(trackIds, startTime, operation, preroll)) {
+          const { range, index } = sample;
+          const bytes = await this.cache.readValue(range.start, range.end, operation(), data => allocate(data));
+          if (signal.aborted) { bytes.release(); throw signal.reason; }
+          yield { id: `${stamp.sessionId}:${stamp.generation}:${track.id}:${index}`, stamp, trackId: track.id,
+            decodeSequence: index, presentationSequence: null, codecConfigEpoch: 0, timeBase: base,
+            ptsTicks: sample.pts - timeline.start, dtsTicks: sample.dts - timeline.start, durationTicks: sample.duration,
+            recovery: sample.sync ? 'key' : 'delta', discardPaddingNs: 0n, codecDelayNs: 0n,
+            representation: { kind: 'source-exact' }, sourceSpans: [{ source: this.source.identity, range }],
+            timingProvenance: { kind: 'container-exact', originalPtsSeconds: null, transformDescription: 'Paged MP4 stts/ctts ticks minus the unit-rate media edit start' }, bytes };
         }
       } else if (this.#alac) {
         const { index, start, end, rate } = this.#alac, track = tracks[0]!;
@@ -175,8 +190,18 @@ export class MediaSourceSession {
       }
     } finally { this.#reading = false; }
   }
-  snapshot() { return { cache: this.cache.snapshot(), packets: this.#packets.snapshot(), parserMetadata: this.preflight, parserInternalMemory: 'opaque' as const }; }
-  async dispose(): Promise<void> { if (this.#closed) return; this.#closed = true; this.#abort.abort(new EngineError('DISPOSED', 'Media source disposed')); this.input?.dispose(); await this.cache.close(); }
+  snapshot() { return { cache: this.cache.snapshot(), packets: this.#packets.snapshot(), parserMetadata: this.preflight,
+    ...(this.#pagedMp4 ? { pagedMp4: this.#pagedMp4.statistics } : {}), parserInternalMemory: 'opaque' as const }; }
+  async dispose(): Promise<void> {
+    if (this.#closed) return;
+    this.#closed = true;
+    this.#abort.abort(new EngineError('DISPOSED', 'Media source disposed'));
+    try { this.input?.dispose(); }
+    finally {
+      try { await this.cache.close(); }
+      finally { this.#pagedMp4?.release(); }
+    }
+  }
 }
 const MKV_CODECS: Record<string, string> = { V_AV1: 'av1', V_VP9: 'vp9', V_VP8: 'vp8', 'V_MPEG4/ISO/AVC': 'avc', 'V_MPEGH/ISO/HEVC': 'hevc', A_TRUEHD: 'truehd', A_FLAC: 'flac', A_AAC: 'aac', A_OPUS: 'opus', A_VORBIS: 'vorbis', A_AC3: 'ac3', A_EAC3: 'eac3', A_DTS: 'dts', 'S_TEXT/ASS': 'ass', 'S_TEXT/SSA': 'ssa', 'S_TEXT/UTF8': 'srt', 'S_TEXT/WEBVTT': 'webvtt', 'S_HDMV/PGS': 'pgs' };
 
@@ -188,7 +213,12 @@ export async function openMedia(value: MediaInput, options: OpenMediaOptions = {
   const cache = new SourceCache(source, options.cacheBytes);
   let input: Input | null = null;
   try {
-    const preflight = await preflightMetadata(cache, op(), true);
+    const preflight = await preflightForPlayback(cache, op());
+    if (preflight.requiresPaged) {
+      cache.releaseLocalMetadata();
+      const paged = await openPagedMp4(cache, op());
+      return new MediaSourceSession(null, source, cache, paged.tracks, paged.duration, paged.mimeType, paged.container, null, preflight, stamp, null, null, 0, paged);
+    }
     if (preflight.format === 'other') {
       const pcm = await openPcmFile(cache, op());
       if (pcm) {

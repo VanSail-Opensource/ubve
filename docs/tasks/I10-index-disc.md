@@ -1,6 +1,6 @@
 # I10 — Complete paged indexes and local UDF/BDMV
 
-**Status:** bounded classic MP4 index and clear BDMV navigation candidates implemented. Playback qualification remains open. **Dependencies:** I02 and I09 for the complete cinema/disc profile; the paged-index subpart may begin after I02. **Owner:** index/disc agents with separate owned directories. **Owned paths:** `packages/io-demux` paged indexes, new `packages/disc`, exact C build/ABI manifests and fixtures. HTTP is an additional dependency only for a separately claimed HTTP index lane; remote ISO stays unsupported.
+**Status:** paged classic MP4 packet playback, bounded fragment scanning and clear BDMV navigation candidates implemented. Playback qualification remains open. **Dependencies:** I02 and I09 for the complete cinema/disc profile; the paged-index subpart may begin after I02. **Owner:** index/disc agents with separate owned directories. **Owned paths:** `packages/io-demux` paged indexes, new `packages/disc`, exact C build/ABI manifests and fixtures. HTTP is an additional dependency only for a separately claimed HTTP index lane; remote ISO stays unsupported.
 
 ## v8 scope
 
@@ -18,10 +18,20 @@ spans and sample-description indices. It does not turn a decode-order search
 into a PTS seek. It retains only a checkpoint per 4096 time/chunk rows, uses the
 shared source-byte LRU and reads sample size data on demand. Unit-rate v0/v1
 edit lists preserve explicit gaps and exact fractional movie-to-media mapping.
-There is an aggregate bound of 24,576 index checkpoints and edit segments. The
-current `openMedia` production cap remains in place until a selected-packet adapter
-uses the paged index. Fragmented, non-unit-rate/dwell edit, recovery-group and protected
-profiles are not admitted by this index.
+There is an aggregate bound of 24,576 index checkpoints and edit segments.
+`openMedia` automatically uses the paged packet adapter when classic tables
+cross the initial preflight cutoff. It preserves the original byte ranges and
+normalized signed PTS/DTS. The pinned provider sees a bounded decoder-config
+probe, not the original tables. The baseline playback profile admits a single
+static description and a contiguous unit-rate edit. The common fixed-width
+audio roll group supplies conservative seek preroll. Other group schemas,
+configuration switches, non-unit-rate/dwell edits and protection remain
+outside this playback path. [FFmpeg's audio roll writer](https://ffmpeg.org/doxygen/9.0/movenc_8c_source.html)
+
+Fragmented MP4 stays on the pinned fragment reader. Preflight applies
+262,144 samples and 16 MiB of metadata to each fragment, plus its independent
+initialization and lookup bounds. A large aggregate count across small
+fragments does not force the classic tables route.
 
 ## Local disc implementation
 
@@ -58,3 +68,9 @@ runtime and fixture hashes, browser version, hash matches and worker closure.
 The recorded Linux headless result is component evidence only.
 
 The [packing matrix](../packing-formats.md) adds actual browser playback of an explicitly chosen original Blu-ray clip from a local ISO or BDMV folder. It does not substitute raw clip playback for the playlist span or prove transitions, PGS, remote ISO, or whole-title support.
+
+Run `node test/mp4-playback-browser.mjs` after building for the large-index
+seek-to-EOS browser regression. The generated media has actual encoded AVC
+and AAC payloads. The test covers a 96-minute timeline without running a
+96-minute endurance trial. Node checks the same classic seek over ETag-bound
+ranges and a sparse MOV address space beyond 4 GiB.

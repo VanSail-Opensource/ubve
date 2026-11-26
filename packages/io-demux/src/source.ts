@@ -95,6 +95,10 @@ export class SourceCache {
     if (!Number.isSafeInteger(capacity) || !Number.isSafeInteger(pageBytes) || pageBytes < 1 || capacity < pageBytes) throw new EngineError('INVALID_ARGUMENT', 'Invalid cache bounds');
     this.source = source; this.capacity = capacity; this.pageBytes = pageBytes;
   }
+  assertReadable(): void {
+    if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed');
+    if (this.source instanceof BoundedSource) this.source.assertReadable();
+  }
   /** Adapter results with no release callback remain charged for the cache lifetime. */
   async read(start: number, end: number, operation: OperationContext): Promise<Uint8Array> {
     const result = await this.readOwned(start, end, operation);

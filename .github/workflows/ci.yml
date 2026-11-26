@@ -47,6 +47,8 @@ jobs:
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: node test/player-native-browser.mjs
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+      - run: node test/mp4-playback-browser.mjs
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: npm run test:pipeline:browser
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: npm run test:codecs:browser
@@ -62,3 +64,4 @@ jobs:
           path: |
             evidence/
             .local/modern-browser/
+            .local/paged-mp4-browser/

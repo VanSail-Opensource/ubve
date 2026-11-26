@@ -65,6 +65,9 @@ test('I10 paged MP4 preserves signed composition, description switches, chunk lo
     assert.equal(await track.locateDts(10n, operation()), 2);
     assert.equal(await track.locateDts(100000n, operation()), 3);
     await assert.rejects(track.sample(4, operation()), /outside/);
+    await track.sample(0, operation());
+    await f.cache.close();
+    await assert.rejects(track.sample(0, operation()), { code: 'DISPOSED' });
   } finally { await f.cache.close(); }
   assert.equal(f.ledger.snapshot().bytes, 0);
 });
@@ -147,6 +150,19 @@ test('I10 paged MP4 rejects malformed extents, inconsistent counts, and unsuppor
     const c = new CancellationController(); c.abort(new Error('retired epoch'));
     await assert.rejects(track.sample(1, operation(c.signal)), /retired epoch/);
   } finally { await f.cache.close(); }
+});
+
+test('I10 verifies declared sample dependencies before returning an indexed sample', async () => {
+  const tables = [sizes(2, 1), time([2, 1]), stsc([1, 2, 1]), offsets(8)];
+  const inconsistent = small([...tables, full('sdtp', 0, Buffer.of(0x20))]);
+  try { await assert.rejects(openMp4PagedIndex(inconsistent.cache, operation()), /dependency count/); }
+  finally { await inconsistent.cache.close(); }
+  const contradicting = small([...tables, full('sdtp', 0, Buffer.of(0x20, 0x10))]);
+  try {
+    const [track] = await openMp4PagedIndex(contradicting.cache, operation());
+    assert.equal((await track.sample(0, operation())).sync, true);
+    await assert.rejects(track.sample(1, operation()), /contradicts its dependency flags/);
+  } finally { await contradicting.cache.close(); }
 });
 
 function negative64(value) { const out = Buffer.alloc(8); out.writeBigInt64BE(value); return out; }

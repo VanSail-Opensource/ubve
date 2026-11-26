@@ -75,6 +75,19 @@
     "exceptionalAccessUnitAdmission": "one exclusive packet after ordinary queue drain and global reservation; larger extreme tuples require a separately admitted profile",
     "maximumLocalSourceCacheBytes": 8388608
   },
+  "largeIsoBmffCandidateLimits": {
+    "classicResidentCheckpointsAndEditSegments": 24576,
+    "classicExplicitRowsPerIndexedTable": 8000000,
+    "classicFixedSizeLogicalSampleCount": 4294967295,
+    "classicMaximumVariableSizeSamplesPerChunk": 65536,
+    "decoderConfigProbeBytes": 8388608,
+    "decoderConfigDescriptionBytes": 262144,
+    "decoderConfigRetainedBytes": 1048576,
+    "expandedSamplesPerFragment": 262144,
+    "metadataBytesPerFragmentOrLookupBox": 16777216,
+    "aggregateFragmentTrackHeaders": 65536,
+    "aggregateFragmentLookupRows": 262144
+  },
   "outputAccounting": {
     "maximumApplicationFrameSlotsIncludingInFlight": 3,
     "actualStridesUsedForBytes": true,

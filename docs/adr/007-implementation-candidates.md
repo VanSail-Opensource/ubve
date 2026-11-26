@@ -39,8 +39,8 @@ stereo channel-index fold-down. It refuses full HDR. N1/N2 preserve encoded
 video while changing packaging or conventional audio coding, but their actual
 native browser/output behavior is deferred. N3 is unavailable.
 
-Large MP4 metadata continues to fail preflight until complete paged semantics
-are connected to the demux path. The disc package exposes the actual pinned
+I10 now connects bounded classic MP4 tables to selected-track packet playback
+for its explicit [candidate profile](../tasks/I10-index-disc.md). The disc package exposes the actual pinned
 read-only WASM filesystem/title inventory; it does not yet provide whole-title
 clip-transition playback. Neither candidate is promoted by a partial test.
 

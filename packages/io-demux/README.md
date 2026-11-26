@@ -48,11 +48,18 @@ physical output.
 
 ## Provider bounds
 
-MP4 preflight checks recognized leading boxes and bounded table counts before
-opening the pinned parser. It does not validate every sample extent or bound
-the parser heap. The provider can allocate its own pending read slice before
-calling the source callback. The callback's per-range limit only bounds
-application-owned reads and handoff leases.
+MP4 preflight checks recognized leading boxes and bounded table counts. Large
+classic MP4/MOV opens with sparse checkpoints and source-exact sample payloads.
+The codec probe passes a small private MP4 with one access unit per track to
+the pinned provider. It never passes the actual large tables to that provider.
+Application limits are 8 MiB for that temporary probe, 256 KiB for each
+description box and 1 MiB of retained codec-private bytes. Exact sample spans
+are checked against their `mdat` extent on demand.
+
+Fragment preflight limits each expanded fragment and separately bounds lookup
+rows. The ordinary provider may still allocate internal metadata or pending
+slice storage. Per-range limits only bound application-owned reads and handoff
+leases, not the vendor heap.
 
 Selected packet seeks check cancellation between provider operations. They
 do not preempt a running upstream key lookup or packet read. Source range

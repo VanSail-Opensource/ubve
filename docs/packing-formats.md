@@ -13,7 +13,15 @@ UBVE identifies containers from bytes. A suffix is a file-picker hint, not a pro
 | Ogg Opus, native FLAC, MP3 and ADTS AAC | Ogg/Opus end trim, native FLAC, MP3 delay/end padding, and ADTS AAC-LC. |
 | Local Blu-ray UDF `.iso` and BDMV folder | Choose a clear, single-angle H.264/AC-3 clip. The original `.m2ts` is read by extent and played as stored. No complete ISO extraction is required. |
 
-MP4 is not a disc image. In the player, select a local ISO or use **Open Blu-ray folder**, then pick a clip. This does not implement DVD-Video, encrypted or remote images, Blu-ray menus, embedded Blu-ray PGS, or playlist splicing and cuts. Legacy AVI/ASF/FLV/MPEG-PS/MXF/NUT mappings are not advertised by this matrix. Native HLS URLs, multi-file adaptive manifests, larger fragment/index profiles, and transport discontinuities are separate scopes. A duration-less large input is not scanned in full simply to enable the seek slider. [Mediabunny input formats](https://mediabunny.dev/guide/input-formats) · [VideoLAN libbluray](https://images.videolan.org/developers/libbluray.html) · [Apple CAF specification](https://developer.apple.com/library/archive/documentation/MusicAudio/Reference/CAFSpec/CAF_spec/CAF_spec.html)
+MP4 is not a disc image. In the player, select a local ISO or use **Open Blu-ray folder**, then pick a clip. This does not implement DVD-Video, encrypted or remote images, Blu-ray menus, embedded Blu-ray PGS, or playlist splicing and cuts. Legacy AVI/ASF/FLV/MPEG-PS/MXF/NUT mappings are not advertised by this matrix. Native HLS URLs, multi-file adaptive manifests and transport discontinuities are separate scopes. [Mediabunny input formats](https://mediabunny.dev/guide/input-formats) · [VideoLAN libbluray](https://images.videolan.org/developers/libbluray.html) · [Apple CAF specification](https://developer.apple.com/library/archive/documentation/MusicAudio/Reference/CAFSpec/CAF_spec/CAF_spec.html)
+
+## Large files
+
+Source ranges are bounded by each read, not by a universal input size limit. The selected container and codecs still have to be admitted, and the device needs working decoders. Unknown-duration streams are not scanned from beginning to end just to populate the seek slider.
+
+- MP4/MOV automatically chooses paged classic tables above 262,144 aggregate entries or 16 MiB of `moov` metadata. It supports clear audio/video tracks with a static sample description, exact signed composition offsets and the admitted contiguous edit. Fixed-size PCM is coalesced within proven chunk bounds. More complex edits, changing descriptions, unsupported sample groups and protected content still fail explicitly.
+- Fragmented MP4 can exceed the old total sample cutoff because the expanded sample budget is per fragment. The initialization and compact lookup metadata still have separate bounds. This is not support for missing initialization segments or every fragment profile.
+- The large-file browser screen opens two authored 96-minute timelines and plays their final half-second after a seek. It checks 13 submitted pictures and 24,000 PCM sample frames for AVC/AAC and 24,000 PCM sample frames for fragmented AAC. Separate screens exercise PCM MOV and four 10-bit AV1 pictures with oversized classic metadata. Node checks the same metadata route with HEVC, VP9 and ALAC packets, and verifies sparse MOV offsets beyond 4 GiB. These tests do not establish large-file throughput or device-wide support.
 
 ## Reproduce verification
 
@@ -22,6 +30,7 @@ npm run test:packing
 npm run lab:build
 npm run test:packing:browser
 npm run test:packing:picker
+node test/mp4-playback-browser.mjs
 ```
 
 The browser matrix uses the actual HTTPS lab runner with a trusted loopback certificate. Set `UBVE_LAB_CERT` and `UBVE_LAB_KEY` as in the [lab runbook](device-lab.md). It checks local File and real HTTPS ranges, including Ready without autoplay, exact picture/PCM counts at EOS, paused seek, resume, close and reopen. ISO uses the File lane only. `UBVE_PACKING_TRANSPORT=file` or `range` selects one lane. The picker test exercises the production Vue view for both ISO and BDMV. `node test/disc-browser.mjs` separately compares the clip read from the ISO against the hash of independently authored folder bytes. Raw browser receipts remain under `.local/packing-browser/` and do not change the v8 release verdict.

@@ -14,7 +14,7 @@ The [v8 specification](specification/Universal-Browser-Video-Engine-v8.0.md) rem
 | I07 HTTP | Actual Fetch loopback, pinned redirects/ETag and virtual ranges above 4 GiB | Cross-origin/device and bandwidth starvation profiles are not qualified |
 | I08 native bridge | Seven exact AV1/TrueHD/ASS files preserve 336 video packets and 211,200 PCM frames across N2; real MSE opened, played and sought on all seven | Every short run dropped pictures. The 4K60/120 cases dropped 23/25 of 48. Rendered ASS and physical output not verified |
 | I09 cinema | Real ASS raster/seek and IMSC timing, bounded PGS and font state, first-render font regression fixed | Complete cinema output semantics across modes/devices remain unqualified |
-| I10 indexes/disc | Sparse five-million-entry classic index, exact edit mapping, actual clear two-clip BDMV and UDF ranges in a real browser worker | Generic large MP4 admission, fragmented tables and complete selected-title playback |
+| I10 indexes/disc | Automatic paged classic MP4/MOV packets, bounded fragmented MP4, sparse high-offset PCM and clear two-clip BDMV/UDF reads | Further codec/edit combinations, sustained large-film evidence and complete selected-title playback |
 | I11 optimization | Faster bounded CPU tone-map component. Smaller 360p raster rejected after paired short browser measurements | No promoted strict playback improvement |
 | I12 release | Static build, standard/isolated document checks, asset hashes, staged notices, raw-receipt integrity and fail-closed support report | Exact sustained and physical-output records, complete corresponding-source inventory and remaining playback exits |
 
@@ -32,4 +32,6 @@ I06/I11 retain bounded stage histograms and an opt-in worker conversion candidat
 
 I02/I07 verify 21 locked container/profile fixtures through the isolated HTTPS lab in Chromium 151.0.7922.34. All 21 File jobs and all 20 applicable HTTPS range jobs passed. Refusal coverage includes corrupt/scrambled transport, truncated PCM chunks, and remote ISO. The [packing matrix](packing-formats.md) records the exact codecs and exclusions rather than assigning support by suffix alone.
 
-I10 verifies the production Vue picker in Windows Chromium 158.0.8127.37. An explicitly selected clip played from both a clear Blu-ray UDF ISO and its authored BDMV folder. The real disc worker matched the ISO clip bytes to the separate folder reference. The playback checks observed 36 submitted pictures and 73,728 PCM sample frames. This is clip playback, not playlist, full-title, menu, or physical output evidence. Whole-title transitions and long and fragmented index coverage remain open.
+I10 verifies the production Vue picker in Windows Chromium 158.0.8127.37. An explicitly selected clip played from both a clear Blu-ray UDF ISO and its authored BDMV folder. The real disc worker matched the ISO clip bytes to the separate folder reference. The playback checks observed 36 submitted pictures and 73,728 PCM sample frames. Whole-title transitions remain open.
+
+The [large-file regression](packing-formats.md#large-files) verifies managed tail playback on an authored 96-minute AVC/AAC MP4 and a 96-minute fragmented AAC file, plus exact PCM indexing above 4 GiB in a sparse MOV. This is short seek-to-EOS and address-space evidence, not uninterrupted movie-length playback or a device-wide qualification.
