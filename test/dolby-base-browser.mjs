@@ -7,9 +7,12 @@ import { preview } from 'vite';
 import { dolbyBaseCarriage } from './fixtures/dolby-base-carriage.mjs';
 
 const authored = await dolbyBaseCarriage(), incompatible = await dolbyBaseCarriage({ profile: 5 });
+const av1 = await dolbyBaseCarriage({ av1: true, profile: 10 }), proprietaryAv1 = await dolbyBaseCarriage({ av1: true, profile: 10, compatibility: 0 });
 const cases = [
   { id: 'authored-mkv-rpu-carriage', name: 'authored-carriage.mkv', bytes: authored.bytes, mode: 'profile-81', pictures: authored.clean.length },
   { id: 'declared-profile-5-refusal', name: 'no-hdr10-base.mkv', bytes: incompatible.bytes, refused: true },
+  { id: 'authored-av1-profile-101-carriage', name: 'authored-av1-carriage.mkv', bytes: av1.bytes, mode: 'profile-101', pictures: av1.clean.length },
+  { id: 'declared-profile-10-refusal', name: 'proprietary-av1-color.mkv', bytes: proprietaryAv1.bytes, refused: true, profile: 10 },
 ];
 const root = process.env.UBVE_DOLBY_SAMPLE_ROOT;
 if (root) {
@@ -47,7 +50,7 @@ try {
       const canPlay = HTMLMediaElement.prototype.canPlayType;
       HTMLMediaElement.prototype.canPlayType = function(mime) {
         const result = canPlay.call(this, mime);
-        if (!/\b(?:dvhe|dvh1)\./i.test(mime)) return result;
+        if (!/\b(?:dvhe|dvh1|dav1)\./i.test(mime)) return result;
         window.dvProbes.push({ mime, result }); return '';
       };
     });
@@ -66,7 +69,7 @@ try {
       if (entry.refused) {
         await waitState('Playback issue');
         receipt.refusal = await page.locator('.stage-error p').innerText();
-        assert.match(receipt.refusal, /Dolby Vision P5.*no verified HDR10-compatible/);
+        assert.match(receipt.refusal, new RegExp(`Dolby Vision P${entry.profile ?? 5}.*no verified HDR10-compatible`));
       } else {
         await waitState('Ready');
         await page.locator('.first-play button').click();

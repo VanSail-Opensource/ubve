@@ -1,0 +1,8 @@
+1
+00:00:00,157 --> 00:00:02,800
+<b>Covering cue</b>
+Second row &amp; timing
+
+2
+00:00:03,150 --> 00:00:04,200
+<i>Next cue</i>

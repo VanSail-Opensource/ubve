@@ -94,7 +94,9 @@ export function readFontFamilyNames(bytes: Uint8Array): readonly string[] {
   return [...result];
 }
 
-export interface SubtitlePacket { readonly kind: 'ass' | 'ssa' | 'pgs'; readonly data: Uint8Array;
+export type StreamedTextKind = 'ass' | 'ssa' | 'srt';
+export function isStreamedTextKind(codec: string): codec is StreamedTextKind { return codec === 'ass' || codec === 'ssa' || codec === 'srt'; }
+export interface SubtitlePacket { readonly kind: StreamedTextKind | 'pgs'; readonly data: Uint8Array;
   readonly ptsSeconds: number; readonly durationSeconds: number | null; readonly epoch?: number; }
 
 export function validateAssPacket(packet: SubtitlePacket): { readonly content: string; readonly timeMs: number; readonly durationMs: number } {
@@ -112,6 +114,24 @@ export function validateAssPacket(packet: SubtitlePacket): { readonly content: s
 export interface PlainTextCue {
   readonly start: number; readonly end: number; readonly text: string;
   readonly align: 'start' | 'center' | 'end';
+}
+
+/** Matroska S_TEXT/UTF8 stores a timed cue body, not an entire SRT file.
+ * Unrecognized markup remains text. No HTML or external resources are loaded. */
+export function readEmbeddedSrtCue(packet: SubtitlePacket): PlainTextCue {
+  const start = packet.ptsSeconds, duration = packet.durationSeconds;
+  if (!Number.isFinite(start) || start < 0 || duration === null || !Number.isFinite(duration) ||
+      duration <= 0 || !Number.isFinite(start + duration) || start + duration <= start)
+    throw new Error('Embedded SRT requires a known positive display interval');
+  if (packet.data.byteLength > 256 * 1024) throw new Error('Embedded SRT cue exceeds 256 KiB');
+  const text = new TextDecoder('utf-8', { fatal: true }).decode(packet.data).replace(/\r\n?/g, '\n')
+    .replace(/<\/?(?:b|i|u)>/gi, tag => tag.toLowerCase());
+  const stack: string[] = [];
+  for (const [, closing, name] of text.matchAll(/<(\/?)(b|i|u)>/g)) {
+    if (closing ? stack.pop() !== name : stack.push(name!) > 64) throw new Error('Invalid embedded SRT cue markup');
+  }
+  if (stack.length) throw new Error('Unbalanced embedded SRT cue markup');
+  return { start, end: start + duration, text, align: 'center' };
 }
 
 /** Explicit managed text profile: timing, line breaks, b/i/u and alignment.

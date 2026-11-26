@@ -26,28 +26,28 @@ function nal(type) {
   return Buffer.of(0, 0, 0, 3, type * 2, 1, 0x80);
 }
 
-export async function dolbyBaseCarriage({ profile = 8, sparse = false } = {}) {
-  const seed = await readFile(new URL('./modern/hevc-main10-hdr10.mkv', import.meta.url));
+export async function dolbyBaseCarriage({ profile = 8, sparse = false, av1 = false, compatibility } = {}) {
+  const seed = await readFile(new URL(av1 ? './primary/combined-720p60.mkv' : './modern/hevc-main10-hdr10.mkv', import.meta.url));
   const media = await openMedia(new Blob([seed]));
   try {
-    const [track] = media.tracks;
-    assert.equal(track.codec, 'hevc');
-    assert.equal(track.codecPrivate[21] & 3, 3);
+    const track = media.tracks.find(track => track.kind === 'video');
+    assert.equal(track.codec, av1 ? 'av1' : 'hevc');
+    if (!av1) assert.equal(track.codecPrivate[21] & 3, 3);
     const clean = [], packets = [];
-    const level = 5, lowFlags = profile === 7 ? 7 : 5, compatibilityId = profile === 8 ? 1 : profile === 7 ? 6 : 0;
+    const level = 5, lowFlags = profile === 7 ? 7 : 5, compatibilityId = compatibility ?? ([8, 10].includes(profile) ? 1 : profile === 7 ? 6 : 0);
     for await (const packet of media.packets([track.id])) {
       try {
         const raw = Buffer.from(packet.bytes.borrow());
         clean.push(raw);
         const ticks = Number(packet.ptsTicks / 1_000_000n), timing = Buffer.alloc(3);
         timing.writeInt16BE(ticks, 0); timing[2] = packet.recovery === 'key' ? 128 : 0;
-        packets.push(element(0xa3, Buffer.of(0x81), timing, raw, ...(profile == null ? [] : profile === 7 ? [nal(63), nal(62)] : [nal(62)])));
+        packets.push(element(0xa3, Buffer.of(0x81), timing, raw, ...(profile == null || av1 ? [] : profile === 7 ? [nal(63), nal(62)] : [nal(62)])));
       } finally { packet.bytes.release(); }
     }
     const metadata = profile == null ? [] : [element(0x41e4, field(0x41f0, 2),
       field(0x41e7, profile < 8 ? 0x64766343 : 0x64767643, 4),
       element(0x41ed, Buffer.of(1, 0, profile * 2, level * 8 + lowFlags, compatibilityId * 16)))];
-    const tracks = element(0x1654ae6b, element(0xae, field(0xd7, 1), field(0x73c5, 1), field(0x83, 1), string(0x86, 'V_MPEGH/ISO/HEVC'),
+    const tracks = element(0x1654ae6b, element(0xae, field(0xd7, 1), field(0x73c5, 1), field(0x83, 1), string(0x86, track.matroskaTrack.codecId),
       field(0x23e383, track.matroskaTrack.defaultDurationNs, 8), element(0x63a2, Buffer.from(track.codecPrivate)),
       element(0xe0, field(0xb0, track.width, 2), field(0xba, track.height, 2), element(0x55b0, field(0x55b1, 9), field(0x55b9, 1),
         field(0x55ba, 16), field(0x55bb, 9))), ...metadata));

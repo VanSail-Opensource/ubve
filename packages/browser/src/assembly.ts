@@ -3,7 +3,7 @@ import { hdr10BaseMode, openMedia, packetSeconds } from '@ubve/io-demux';
 import type { DolbyVisionConfig, MediaSourceSession, MediaTrack } from '@ubve/io-demux';
 import { createNativeStream } from '@ubve/native-bridge';
 import type { NativeStream } from '@ubve/native-bridge';
-import { SubtitleController } from '@ubve/presentation';
+import { SubtitleController, isStreamedTextKind } from '@ubve/presentation';
 import { ReferencePlayer, describeInput, prepareDirectPlayback } from './player.js';
 import type { MediaInput, PlayerSourceInfo, PlayerTrack, PreparedPlayback, QualityMode } from './player.js';
 import { ManagedPlayback } from './managed.js';
@@ -13,12 +13,13 @@ export type RoutePreference = 'automatic' | 'native' | 'experimental' | 'managed
 
 function dolbyLabel(config: DolbyVisionConfig): string {
   return config.profile === null ? `${config.sampleEntry} (profile unavailable)` :
-    `P${config.profile}${config.profile === 8 && config.compatibilityId === 1 ? '.1' : ''}`;
+    `P${config.profile}${[8, 10].includes(config.profile) && config.compatibilityId === 1 ? '.1' : ''}`;
 }
 
 function nativeDolbyMime(config: DolbyVisionConfig, audio: MediaTrack | undefined): string {
-  if (config.profile === null || ![5, 7, 8].includes(config.profile) || !config.level || !config.rpuPresent || !config.baseLayerPresent || (audio && !audio.codecString)) return '';
-  const tag = ['hvc1', 'dvh1'].includes(config.sampleEntry) ? 'dvh1' : ['hev1', 'dvhe'].includes(config.sampleEntry) ? 'dvhe' : null;
+  if (config.profile === null || ![5, 7, 8, 10].includes(config.profile) || !config.level || !config.rpuPresent || !config.baseLayerPresent || (audio && !audio.codecString)) return '';
+  const tag = config.profile === 10 ? (['av01', 'dav1'].includes(config.sampleEntry) ? 'dav1' : null)
+    : ['hvc1', 'dvh1'].includes(config.sampleEntry) ? 'dvh1' : ['hev1', 'dvhe'].includes(config.sampleEntry) ? 'dvhe' : null;
   if (!tag) return '';
   const dv = `${tag}.${String(config.profile).padStart(2, '0')}.${String(config.level).padStart(2, '0')}`;
   return `video/mp4; codecs="${[dv, ...(audio?.codecString ? [audio.codecString] : [])].join(', ')}"`;
@@ -82,10 +83,11 @@ export async function preparePlayback(input: MediaInput, video: HTMLVideoElement
     if (dolby && (dolbyConfigs.length !== 1 || media.tracks.filter(track => track.kind === 'video').length !== 1))
       throw new EngineError('UNSUPPORTED_PROFILE', 'Dolby Vision needs an unambiguous single-video-track mapping.', 'caller-fix');
     const label = dolby ? dolbyLabel(dolby) : null;
-    const baseMode = dolby && primaryVideo?.codec === 'hevc' ? hdr10BaseMode(dolby) : null;
+    const declaredBase = dolby ? hdr10BaseMode(dolby) : null;
+    const baseMode = primaryVideo?.codec === (declaredBase === 'profile-101' ? 'av1' : 'hevc') ? declaredBase : null;
     const preparedMedia = media;
     const software = (): PreparedPlayback => {
-      if (dolby && !baseMode) throw new EngineError('UNSUPPORTED_PROFILE', `Dolby Vision ${label} has no verified HDR10-compatible HEVC base layer for software playback.`, 'caller-fix',
+      if (dolby && !baseMode) throw new EngineError('UNSUPPORTED_PROFILE', `Dolby Vision ${label} has no verified HDR10-compatible base layer for this codec. Software fallback cannot render the Dolby Vision signal.`, 'caller-fix',
         { sampleEntry: dolby.sampleEntry, dolbyVisionProfile: dolby.profile, dolbyVisionLevel: dolby.level, dolbyVisionCompatibilityId: dolby.compatibilityId });
       if (!managed || !subtitles) throw new EngineError('INVALID_ARGUMENT', 'Managed playback requires an output host and subtitle controller');
       return new ManagedPlayback({ media: preparedMedia, video, subtitles, signal, assetBaseUrl, ...managed, stereoFallbackOnly: preference === 'automatic',
@@ -135,6 +137,7 @@ function prepareNativeCandidate(media: MediaSourceSession, video: HTMLVideoEleme
   const videoId = selectDefault(media.tracks, 'video')?.id;
   const audio = media.tracks.find(track => track.id === audioId);
   const subtitle = selectDefault(media.tracks, 'subtitle');
+  const subtitleKind = subtitle && isStreamedTextKind(subtitle.codec) ? subtitle.codec : undefined;
   let subtitlesEnabled = true;
   let embeddedInitialized = false;
   let subtitleEpoch = 0;
@@ -149,12 +152,13 @@ function prepareNativeCandidate(media: MediaSourceSession, video: HTMLVideoEleme
     const previous = stream; stream = null;
     await previous?.dispose(); ensureActive();
     if (subtitle && subtitlesEnabled) {
-      if (!subtitles || (subtitle.codec !== 'ass' && subtitle.codec !== 'ssa')) throw new EngineError('UNSUPPORTED_PROFILE', `Embedded ${subtitle.codec} streaming is not admitted for this route.`, 'caller-fix');
+      if (!subtitles || !subtitleKind) throw new EngineError('UNSUPPORTED_PROFILE', `Embedded ${subtitle.codec} streaming is not admitted for this route.`, 'caller-fix');
       if (!embeddedInitialized) {
-        await subtitles.load({ kind: subtitle.codec, data: new TextDecoder().decode(subtitle.codecPrivate), fonts: media.attachments.filter(font => /\.(ttf|otf|woff2?)$/i.test(font.name) || /font|truetype|opentype/i.test(font.mimeType)).map(font => ({ name: font.name, data: font.data })), label: subtitle.name ?? subtitle.codec.toUpperCase() });
+        await subtitles.load({ kind: subtitleKind, streaming: true, data: subtitleKind === 'srt' ? '' : new TextDecoder().decode(subtitle.codecPrivate),
+          ...(subtitleKind === 'srt' ? {} : { fonts: media.attachments.filter(font => /\.(ttf|otf|woff2?)$/i.test(font.name) || /font|truetype|opentype/i.test(font.mimeType)).map(font => ({ name: font.name, data: font.data })) }), label: subtitle.name ?? subtitle.codec.toUpperCase() });
         embeddedInitialized = true;
       }
-      await subtitles.resetStream(++subtitleEpoch);
+      await subtitles.resetStream(++subtitleEpoch, time);
     }
     ensureActive();
     const activeSubtitle = subtitlesEnabled ? subtitle : undefined, epoch = subtitleEpoch;
@@ -162,10 +166,10 @@ function prepareNativeCandidate(media: MediaSourceSession, video: HTMLVideoEleme
     // An exact-end seek is a terminal transport position, not a picture interval.
     // Prime from just before the end, then let the facade set the requested endpoint.
     const startTime = media.duration !== null && time >= media.duration ? Math.max(0, media.duration - 0.25) : time;
-    const next = await createNativeStream(media, video, selection, { allowExperimental: true, assetBaseUrl, signal: runtimeSignal, startTime, ...(activeSubtitle && subtitles ? { onSubtitle: async (packet) => {
+    const next = await createNativeStream(media, video, selection, { allowExperimental: true, assetBaseUrl, signal: runtimeSignal, startTime, ...(activeSubtitle && subtitles && subtitleKind ? { onSubtitle: async (packet) => {
       if (revision !== runtimeRevision || !subtitlesEnabled) return;
       const timing = packetSeconds(packet);
-      await subtitles.addPacket({ kind: activeSubtitle.codec as 'ass' | 'ssa', data: packet.bytes.borrow(), ptsSeconds: timing.timestamp, durationSeconds: timing.duration, epoch });
+      await subtitles.addPacket({ kind: subtitleKind, data: packet.bytes.borrow(), ptsSeconds: timing.timestamp, durationSeconds: timing.duration, epoch });
     } } : {}) });
     try {
       ensureActive(); stream = next;

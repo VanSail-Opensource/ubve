@@ -8,10 +8,31 @@ test('Only declared HDR10 base profiles with the matching layer flags can pass a
   const config = (profile, compatibility, flags) => readDolbyVisionConfig('hvc1', Uint8Array.of(1, 0, profile * 2, 5 * 8 + flags, compatibility * 16));
   assert.equal(hdr10BaseMode(config(8, 1, 5)), 'profile-81');
   assert.equal(hdr10BaseMode(config(7, 6, 7)), 'profile-7');
+  assert.equal(hdr10BaseMode(config(10, 1, 5)), 'profile-101');
   for (const args of [[5, 0, 5], [8, 4, 5], [8, 2, 5], [8, 1, 7], [8, 1, 4], [7, 6, 5], [7, 6, 6]]) {
     assert.equal(hdr10BaseMode(config(...args)), null);
   }
   assert.equal(hdr10BaseMode(readDolbyVisionConfig('dvh1', Uint8Array.of(1, 0, 16, 45))), null);
+});
+
+test('Matroska AV1 Dolby Vision metadata preserves the base access units and real CodecID', async () => {
+  const fixture = await dolbyBaseCarriage({ av1: true, profile: 10 });
+  const media = await openMedia(new Blob([fixture.bytes]));
+  try {
+    const [track] = media.tracks;
+    assert.equal(track.codec, 'av1');
+    assert.equal(track.matroskaTrack.dolbyVision.sampleEntry, 'V_AV1');
+    assert.equal(hdr10BaseMode(track.matroskaTrack.dolbyVision), 'profile-101');
+    let count = 0;
+    for await (const packet of media.packets([track.id])) {
+      try {
+        validatePacket(packet);
+        assert.equal(packet.representation.kind, 'source-exact');
+        assert.deepEqual(Buffer.from(packet.bytes.borrow()), fixture.clean[count++]);
+      } finally { packet.bytes.release(); }
+    }
+    assert.equal(count, fixture.clean.length);
+  } finally { await media.dispose(); }
 });
 
 test('Declared Matroska P8.1 and P7 strip only RPU/EL while source tracks stay unchanged', async () => {

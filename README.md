@@ -17,10 +17,11 @@ The standard document is `/`. Portable software codecs work without shared memor
 
 - Bounded Blob and strict HTTP range reads, selected-track Matroska demuxing, and exact packet provenance where available.
 - Packet-fed AV1 and TrueHD software candidates, an AudioWorklet clock, and ASS/PGS/IMSC and timed-text components.
-- Bounded software fallback for the [modern codec matrix](docs/modern-software-codecs.md), including AVC, HEVC, VP8/VP9, AAC, Opus, ALAC, and conventional AC-3/E-AC-3/DTS Core.
+- Bounded software fallback for the [modern codec matrix](docs/modern-software-codecs.md), including AVC, HEVC, VP8/VP9, AAC, Opus, ALAC, and conventional AC-3/E-AC-3/DTS including DTS-HD.
 - Browser-native direct playback candidates, bounded stream-copy remuxing, and a lossless TrueHD-to-FLAC candidate for one native media clock.
 - Canvas presentation with declared SDR transforms and an explicit, unqualified WebGPU presentation candidate. WebGPU does not decode the compressed AV1 stream.
-- [HDR10-compatible base playback](docs/hdr-base-playback.md) for admitted Dolby Vision Profile 8.1 and single-video-track Profile 7 files. Software decodes the HEVC base without applying Dolby Vision metadata or enhancement layers.
+- [HDR10-compatible base playback](docs/hdr-base-playback.md) for admitted Dolby Vision Profiles 8.1, 7 and AV1 Profile 10.1. Software does not apply Dolby Vision metadata or enhancement layers.
+- Embedded Matroska SRT follows the playback clock and reconstructs an active cue when seeking within the admitted text profile.
 - A [verified packing matrix](docs/packing-formats.md) spanning MP4/MOV, MKV/WebM, MPEG-TS/M2TS, common audio containers and clear local Blu-ray ISO/BDMV clip playback. Large classic MP4/MOV uses paged sample tables, and fragmented MP4 bounds sample metadata per fragment. This is not whole-disc or release qualification.
 
 ## Verify the build

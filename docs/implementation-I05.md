@@ -49,11 +49,28 @@ The Vue app includes local file selection, drag and drop, a session queue, direc
 
 PGS loading has an explicit BT.709/BT.601 limited-range palette selector. Ordinary video picture in picture is disabled when a required custom subtitle overlay would be lost. Managed subtitle clocks use the selected source time rather than an unloaded media element.
 
+Embedded Matroska SRT uses its UTF-8 block body and exact positive
+`BlockDuration`, not a second SRT file. The selected overlay preserves line
+breaks, bold, italic and underline. Other tags are displayed as text. A seek
+can walk earlier clusters for SRT without decoding those earlier video packets
+and can resume video from the exact CueTime keyframe. Embedded SRT cue lengths
+up to 60 seconds are admitted by this bounded seek path. The ordinary disabled
+state clears the overlay and keeps it off on seek.
+
 ## Verification
 
 `test/player.test.mjs` exercises nine lifecycle/ownership scenarios, including actual object-URL revocation, using deterministic event-host doubles. These are Node contract/race tests, not evidence of real media decoding, browser rendering, audio output or physical presentation.
 
 `node test/automatic-truehd-browser.mjs` loads the real AV1/TrueHD/ASS MKV through the built reference player. It checks refusal on stereo without permission, successful retry and playback to EOS after permission, persistence across the two documents, and refusal in explicit Native direct. Its device-capacity probe may narrow actual browser output to stereo, but cannot increase it. This screen does not measure physical sound or device-wide compatibility.
+
+`node test/embedded-srt-browser.mjs` loads an authored 72-picture VP9 MKV
+with the two cues in [embedded-srt.srt](../test/fixtures/embedded-srt.srt).
+FFmpeg 9.1 generated it from `testsrc2=size=128x72:rate=12:duration=6` with
+libvpx-vp9, a 12-picture key interval and copied SRT. Windows Chromium
+verified line breaks and formatting, paused seeks across cluster boundaries,
+expiry, and disable. Automatic and Managed are checked in CI. Set
+`UBVE_SRT_BRIDGE=1` to also check an explicitly selected N1 browser that
+admits the sample's native MSE tuple.
 
 The full browser test lane must exercise the real pinned codecs and current target environments. Execution in this session was blocked by the available browser environment; no browser pass, complete combined performance result or target-platform support claim is recorded from that absence.
 

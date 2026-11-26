@@ -38,10 +38,11 @@ for (const row of fixturePack.cases) {
     let hevc;
     if (row.hdr10Base) {
       const config = track.matroskaTrack?.dolbyVision ?? media.preflight.dolbyVision[0];
-      assert.ok(config && track.codec === 'hevc');
+      assert.ok(config);
+      assert.equal(track.codec, row.hdr10Base === 'profile-101' ? 'av1' : 'hevc');
       assert.equal(hdr10BaseMode(config), row.hdr10Base);
-      hevc = { trackId: track.id, mode: row.hdr10Base };
-      record.hdr10Base = { mode: hevc.mode, config };
+      if (track.codec === 'hevc') hevc = { trackId: track.id, mode: row.hdr10Base };
+      record.hdr10Base = { mode: row.hdr10Base, config };
       record.repackedAccessUnits = 0;
     }
     const options = { codec: track.codec, description: track.codecPrivate, stamp, assetBaseUrl };
@@ -63,9 +64,10 @@ for (const row of fixturePack.cases) {
             previousVideoTime = time;
             frames.push(sha(value.data));
             if (value.signalMetadata?.masteringDisplay.state === 'known') record.hdrSeen = true;
-            if (hevc) {
+            if (row.hdr10Base) {
               assert.equal(value.format, 'I420P10');
               assert.deepEqual(value.color, { primaries: 'bt2020', transfer: 'smpte2084', matrix: 'bt2020-ncl', range: 'limited' });
+              for (const field of ['primaries', 'transfer', 'matrix', 'range']) assert.equal(value.signalMetadata[field].origin, 'decoder');
               if (value.signalMetadata?.chromaLocation.state === 'known') record.chromaLocation = value.signalMetadata.chromaLocation.value;
             }
           } else {
@@ -86,6 +88,7 @@ for (const row of fixturePack.cases) {
     const produce = async () => {
       for await (const packet of media.packets([track.id], { stamp, signal: abort.signal, ...(hevc ? { hevc } : {}) })) {
         if (hevc && packet.representation.kind === 'repacked') record.repackedAccessUnits++;
+        if (row.hdr10Base === 'profile-101') assert.notEqual(packet.representation.kind, 'repacked');
         const submitted = decoder.trySubmit(packet, operation('packet-' + packet.decodeSequence));
         try {
           if (submitted.status !== 'accepted') throw submitted.error ?? Error(submitted.reason);

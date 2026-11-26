@@ -18,7 +18,13 @@ applicable, enhancement data from the selected access units while retaining
 base-layer parameter sets, static SEI, packet timing and original spans where
 available. The decoder must confirm limited-range 10-bit BT.2020 PQ. A
 generic HEVC tag alone does not authorize a Dolby Vision transformation.
-[Dolby Vision bitstream profiles](https://ott.dolby.com/OnDelKits/Dolby_Vision_Online_Delivery_Kit/v1/Documentation/Specs/Visio_Profiles/help_files/topics/c_dovi_profiles.html) · [Matroska block-addition mappings](https://www.matroska.org/technical/block_additional_mappings.html)
+
+**Profile 10.1** uses a single AV1 picture layer in MKV and MP4. Its declared
+HDR10 compatibility must agree with the actual decoded 10-bit limited-range
+BT.2020 PQ output. The software route decodes the original AV1 access units
+and does not apply the Dolby Vision metadata in their ITU-T T.35 messages.
+The proprietary Profile 10.0 and HLG Profile 10.4 do not become HDR10.
+[Dolby Vision bitstream profiles](https://ott.dolby.com/OnDelKits/Dolby_Vision_Online_Delivery_Kit/v1/Documentation/Specs/Visio_Profiles/help_files/topics/c_dovi_profiles_public.html) · [Matroska block-addition mappings](https://www.matroska.org/technical/block_additional_mappings.html)
 
 Choose **Performance** for explicitly tone-mapped SDR. For the HDR candidate,
 choose **Full** and enable **Try WebGPU presentation** before opening. It
@@ -32,8 +38,8 @@ server-side processing is required. [WebGPU canvas color spaces](https://develop
 ## Verification
 
 After the ordinary build, `node test/dolby-base-browser.mjs` uses generated
-Matroska metadata around an authored and independently checked HEVC picture
-sequence. Synthetic RPU/EL bytes are carriage tests only. The unit tests
+Matroska metadata around independently checked HEVC and AV1 picture sequences.
+Synthetic declarations and RPU/EL bytes are carriage tests only. The unit tests
 also verify exact MKV cue offsets beyond 4 GiB on a sparse source and preserve
 the original selected MKV payload spans through filtering.
 
@@ -46,6 +52,12 @@ and decode planar 10-bit frames with FFmpeg. The software component probe
 compares those SHA-256 hashes before browser playback. The genuine Profile 5
 file is refused when native support is unavailable.
 [Jellyfin fixture lock](../test/fixtures/jellyfin-corpus.json) · [FFmpeg FATE Profile 7 MKV](https://fate-suite.ffmpeg.org/mkv/dovi-p7-hvce.mkv) · [FFmpeg FATE Profile 7 MP4](https://fate-suite.ffmpeg.org/mov/dovi-p7-hvce.mp4)
+
+For Profile 10.1, FFmpeg 9.1 with `libsvtav1 -dolbyvision 1` encoded a short
+640×360 excerpt with actual Dolby metadata from the locked Profile 8.1 input.
+FFprobe confirmed the AV1 profile, HDR10 compatibility ID and frame-side
+metadata. All 18 planar picture hashes matched native libdav1d in both the
+MKV and MP4 remux, without redistributing either clip.
 
 The short P8.1 MP4 contains a B-picture after its `mdhd` duration but inside
 its `elst` presentation interval. The managed clock now uses the mapped

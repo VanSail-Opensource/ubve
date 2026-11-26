@@ -8,9 +8,17 @@ Managed playback uses the same bounded packet source, Canvas/overlay and media c
 | AV1, VP8, VP9 | AV1 Main 8/10-bit in MP4/MKV/WebM, VP8 in WebM/MKV, VP9 profiles 0/2 in WebM/MKV/MP4 |
 | AAC, Opus, Vorbis, MP3 | AAC-LC and HE-AAC in MP4/M4A/MKV, Opus and Vorbis in Ogg and WebM/MKV, standalone MP3 |
 | FLAC, ALAC, PCM | 16/24-bit FLAC in FLAC/MKV, classic one-track ALAC in MP4/M4A, 16/24-bit integer or float32 PCM in WAV/MOV |
-| AC-3, E-AC-3, DTS Core, TrueHD | Conventional channel audio in Matroska, not extension-object rendering or implicit DTS-HD core extraction |
+| AC-3, E-AC-3, DTS, TrueHD | Conventional Matroska channel audio, including DTS Core, ES, 96/24, DTS-HD HRA and DTS-HD MA. No implicit core extraction or DTS:X object rendering. |
 
-The envelope does not make every codec cross-product an exercised tuple. See the authored manifest for exact tested inputs. Color/range must be signaled for managed presentation. Full HDR software output is not admitted on Canvas, and **Performance** explicitly maps supported HDR10 to SDR. Unknown signal interpretation, unhandled edits or layouts, DRM, Dolby Vision, and missing required subtitles refuse visibly.
+The envelope does not make every codec cross-product an exercised tuple. See the authored manifest for exact tested inputs. Color/range must be signaled for managed presentation. Full HDR software output is not admitted on Canvas, and **Performance** explicitly maps supported HDR10 to SDR. Unknown signal interpretation, unhandled edits or layouts, DRM, Dolby Vision without an admitted base, and missing required subtitles refuse visibly.
+
+The portable FFmpeg DCA decoder leaves extensions enabled and checks the actual
+decoded profile and channel layout. DTS-HD MA retains integer PCM. DTS:X,
+Express and midstream profile changes still refuse. Native FFmpeg matched the
+PCM on five FATE clips covering 5.1/7.1 MA, 5.1 HRA, 6.1 ES and 96 kHz 96/24.
+The fixtures were remuxed to Matroska without re-encoding and played through the
+managed browser pipeline as a separate short check. These clips are not
+redistributed with the player. [FFmpeg's DTS reference fixtures](https://fate-suite.ffmpeg.org/dts/dcadec-suite/)
 
 ## Verify or rebuild
 

@@ -7,6 +7,31 @@ import { BlobSource, SourceCache, operationContext, preflightMetadata, openMedia
 
 const stamp = sessionStamp('io-test', 0);
 const op = (signal) => operationContext(stamp, crypto.randomUUID(), signal);
+test('SRT recovery reads the overlapping cue before the A/V keyframe without decoding earlier pictures', async () => {
+  const bytes = await readFile(new URL('./fixtures/embedded-srt.mkv', import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), 'd01b5f608a5d07e67aca5d48e106a023e62821925dd26b7120d0f54f189075fa');
+  const media = await openMedia(new Blob([bytes]));
+  try {
+    const video = media.tracks.find(track => track.kind === 'video'), text = media.tracks.find(track => track.kind === 'subtitle');
+    assert.equal(text.codec, 'srt');
+    const seen = [];
+    for await (const packet of media.packets([video.id, text.id], { startTime: 2.25 })) {
+      try {
+        seen.push({ id: packet.trackId, pts: packet.ptsTicks, duration: packet.durationTicks, offset: packet.sourceSpans[0].range.start,
+          ...(packet.trackId === text.id ? { text: new TextDecoder().decode(packet.bytes.borrow()) } : {}) });
+      } finally { packet.bytes.release(); }
+    }
+    const firstVideo = seen.find(packet => packet.id === video.id), [first, next] = seen.filter(packet => packet.id === text.id);
+    assert.equal(firstVideo.pts, 2_000_000_000n);
+    assert.ok(first.offset < firstVideo.offset);
+    assert.equal(first.pts, 157_000_000n);
+    assert.equal(first.pts + first.duration, 2_800_000_000n);
+    assert.match(first.text, /<b>Covering cue<\/b>/);
+    assert.equal(next.pts, 3_150_000_000n);
+    assert.equal(media.snapshot().packets.bytes, 0);
+  } finally { await media.dispose(); }
+});
+
 test('immutable Blob source returns exact boundaries, permits EOF empty reads, and retains ownership until release', async () => {
   const source = new BlobSource(new Blob([new Uint8Array([1, 2, 3, 4])]));
   const read = await source.readExact(byteRange(1, 3), op());

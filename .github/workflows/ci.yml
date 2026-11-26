@@ -53,6 +53,8 @@ jobs:
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: node test/dolby-base-browser.mjs
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+      - run: node test/embedded-srt-browser.mjs
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: node test/webgpu-browser.mjs
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
         env:
@@ -76,3 +78,4 @@ jobs:
             .local/dolby-base-browser/
             .local/webgpu-browser/
             .local/automatic-truehd-browser/
+            .local/embedded-srt-browser/

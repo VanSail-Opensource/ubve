@@ -12,7 +12,7 @@ export interface MatroskaTrack {
 }
 export interface MediaAttachment { id: string; name: string; mimeType: string; data: Uint8Array; }
 export interface MatroskaMetadata { timecodeScaleNs: bigint; duration: number | null; tracks: MatroskaTrack[]; attachments: MediaAttachment[]; segmentStart: number; segmentEnd: number; firstCluster: number; cues: { timeNs: bigint; position: number; track: number }[]; }
-export interface MatroskaPacket { trackNumber: number; data: Uint8Array; ptsNs: bigint; durationNs: bigint | null; key: boolean; sourceStart: number; discardPaddingNs: bigint; }
+export interface MatroskaPacket { trackNumber: number; data: Uint8Array; ptsNs: bigint; durationNs: bigint | null; key: boolean; clusterStart: number; sourceStart: number; discardPaddingNs: bigint; }
 const text = new TextDecoder();
 const bad = (message: string): never => { throw new EngineError('INVALID_PACKET', message); };
 
@@ -65,6 +65,7 @@ async function payload(cache: SourceCache, entry: Element, operation: OperationC
 
 function parseTrack(bytes: Uint8Array): MatroskaTrack {
   const result: MatroskaTrack = { number: 0, uid: '', type: 'subtitle', codecId: '', codecPrivate: new Uint8Array(), language: 'und', name: null, default: true, forced: false, defaultDurationNs: null, codecDelayNs: 0n, seekPreRollNs: 0n, video: {}, audio: {}, color: {}, mastering: {} };
+  let dolbyConfig: Uint8Array | null = null;
   for (const entry of children(bytes)) {
     switch (entry.id) {
       case 0xd7: result.number = safe(integer(entry.data)); break;
@@ -85,11 +86,11 @@ function parseTrack(bytes: Uint8Array): MatroskaTrack {
         const mapping = children(entry.data), type = mapping.find(field => field.id === 0x41e7);
         const value = type ? integer(type.data) : 0n;
         // Matroska carries the same DV decoder configuration record as ISO BMFF.
-        if (value === 0x64766343n || value === 0x64767643n) {
-          if (result.dolbyVision) return bad('Matroska track declares multiple Dolby Vision configurations');
+        if (value === 0x64766343n || value === 0x64767643n || value === 0x64767743n) {
+          if (dolbyConfig) return bad('Matroska track declares multiple Dolby Vision configurations');
           const extra = mapping.find(field => field.id === 0x41ed);
           if (!extra || extra.data.length < 4 || extra.data.length > 64) return bad('Invalid Matroska Dolby Vision configuration');
-          result.dolbyVision = Object.freeze(readDolbyVisionConfig('V_MPEGH/ISO/HEVC', extra.data));
+          dolbyConfig = extra.data;
         }
       } break;
       case 0x6d80: throw new EngineError('UNSUPPORTED_CODEC', 'Matroska content encoding/encryption is outside this profile');
@@ -118,8 +119,10 @@ function parseTrack(bytes: Uint8Array): MatroskaTrack {
     }
   }
   if (!result.number || !result.codecId) return bad('Incomplete Matroska track');
-  if (result.dolbyVision && (result.type !== 'video' || result.codecId !== 'V_MPEGH/ISO/HEVC'))
-    throw new EngineError('UNSUPPORTED_PROFILE', 'Only Matroska HEVC Dolby Vision track mappings are admitted');
+  if (dolbyConfig) {
+    if (result.type !== 'video') return bad('Matroska Dolby Vision configuration must belong to a video track');
+    result.dolbyVision = Object.freeze(readDolbyVisionConfig(result.codecId, dolbyConfig));
+  }
   return result;
 }
 
@@ -206,12 +209,15 @@ export function decodeLacing(bytes: Uint8Array, offset: number, mode: number): {
 }
 
 const SEGMENT_CHILDREN = new Set([0x114d9b74, 0x1549a966, 0x1654ae6b, 0x1f43b675, 0x1c53bb6b, 0x1941a469, 0x1043a770, 0x1254c367]);
+/** Bounds the SRT seek lookback without decoding video from that earlier point. */
+export const MAX_SRT_DURATION_NS = 60_000_000_000n;
+interface SubtitleSeekLead { readonly tracks: ReadonlySet<number>; readonly before: number; }
 
 /** Inspect only bounded headers of unselected blocks. No full payload allocation before track selection. */
 async function blockTrack(cache: SourceCache, block: Element, operation: OperationContext): Promise<number> {
   return cache.readValue(block.data, Math.min(block.end, block.data + 8), operation, bytes => safe(readVint(bytes).value));
 }
-export async function* matroskaPackets(cache: SourceCache, metadata: MatroskaMetadata, selected: ReadonlySet<number>, operation: () => OperationContext, start = metadata.firstCluster): AsyncGenerator<MatroskaPacket> {
+export async function* matroskaPackets(cache: SourceCache, metadata: MatroskaMetadata, selected: ReadonlySet<number>, operation: () => OperationContext, start = metadata.firstCluster, lead?: SubtitleSeekLead): AsyncGenerator<MatroskaPacket> {
   const tracks = new Map(metadata.tracks.map(track => [track.number, track]));
   let position = start;
   for (; position < metadata.segmentEnd;) {
@@ -254,10 +260,12 @@ export async function* matroskaPackets(cache: SourceCache, metadata: MatroskaMet
         if (!found) return bad('BlockGroup missing Block'); block = found;
       }
       const trackNumber = await blockTrack(cache, block, operation());
-      if (!selected.has(trackNumber)) continue;
+      if (!(lead && cluster.start < lead.before ? lead.tracks : selected).has(trackNumber)) continue;
       if (hasAdditions) throw new EngineError('UNSUPPORTED_PROFILE', 'Selected Matroska BlockGroup needs unsupported codec state or additions');
       if (timecode === null) return bad('Matroska Block precedes Cluster Timestamp');
       const track = tracks.get(trackNumber); if (!track) return bad('Block references unknown track');
+      if (track.codecId === 'S_TEXT/UTF8' && duration !== null && duration > MAX_SRT_DURATION_NS)
+        throw new EngineError('UNSUPPORTED_PROFILE', 'Embedded SRT cue exceeds the 60-second seek reconstruction window.');
       const owner = await cache.readOwned(block.data, block.end, operation());
       try {
         const bytes = owner.borrow(), number = readVint(bytes);
@@ -272,7 +280,7 @@ export async function* matroskaPackets(cache: SourceCache, metadata: MatroskaMet
         if (track.type === 'subtitle' && (duration === null || duration === 0n)) throw new EngineError('UNSUPPORTED_CODEC', 'Required subtitle block lacks a positive display duration');
         let dataOffset = lace.offset;
         for (const [i, size] of lace.sizes.entries()) {
-          yield { trackNumber, data: bytes.subarray(dataOffset, dataOffset + size), ptsNs: (timecode + BigInt(relative)) * metadata.timecodeScaleNs - track.codecDelayNs + BigInt(i) * (frameDuration ?? 0n), durationNs: frameDuration, key, sourceStart: block.data + dataOffset, discardPaddingNs: (discard < 0n && i === 0) || (discard > 0n && i === lace.sizes.length - 1) ? discard : 0n };
+          yield { trackNumber, data: bytes.subarray(dataOffset, dataOffset + size), ptsNs: (timecode + BigInt(relative)) * metadata.timecodeScaleNs - track.codecDelayNs + BigInt(i) * (frameDuration ?? 0n), durationNs: frameDuration, key, clusterStart: cluster.start, sourceStart: block.data + dataOffset, discardPaddingNs: (discard < 0n && i === 0) || (discard > 0n && i === lace.sizes.length - 1) ? discard : 0n };
           dataOffset += size;
         }
       } finally { owner.release(); }

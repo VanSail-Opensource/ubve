@@ -14,7 +14,7 @@ const videoDecoders: Readonly<Record<string, string>> = Object.freeze({ avc: 'h2
 const audioDecoders: Readonly<Record<string, string>> = Object.freeze({
   aac: 'aac', opus: 'opus', vorbis: 'vorbis', mp3: 'mp3float', flac: 'flac', alac: 'alac',
   'pcm-s16': 'pcm_s16le', 'pcm-s16be': 'pcm_s16be', 'pcm-s24': 'pcm_s24le', 'pcm-s24be': 'pcm_s24be',
-  'pcm-f32': 'pcm_f32le', 'pcm-f32be': 'pcm_f32be', ac3: 'ac3', eac3: 'eac3', dts: 'dca',
+  'pcm-f32': 'pcm_f32le', 'pcm-f32be': 'pcm_f32be', ac3: 'ac3', eac3: 'eac3', dts: 'dca', 'dts-hd': 'dca',
 });
 export function supportsPortableCodec(kind: PortableKind, codec: string): boolean {
   return Object.hasOwn(kind === 'video' ? videoDecoders : audioDecoders, codec);
@@ -228,7 +228,9 @@ export class PortableDecoder<Payload extends AudioPCM | VideoPixels> extends Pac
     if (count <= 0) return null;
     const from = head * channels, to = (head + count) * channels;
     const scalar = kind <= 2 ? new Int32Array(data) : null;
-    const lossless = o.codec === 'flac' || o.codec === 'alac' || o.codec.startsWith('pcm-s');
+    const dtsMasterAudio = this.#decoder === 'dca' && s[41] === 1;
+    const lossless = o.codec === 'flac' || o.codec === 'alac' || o.codec.startsWith('pcm-s') || dtsMasterAudio;
+    if (dtsMasterAudio && !scalar) throw new EngineError('INVALID_PACKET', 'DTS-HD MA did not return its integer PCM');
     let pcm: AudioPCM;
     if (scalar && lossless) {
       const validBits = kind === 1 ? 16 : o.codec.startsWith('pcm-s24') ? 24 : s[7];

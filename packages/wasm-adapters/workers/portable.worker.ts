@@ -30,7 +30,15 @@ const integer = (value: unknown, low: number, high: number): value is number =>
 const bounds = (m: Module, ptr: number, length: number) => {
   if (!integer(ptr, 1, m.HEAPU8.byteLength) || !integer(length, 0, m.HEAPU8.byteLength - ptr)) fail('Software codec plane escapes its WASM heap');
 };
-const success = (code: number) => { if (code !== CODEC_OK) fail(`Software codec rejected operation (${code})`); };
+// FFmpeg AVERROR values remain diagnostic evidence, not user-facing explanations.
+const PATCHWELCOME = -1163346256, INVALIDDATA = -1094995529;
+function success(code: number, operation: string, decoder = options?.decoder): void {
+  if (code === CODEC_OK) return;
+  const codec = decoder === 'dca' ? 'DTS' : decoder === 'libaom-av1' ? 'AV1' : decoder?.toUpperCase() ?? 'media';
+  const detail = code === PATCHWELCOME ? decoder === 'dca' ? 'unsupported DTS profile or extension. DTS:X and DTS Express are not admitted' : 'this bitstream feature is not implemented by the decoder'
+    : code === INVALIDDATA ? 'invalid or changed bitstream configuration' : 'FFmpeg rejected the input';
+  fail(`${codec} software decoder could not ${operation}: ${detail} (${code}).`);
+}
 
 async function init(kind: PortableKind): Promise<unknown> {
   if (instance || (kind !== 'video' && kind !== 'audio')) fail('Invalid software codec module selection');
@@ -55,7 +63,7 @@ function open(m: Module, o: PortableOpen): void {
     m.HEAPU8.set(name, ptr);
     m.HEAPU8.set(o.description, ptr + name.byteLength);
     success(m._ubve_open(ptr, Number(o.kind === 'video'), o.width, o.height, o.sampleRate, o.channels,
-      ptr + name.byteLength, o.description.byteLength, ...o.tb));
+      ptr + name.byteLength, o.description.byteLength, ...o.tb), 'open the track', o.decoder);
     options = o;
   } finally { if (ptr) m._free(ptr); }
 }
@@ -65,11 +73,11 @@ function receive(m: Module): void {
   const code = m._ubve_receive();
   if (code === CODEC_EOF) { eof = true; return; }
   if (code === CODEC_AGAIN) return;
-  success(code);
+  success(code, 'decode the next packet');
   const ptr = m._ubve_shape();
   bounds(m, ptr, 64 * 4);
   const v = new DataView(m.HEAPU8.buffer, ptr, 64 * 4);
-  const shape = Array.from({ length: 41 }, (_, i) => v.getInt32(i * 4, true));
+  const shape = Array.from({ length: 42 }, (_, i) => v.getInt32(i * 4, true));
   const o = options!;
   let bytes: number;
   if (o.kind === 'video') {
@@ -101,7 +109,7 @@ function submit(m: Module, packet: PortablePacket | undefined): PortableStep {
   if (!pending) fail('No pending software packet to resubmit');
   const code = m._ubve_send();
   const accepted = code !== CODEC_AGAIN;
-  if (accepted) { success(code); pending = false; }
+  if (accepted) { success(code, 'submit the packet'); pending = false; }
   receive(m);
   return { accepted, eof, output };
 }
@@ -163,7 +171,7 @@ ctx.onmessage = async ({ data: message }: MessageEvent<{ id: number; command: { 
         if (!options || pending || output || sealed) fail('Software codec cannot flush in this state');
         const code = m._ubve_flush();
         if (code === CODEC_EOF) eof = sealed = true;
-        else if (code !== CODEC_AGAIN) { success(code); sealed = true; }
+        else if (code !== CODEC_AGAIN) { success(code, 'finish the stream'); sealed = true; }
         if (!eof) receive(m);
         data = { accepted: sealed, eof, output } satisfies PortableStep;
       } else if (command.type === 'take') {

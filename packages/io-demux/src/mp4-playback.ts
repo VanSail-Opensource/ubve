@@ -52,7 +52,7 @@ function words(...values: readonly (number | (() => number))[]): Part {
 // This private probe contains one original sample per track and only newly
 // generated single-row tables. The real tracks/packets never use this Input.
 function baseEntry(type: string | undefined, dolby: boolean): string | undefined {
-  return dolby && type === 'dvh1' ? 'hvc1' : dolby && type === 'dvhe' ? 'hev1' : type;
+  return dolby && type === 'dvh1' ? 'hvc1' : dolby && type === 'dvhe' ? 'hev1' : dolby && type === 'dav1' ? 'av01' : type;
 }
 
 async function codecProbe(cache: SourceCache, classic: Classic, operation: OperationContext, dolby: boolean): Promise<BufferLease> {

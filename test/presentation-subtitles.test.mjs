@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decodePgsRle, PgsDecoder, parsePgsSup, srtToWebVtt, parseManagedWebVtt, validateAss, validateAssPacket, decodeSubtitleText, readFontFamilyNames, validateSubtitleFonts }
+import { decodePgsRle, PgsDecoder, parsePgsSup, srtToWebVtt, readEmbeddedSrtCue, parseManagedWebVtt, validateAss, validateAssPacket, decodeSubtitleText, readFontFamilyNames, validateSubtitleFonts }
   from '../packages/presentation/dist/index.js';
 
 const be16 = value => [Math.floor(value / 256), value % 256];
@@ -18,6 +18,15 @@ const segment = (type, body, pts = 90000) => Uint8Array.from([0x50,0x47,...be32(
 const source = (...parts) => Uint8Array.from(parts.flatMap(part => [...part]));
 const basicSup = () => source(segment(0x16, pcs()), segment(0x17, wds), segment(0x14, pds), segment(0x15, ods), segment(0x80, []),
   segment(0x16, pcs({ state: 0, clear: true }), 180000), segment(0x80, [], 180000));
+
+test('Embedded SRT admits the raw UTF-8 cue body and requires exact provided endpoints', () => {
+  const packet = { kind: 'srt', ptsSeconds: 1.125, durationSeconds: 0.75, data: Buffer.from('<I>One</I>\r\n二 </unknown>') };
+  assert.deepEqual(readEmbeddedSrtCue(packet), { start: 1.125, end: 1.875, align: 'center', text: '<i>One</i>\n二 </unknown>' });
+  for (const durationSeconds of [null, 0, NaN]) assert.throws(() => readEmbeddedSrtCue({ ...packet, durationSeconds }), /positive display interval/);
+  assert.throws(() => readEmbeddedSrtCue({ ...packet, data: Uint8Array.of(0xff) }), /UTF-8|encoded data/);
+  assert.throws(() => readEmbeddedSrtCue({ ...packet, data: Buffer.from('<b><i>unbalanced</b></i>') }), /markup/);
+  assert.throws(() => readEmbeddedSrtCue({ ...packet, data: new Uint8Array(256 * 1024 + 1) }), /256 KiB/);
+});
 
 test('PGS RLE preserves color/transparent runs and rejects row overflow/truncation', () => {
   assert.deepEqual(Array.from(decodePgsRle(rle, 4, 2)), [1,1,1,1,2,2,0,0]);

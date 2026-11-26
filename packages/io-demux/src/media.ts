@@ -5,7 +5,7 @@ import { HttpRangeSource } from './http.js';
 import { abortForOperation, operationContext } from './operations.js';
 import { hdr10BaseMode, hevcPacketFilter, type HevcCopyPlan, type HevcPacketMode } from './dolby-vision.js';
 import { preflightForPlayback, type MetadataPreflight } from './preflight.js';
-import { matroskaPackets, readMatroskaMetadata, type MatroskaMetadata, type MatroskaTrack, type MediaAttachment } from './matroska.js';
+import { MAX_SRT_DURATION_NS, matroskaPackets, readMatroskaMetadata, type MatroskaMetadata, type MatroskaTrack, type MediaAttachment } from './matroska.js';
 import { mp4AudioEditEnd, mp4VideoEditEnd, openClassicAlac } from './mp4-index.js';
 import { openPagedMp4, type PagedMp4Media } from './mp4-playback.js';
 import { mp3AudioEnd, oggAudioEnd } from './audio-end.js';
@@ -32,7 +32,7 @@ export interface PacketOptions { readonly startTime?: number; readonly signal?: 
 export interface OpenMediaOptions { readonly signal?: AbortSignal; readonly stamp?: SessionStamp; readonly cacheBytes?: number; readonly sameOriginCredentials?: boolean; }
 export interface MediaPacket extends EncodedPacket { readonly discardPaddingNs: bigint; readonly codecDelayNs: bigint; }
 type Alac = Awaited<ReturnType<typeof openClassicAlac>>;
-const preroll = (codec: string) => codec === 'opus' ? .08 : codec === 'mp3' || codec === 'vorbis' || codec === 'aac' ? .2 : 0;
+const preroll = (codec: string) => codec === 'opus' ? .08 : ['mp3', 'vorbis', 'aac', 'dts', 'dts-hd'].includes(codec) ? .2 : 0;
 const packedPcm = /^pcm-(s16|s24|f32)(?:be)?$/;
 const apiSecondsTicks = (time: number): bigint => {
   const scaled = Math.round(time * 1e9);
@@ -140,20 +140,43 @@ export class MediaSourceSession {
             timingProvenance: { kind: 'container-exact', originalPtsSeconds: null, transformDescription: 'Classic MP4 audio sample clock minus the unit-rate edit start' }, bytes };
         }
       } else if (this.matroska) {
+        const metadata = this.matroska;
         const selected = new Set(tracks.map(track => track.matroskaTrack!.number)), byNumber = new Map(tracks.map(track => [track.matroskaTrack!.number, track]));
         const seekNs = BigInt(Math.floor(startTime * 1e9));
-        let offset = this.matroska.firstCluster, recoveryTime = -1n;
         const recoveryTrack = tracks.find(track => track.kind === 'video') ?? tracks.find(track => track.kind === 'audio');
         const selectedPreRoll = tracks.reduce((max, track) => {
           const declared = track.matroskaTrack!.seekPreRollNs, required = BigInt(Math.round(preroll(track.codec) * 1e9));
           return [declared, required, max].reduce((a, b) => a > b ? a : b);
         }, 0n);
-        for (const cue of this.matroska.cues) {
-          if (cue.timeNs > seekNs - selectedPreRoll || cue.timeNs <= recoveryTime || (recoveryTrack ? cue.track !== recoveryTrack.matroskaTrack!.number : !selected.has(cue.track))) continue;
-          recoveryTime = cue.timeNs; offset = cue.position;
+        function cueAt(time: bigint): MatroskaMetadata['cues'][number] | null {
+          let match: MatroskaMetadata['cues'][number] | null = null;
+          for (const cue of metadata.cues) {
+            if (cue.timeNs > time || (match && cue.timeNs <= match.timeNs) || (recoveryTrack ? cue.track !== recoveryTrack.matroskaTrack!.number : !selected.has(cue.track))) continue;
+            match = cue;
+          }
+          return match;
         }
-        for await (const raw of matroskaPackets(this.cache, this.matroska, selected, operation, offset)) {
+        const cue = cueAt(seekNs - selectedPreRoll), recover = cue?.position ?? metadata.firstCluster;
+        const srt = new Set(tracks.filter(track => track.kind === 'subtitle' && track.codec === 'srt').map(track => track.matroskaTrack!.number));
+        // A cue emitted before the A/V keyframe can still cover the target.
+        // Start the same cluster walk earlier for text only. Include the maximum
+        // signed Block offset on both sides of the cue timestamp.
+        const lookback = MAX_SRT_DURATION_NS + 65_535n * metadata.timecodeScaleNs;
+        const first = srt.size && seekNs > 0n ? Math.min(recover, cueAt(seekNs - lookback)?.position ?? metadata.firstCluster) : recover;
+        const lead = first < recover ? { tracks: srt, before: recover } : undefined;
+        // A Cluster may begin with the previous GOP. Resume selected video at
+        // the exact CueTime keyframe, without discarding the audio preroll.
+        let keyTime = seekNs > 0n && cue && recoveryTrack?.kind === 'video' ? cue.timeNs - recoveryTrack.matroskaTrack!.codecDelayNs : null;
+        const missingCue = () => new EngineError('INVALID_PACKET', 'Selected Matroska cue has no matching video keyframe in its Cluster');
+        for await (const raw of matroskaPackets(this.cache, metadata, selected, operation, first, lead)) {
           if (signal.aborted) throw signal.reason;
+          if (keyTime !== null) {
+            if (raw.clusterStart > recover) throw missingCue();
+            if (raw.trackNumber === cue!.track) {
+              if (!raw.key || raw.ptsNs !== keyTime) continue;
+              keyTime = null;
+            }
+          }
           const track = byNumber.get(raw.trackNumber)!, sequence = sequences.get(track.id) ?? 0; sequences.set(track.id, sequence + 1);
           const packet: MediaPacket = {
             discardPaddingNs: raw.discardPaddingNs, codecDelayNs: track.matroskaTrack!.codecDelayNs,
@@ -165,6 +188,7 @@ export class MediaSourceSession {
           };
           yield packet;
         }
+        if (keyTime !== null) throw missingCue();
       } else {
         const readers = await Promise.all(tracks.map(async track => {
           if (!track.nativeTrack) throw new EngineError('UNSUPPORTED_CODEC', 'This track lacks an admitted packet provider');
@@ -232,7 +256,7 @@ export class MediaSourceSession {
     }
   }
 }
-const MKV_CODECS: Record<string, string> = { V_AV1: 'av1', V_VP9: 'vp9', V_VP8: 'vp8', 'V_MPEG4/ISO/AVC': 'avc', 'V_MPEGH/ISO/HEVC': 'hevc', A_TRUEHD: 'truehd', A_FLAC: 'flac', A_AAC: 'aac', A_OPUS: 'opus', A_VORBIS: 'vorbis', A_AC3: 'ac3', A_EAC3: 'eac3', A_DTS: 'dts', 'S_TEXT/ASS': 'ass', 'S_TEXT/SSA': 'ssa', 'S_TEXT/UTF8': 'srt', 'S_TEXT/WEBVTT': 'webvtt', 'S_HDMV/PGS': 'pgs' };
+const MKV_CODECS: Record<string, string> = { V_AV1: 'av1', V_VP9: 'vp9', V_VP8: 'vp8', 'V_MPEG4/ISO/AVC': 'avc', 'V_MPEGH/ISO/HEVC': 'hevc', A_TRUEHD: 'truehd', A_FLAC: 'flac', A_AAC: 'aac', A_OPUS: 'opus', A_VORBIS: 'vorbis', A_AC3: 'ac3', A_EAC3: 'eac3', A_DTS: 'dts', 'A_DTS/LOSSLESS': 'dts-hd', 'A_DTS/EXPRESS': 'dts', 'S_TEXT/ASS': 'ass', 'S_TEXT/SSA': 'ssa', 'S_TEXT/UTF8': 'srt', 'S_TEXT/WEBVTT': 'webvtt', 'S_HDMV/PGS': 'pgs' };
 
 export async function openMedia(value: MediaInput, options: OpenMediaOptions = {}): Promise<MediaSourceSession> {
   const stamp = options.stamp ?? sessionStamp(crypto.randomUUID(), 0), signal = options.signal; let count = 0;
@@ -244,7 +268,7 @@ export async function openMedia(value: MediaInput, options: OpenMediaOptions = {
   try {
     const preflight = await preflightForPlayback(cache, op());
     const declaration = preflight.dolbyVision.length === 1 ? preflight.dolbyVision[0] : null;
-    const dvSampleEntry = !!declaration && ['dvh1', 'dvhe'].includes(declaration.sampleEntry) && hdr10BaseMode(declaration) !== null;
+    const dvSampleEntry = !!declaration && ['dvh1', 'dvhe', 'dav1'].includes(declaration.sampleEntry) && hdr10BaseMode(declaration) !== null;
     if (preflight.requiresPaged || dvSampleEntry) {
       cache.releaseLocalMetadata();
       const paged = await openPagedMp4(cache, op(), dvSampleEntry);

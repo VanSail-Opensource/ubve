@@ -20,11 +20,12 @@ export function readDolbyVisionConfig(sampleEntry: string, bytes: Uint8Array): D
 }
 
 export type HevcPacketMode = 'ordinary' | 'profile-81' | 'profile-7';
-export type Hdr10BaseMode = Exclude<HevcPacketMode, 'ordinary'>;
+export type Hdr10BaseMode = Exclude<HevcPacketMode, 'ordinary'> | 'profile-101';
 export function hdr10BaseMode(config: DolbyVisionConfig): Hdr10BaseMode | null {
   if (!config.baseLayerPresent || !config.rpuPresent) return null;
   if (config.profile === 8 && config.compatibilityId === 1 && config.enhancementLayerPresent === false) return 'profile-81';
   if (config.profile === 7 && config.compatibilityId === 6 && config.enhancementLayerPresent === true) return 'profile-7';
+  if (config.profile === 10 && config.compatibilityId === 1 && config.enhancementLayerPresent === false) return 'profile-101';
   return null;
 }
 

@@ -1,7 +1,7 @@
 import type JASSUB from 'jassub';
 import type * as Imsc from 'imsc';
 import { finite } from './pcm-output.js';
-import { decodeSubtitleText, readFontFamilyNames, srtToWebVtt, SUBTITLE_LIMITS, validateAss, validateAssPacket, validateSubtitleFonts, parseManagedWebVtt } from './subtitle-input.js';
+import { decodeSubtitleText, readEmbeddedSrtCue, readFontFamilyNames, srtToWebVtt, SUBTITLE_LIMITS, validateAss, validateAssPacket, validateSubtitleFonts, parseManagedWebVtt } from './subtitle-input.js';
 import type { SubtitleFont, SubtitlePacket, PlainTextCue } from './subtitle-input.js';
 import { parsePgsSup, PgsDecoder } from './pgs.js';
 import type { PgsDisplaySet } from './pgs.js';
@@ -64,6 +64,9 @@ export class SubtitleController {
   #plainCues: readonly PlainTextCue[] = [];
   #plainTimes: readonly number[] = [];
   #plainIndex = -2;
+  #streamText: (PlainTextCue & { bytes: number })[] | null = null;
+  #plainFrom = Infinity;
+  #plainUntil = -Infinity;
   #urls: string[] = [];
   #fontFaces: FontFace[] = [];
   #canvas: HTMLCanvasElement | null = null;
@@ -178,6 +181,14 @@ export class SubtitleController {
   }
 
   async #loadVtt(input: SubtitleLoad): Promise<void> {
+    if (input.streaming) {
+      if (input.kind !== 'srt') throw new Error('Streaming text currently expects embedded SRT cue bodies');
+      this.#streamText = [];
+      this.#content = document.createElement('div'); this.overlay.append(this.#content);
+      this.#update({ renderer: 'managed-basic-text', requiresOverlay: true, eventCount: 0,
+        diagnostics: ['Embedded SRT uses container cue intervals and a text overlay with line breaks and b/i/u formatting. Other tags are displayed as text.'] });
+      return;
+    }
     const text = input.kind === 'srt' ? srtToWebVtt(decodeSubtitleText(input.data)) : decodeSubtitleText(input.data);
     if (!/^WEBVTT(?:[ \t].*)?\r?\n/.test(text)) throw new Error('Invalid WebVTT header');
     const count = (text.match(/-->/g) ?? []).length;
@@ -238,6 +249,24 @@ export class SubtitleController {
     return this.#enqueue(async () => {
       if (this.#disposed || this.#status.state !== 'ready') throw new Error('Subtitle renderer is not ready');
       if (packet.epoch !== undefined && packet.epoch !== this.#streamEpoch) throw new Error('Stale subtitle epoch');
+      if (packet.kind === 'srt') {
+        if (!this.#streamText) throw new Error('SRT stream is not initialized');
+        const time = (this.#externalClock ? this.#lastTime : this.video.currentTime) - this.#offset;
+        if (time - this.#lastPrune >= 5) {
+          this.#streamText = this.#streamText.filter(cue => cue.end >= time - 30);
+          this.#streamBytes = this.#streamText.reduce((sum, cue) => sum + cue.bytes, 0);
+          this.#lastPrune = time;
+        }
+        const bytes = packet.data.byteLength;
+        if (this.#streamText.length >= SUBTITLE_LIMITS.events || this.#streamBytes + bytes > SUBTITLE_LIMITS.textBytes)
+          throw new Error('Streaming SRT cue budget exceeded');
+        const cue = readEmbeddedSrtCue(packet);
+        if (cue.end < time - 30) return;
+        this.#streamText.push({ ...cue, bytes }); this.#streamBytes += bytes; this.#plainUntil = -Infinity;
+        this.#update({ eventCount: this.#streamText.length });
+        this.#requestVideoDraw(false);
+        return;
+      }
       if (packet.kind === 'pgs') {
         if (!this.#pgsDecoder) throw new Error('PGS stream is not initialized');
         const cutoffIndex = indexAtOrBefore(this.#pgs.length, this.#lastTime - this.#offset - 30, index => this.#pgs[index]!.ptsSeconds);
@@ -263,10 +292,15 @@ export class SubtitleController {
     });
   }
 
-  resetStream(epoch: number): Promise<void> {
+  resetStream(epoch: number, startTime?: number): Promise<void> {
     return this.#enqueue(async () => {
       if (!Number.isSafeInteger(epoch) || epoch <= this.#streamEpoch) throw new Error('Subtitle stream reset requires a newer epoch');
       this.#streamEpoch = epoch; this.#streamEntries = []; this.#streamBytes = 0; this.#lastPrune = -Infinity;
+      if (this.#streamText) {
+        this.#streamText = []; this.#plainFrom = Infinity; this.#plainUntil = -Infinity;
+        this.#content?.replaceChildren();
+        if (startTime !== undefined && Number.isFinite(startTime) && startTime >= 0) this.#lastTime = startTime;
+      }
       if (this.#ass) await finite(this.#ass.renderer.setTrack(this.#assHeader), 2_000, 'ASS stream reset');
       this.#pgs = []; this.#pgsDecoder?.reset(); this.#pgsDisplay = undefined;
       if (this.#canvas && !this.#ass) this.#canvas.getContext('2d')?.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
@@ -300,7 +334,7 @@ export class SubtitleController {
     }
   }
 
-  async renderAt(seconds: number, width: number, height: number): Promise<void> {
+  async renderAt(seconds: number, width = this.#lastWidth, height = this.#lastHeight): Promise<void> {
     if (this.#track) throw new Error('Managed playback must select external subtitle clock before loading text tracks');
     this.setExternalClock(true);
     await this.#render(seconds, width, height, false);
@@ -338,9 +372,24 @@ export class SubtitleController {
       }
       await finite(this.#ass.renderer._draw(Math.max(0, seconds), repaint || resized), 2_000, 'ASS raster draw');
     } else if (this.#status.renderer === 'managed-basic-text' && this.#content) {
-      const index = eventIndex(this.#plainTimes, seconds);
-      if (index === this.#plainIndex && !resized && !repaint) return; this.#plainIndex = index;
-      const active = this.#plainCues.filter(cue => cue.start <= seconds && cue.end > seconds);
+      let active: PlainTextCue[];
+      if (this.#streamText) {
+        if (seconds >= this.#plainFrom && seconds < this.#plainUntil && !resized && !repaint) return;
+        active = [];
+        this.#plainFrom = seconds; this.#plainUntil = Infinity;
+        for (const cue of this.#streamText) {
+          if (cue.start > seconds) this.#plainUntil = Math.min(this.#plainUntil, cue.start);
+          else if (cue.end > seconds) {
+            active.push(cue);
+            this.#plainUntil = Math.min(this.#plainUntil, cue.end);
+          }
+        }
+        active.sort((a, b) => a.start - b.start);
+      } else {
+        const index = eventIndex(this.#plainTimes, seconds);
+        if (index === this.#plainIndex && !resized && !repaint) return; this.#plainIndex = index;
+        active = this.#plainCues.filter(cue => cue.start <= seconds && cue.end > seconds);
+      }
       if (active.length > 100) throw new Error('More than 100 simultaneous text cues exceeds the admitted overlay envelope');
       this.#content.replaceChildren();
       Object.assign(this.#content.style, { display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', padding: '0 5% 5%', boxSizing: 'border-box' });
@@ -427,6 +476,7 @@ export class SubtitleController {
     if (this.#track) { this.#track.track.mode = 'disabled'; this.#track.remove(); this.#track = null; }
     this.#nativeOriginalTimes.clear();
     this.#plainCues = []; this.#plainTimes = []; this.#plainIndex = -2;
+    this.#streamText = null; this.#plainFrom = Infinity; this.#plainUntil = -Infinity;
     for (const url of this.#urls) URL.revokeObjectURL(url); this.#urls = [];
     for (const font of this.#fontFaces) document.fonts.delete(font); this.#fontFaces = [];
     this.overlay.replaceChildren(); this.#canvas = this.#content = null;
@@ -489,7 +539,7 @@ function appendBasicMarkup(parent: HTMLElement, text: string): void {
   const stack: HTMLElement[] = [parent];
   const entities: Readonly<Record<string, string>> = { amp: '&', lt: '<', gt: '>', nbsp: '\u00a0', lrm: '\u200e', rlm: '\u200f' };
   for (const token of text.split(/(<\/?(?:b|i|u)>)/)) {
-    if (/^<\//.test(token)) { stack.pop(); continue; }
+    if (/^<\/(?:b|i|u)>$/.test(token)) { stack.pop(); continue; }
     const tag = /^<(b|i|u)>$/.exec(token);
     if (tag) { const element = document.createElement(tag[1]!); stack.at(-1)!.append(element); stack.push(element); }
     else stack.at(-1)!.append(document.createTextNode(token.replace(/&(amp|lt|gt|nbsp|lrm|rlm);/g, (_all, name: string) => entities[name]!)));

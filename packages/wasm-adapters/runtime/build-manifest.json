@@ -16,7 +16,7 @@
   },
   "inputs": {
     "scripts/build-software-codecs.sh": "2dcc29a32aff8546ce38624472ef70c7d5f0b959f0edd6ad565beb76c2259de8",
-    "packages/wasm-adapters/native/decode.c": "4eec4594b3cfb2100ef25abb3d91a0a3cd7e00660d98a2411c7d0e44a6c5e369"
+    "packages/wasm-adapters/native/decode.c": "45e27190ffe0bc5839c863a9ddade15cf2cc0e99b5e1187128f46c770fb27cde"
   },
   "files": [
     {
@@ -31,8 +31,8 @@
     },
     {
       "file": "audio.wasm",
-      "bytes": 1294000,
-      "sha256": "95a73a0cd2b5f69802bb3d502b3c408ce81740c203397f21de1a99dc3793f081"
+      "bytes": 1294159,
+      "sha256": "5b295e69e820ac4e9702e645006232973f9a2705f86b80dd883e3c17ba5799b3"
     },
     {
       "file": "libaom-LICENSE",
@@ -51,8 +51,8 @@
     },
     {
       "file": "video.wasm",
-      "bytes": 3689651,
-      "sha256": "4dcbbe9c4883b065b1102cfbaca49b138d3340360155ecf563e067925c7e6423"
+      "bytes": 3689805,
+      "sha256": "ce8c7dba843cd41f1c198d74a7879405b1f41f676615970c5e4b26616b1bc131"
     }
   ]
 }

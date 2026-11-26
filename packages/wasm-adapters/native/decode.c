@@ -12,6 +12,7 @@ static AVCodecContext *decoder;
 static AVPacket *packet;
 static AVFrame *frame;
 static int pending, ready, is_video;
+static int dts_profile = AV_PROFILE_UNKNOWN;
 static int32_t shape[64];
 
 enum { AGAIN, OK, END };
@@ -21,6 +22,7 @@ void ubve_close(void) {
     av_packet_free(&packet);
     avcodec_free_context(&decoder);
     pending = ready = is_video = 0;
+    dts_profile = AV_PROFILE_UNKNOWN;
 }
 
 int ubve_open(const char *name, int video, int width, int height,
@@ -110,9 +112,27 @@ int ubve_receive(void) {
     ready = 1;
     if (frame->decode_error_flags || (frame->flags & AV_FRAME_FLAG_CORRUPT))
         return AVERROR_INVALIDDATA;
-    /* DTS-HD is not an alias for conventional DTS Core. */
-    if (decoder->codec_id == AV_CODEC_ID_DTS && decoder->profile != AV_PROFILE_DTS &&
-        decoder->profile != AV_PROFILE_UNKNOWN) return AVERROR_PATCHWELCOME;
+    /* Allow the conventional channel extensions from the full DCA decoder.
+       Never enable core_only: a fallback to a different profile midstream
+       can silently lose channels or lossless residuals. DTS:X object/height
+       rendering is a different playback profile. */
+    if (decoder->codec_id == AV_CODEC_ID_DTS) {
+        int profile = decoder->profile;
+        switch (profile) {
+        case AV_PROFILE_UNKNOWN:
+        case AV_PROFILE_DTS:
+        case AV_PROFILE_DTS_ES:
+        case AV_PROFILE_DTS_96_24:
+        case AV_PROFILE_DTS_HD_HRA:
+        case AV_PROFILE_DTS_HD_MA:
+            break;
+        default:
+            return AVERROR_PATCHWELCOME;
+        }
+        if (dts_profile != AV_PROFILE_UNKNOWN && profile != dts_profile)
+            return AVERROR_INVALIDDATA;
+        dts_profile = profile;
+    }
     return OK;
 }
 
@@ -183,6 +203,7 @@ const int32_t *ubve_shape(void) {
         for (int i = 0; i < frame->ch_layout.nb_channels && i < 8; i++)
             shape[9 + i] = av_channel_layout_channel_from_index(&frame->ch_layout, i);
         const AVFrameSideData *skip = av_frame_get_side_data(frame, AV_FRAME_DATA_SKIP_SAMPLES);
+        shape[41] = decoder->codec_id == AV_CODEC_ID_DTS && decoder->profile == AV_PROFILE_DTS_HD_MA;
         if (skip && skip->size >= 10) {
             shape[17] = AV_RL32(skip->data);
             shape[18] = AV_RL32(skip->data + 4);

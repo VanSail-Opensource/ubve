@@ -3,8 +3,8 @@ import type { AudioPCM, Decoder, EncodedPacket, IntegerAudioPCM, MediaTime, Owne
 import { operationContext, packetSeconds } from '@ubve/io-demux';
 import type { Hdr10BaseMode, MediaSourceSession, MediaTrack } from '@ubve/io-demux';
 import { Av1Decoder, PortableDecoder, TrueHdDecoder, integerPcmToFloat, supportsPortableCodec } from '@ubve/wasm-adapters';
-import { CanvasPreconverter, PcmOutput, RawCanvasRenderer, WebGpuRawRenderer, finite } from '@ubve/presentation';
-import type { ConvertedFrame, PcmEvent, SubtitleController } from '@ubve/presentation';
+import { CanvasPreconverter, PcmOutput, RawCanvasRenderer, WebGpuRawRenderer, finite, isStreamedTextKind } from '@ubve/presentation';
+import type { ConvertedFrame, PcmEvent, StreamedTextKind, SubtitleController } from '@ubve/presentation';
 import type { ManagedTransport, ManagedTransportSnapshot, PlayerTrack, PreparedPlayback, QualityMode } from './player.js';
 import { PacketStage } from './packet-stage.js';
 import { managedGpuOptions } from './gpu-admission.js';
@@ -73,6 +73,7 @@ export class ManagedPlayback implements ManagedTransport {
   readonly #videoTrack: MediaTrack | undefined;
   readonly #audioTrack: MediaTrack | undefined;
   readonly #subtitleTrack: MediaTrack | undefined;
+  readonly #subtitleKind: StreamedTextKind | undefined;
   readonly #canvas: HTMLCanvasElement;
   readonly #renderer: RawCanvasRenderer | null;
   readonly #preconverter: CanvasPreconverter | null;
@@ -126,7 +127,9 @@ export class ManagedPlayback implements ManagedTransport {
     if (this.#audioTrack && this.#audioTrack.codec !== 'truehd' && !supportsPortableCodec('audio', this.#audioTrack.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `Managed ${this.#audioTrack.codec} audio is not registered in this candidate.`, 'caller-fix');
     if (this.#audioTrack?.audioEditUnsupported) throw new EngineError('UNSUPPORTED_PROFILE', 'Software audio requires one contiguous admitted MP4 edit');
     if (!this.#videoTrack && !this.#audioTrack) throw new EngineError('UNSUPPORTED_PROFILE', 'No registered managed video or audio track exists.');
-    if (this.#subtitleTrack && !['ass', 'ssa'].includes(this.#subtitleTrack.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `Embedded ${this.#subtitleTrack.codec} streaming is not registered in this candidate.`);
+    const subtitleCodec = this.#subtitleTrack?.codec;
+    if (subtitleCodec !== undefined && !isStreamedTextKind(subtitleCodec)) throw new EngineError('UNSUPPORTED_PROFILE', `Embedded ${subtitleCodec} streaming is not registered in this candidate.`);
+    this.#subtitleKind = subtitleCodec;
     const transfer = String(this.#videoTrack?.color?.transfer ?? '');
     const isHdr = !!options.hdr10Base || transfer === 'pq' || transfer === 'smpte2084' || transfer === 'hlg' || transfer === 'arib-std-b67';
     if (isHdr && options.quality === 'full' && !options.preferWebGpu) throw new EngineError('OUTPUT_UNAVAILABLE',
@@ -158,7 +161,7 @@ export class ManagedPlayback implements ManagedTransport {
     const self = this, media = this.#options.media;
     const tracks: readonly PlayerTrack[] = media.tracks.map(track => ({ id: track.id, kind: track.kind, label: track.name ?? track.codec.toUpperCase(), codec: track.codec, language: track.language, channels: track.channelCount, selectable: false }));
     return {
-      route: 'C1', description: [self.#videoTrack && (self.#options.hdr10Base ? 'HDR10 base-layer HEVC software' : `${self.#videoTrack.codec.toUpperCase()} software`), self.#audioTrack && `${self.#audioTrack.codec.toUpperCase()} PCM`,
+      route: 'C1', description: [self.#videoTrack && `${self.#options.hdr10Base ? 'HDR10 base-layer ' : ''}${self.#videoTrack.codec.toUpperCase()} software`, self.#audioTrack && `${self.#audioTrack.codec.toUpperCase()} PCM`,
         self.#videoTrack && (self.#options.preferWebGpu ? 'WebGPU composition' : 'Canvas2D composition')].filter(Boolean).join(' · '), tracks,
       selectedAudio: this.#audioTrack?.id ?? null,
       selectedSubtitle: this.#subtitleTrack?.id ?? null,
@@ -168,7 +171,7 @@ export class ManagedPlayback implements ManagedTransport {
           : self.#quality === 'performance' ? 'Original decode → ≤720p SDR / sRGB' : 'Original decode → SDR / sRGB',
         audio: self.#audioTrack ? `${self.#audioTrack.codec.toUpperCase()} · ${self.#audioTrack.channelCount} source channels${self.#sourceChannels > self.#audioChannels ? ' · explicit stereo index fold-down' : ' · discrete channel output'}` : 'No audio track' }; },
       get notices() { return ['Managed software candidate. Decode, draw submissions and the PCM graph are observed separately; physical output and full 60/120 gates remain unqualified.',
-        ...(self.#options.hdr10Base ? [`Dolby Vision ${self.#options.hdr10Base.label} → HDR10-compatible HEVC base layer only. Dolby Vision metadata and enhancement are not rendered.`] : []),
+        ...(self.#options.hdr10Base ? [`Dolby Vision ${self.#options.hdr10Base.label} → HDR10-compatible ${self.#options.hdr10Base.mode === 'profile-101' ? 'AV1' : 'HEVC'} base layer only. Dolby Vision metadata and enhancement are not rendered.`] : []),
         ...(self.#options.preferWebGpu ? ['WebGPU presents decoded planes; bitstream decoding is still WASM. Extended linear HDR presentation does not carry static HDR10 metadata into a native media pipeline. No automatic video-output fallback.'] : []),
         'Speaker mapping and output-device routing are unverified.',
         ...(self.#sourceChannels > self.#audioChannels ? ['Explicit stereo output transform: even source channel indices average to left, odd indices average to right. This does not preserve a cinema speaker layout.'] : [])]; },
@@ -259,6 +262,7 @@ export class ManagedPlayback implements ManagedTransport {
         await this.#retireEpoch();
         if (signal.aborted || this.#disposed) throw cancelled();
         this.#logicalTime = target; this.#state = 'ended'; this.#wantPlay = false;
+        if (this.#subtitleKind === 'srt' && this.#embeddedSubtitlesEnabled) await this.#options.subtitles.renderAt(target);
         return;
       }
       await this.#replaceEpoch(target, signal);
@@ -281,9 +285,9 @@ export class ManagedPlayback implements ManagedTransport {
   }
 
   async #initializeSubtitles(): Promise<void> {
-    const subtitle = this.#subtitleTrack; if (!subtitle) return;
-    await this.#options.subtitles.load({ kind: subtitle.codec as 'ass' | 'ssa', data: new TextDecoder().decode(subtitle.codecPrivate), label: subtitle.name ?? subtitle.codec,
-      fonts: this.#options.media.attachments.filter(font => /\.(ttf|otf|woff2?)$/i.test(font.name) || /font|truetype|opentype/i.test(font.mimeType)).map(font => ({ name: font.name, data: font.data })) });
+    const subtitle = this.#subtitleTrack, kind = this.#subtitleKind; if (!subtitle || !kind) return;
+    await this.#options.subtitles.load({ kind, streaming: true, data: kind === 'srt' ? '' : new TextDecoder().decode(subtitle.codecPrivate), label: subtitle.name ?? subtitle.codec,
+      ...(kind === 'srt' ? {} : { fonts: this.#options.media.attachments.filter(font => /\.(ttf|otf|woff2?)$/i.test(font.name) || /font|truetype|opentype/i.test(font.mimeType)).map(font => ({ name: font.name, data: font.data })) }) });
     await this.#options.subtitles.setQuality(this.#quality);
   }
 
@@ -305,7 +309,7 @@ export class ManagedPlayback implements ManagedTransport {
     operationSignal?.addEventListener('abort', cancelOperation, { once: true });
     const stamp = sessionStamp(this.#options.media.stamp.sessionId, id);
     try {
-      if (this.#subtitleTrack && this.#embeddedSubtitlesEnabled) await this.#options.subtitles.resetStream(id);
+      if (this.#subtitleTrack && this.#embeddedSubtitlesEnabled) await this.#options.subtitles.resetStream(id, target);
       if (this.#videoTrack) {
         const track = this.#videoTrack;
         if (!track.width || !track.height) throw new EngineError('INVALID_PACKET', 'Software video source dimensions are missing');
@@ -363,10 +367,11 @@ export class ManagedPlayback implements ManagedTransport {
   }
 
   async #produce(epoch: Epoch): Promise<void> {
-    const tracks = [this.#videoTrack, this.#audioTrack, this.#subtitleTrack].filter((track): track is MediaTrack => Boolean(track));
+    const tracks = [this.#videoTrack, this.#audioTrack, this.#embeddedSubtitlesEnabled ? this.#subtitleTrack : undefined].filter((track): track is MediaTrack => Boolean(track));
     const stamp = sessionStamp(this.#options.media.stamp.sessionId, epoch.id);
     let requested = this.#trace ? performance.now() : 0;
-    const hevc = this.#videoTrack?.codec === 'hevc' ? { trackId: this.#videoTrack.id, mode: this.#options.hdr10Base?.mode ?? 'ordinary' as const } : null;
+    const base = this.#options.hdr10Base?.mode;
+    const hevc = this.#videoTrack?.codec === 'hevc' ? { trackId: this.#videoTrack.id, mode: base === 'profile-7' || base === 'profile-81' ? base : 'ordinary' as const } : null;
     for await (const packet of this.#options.media.packets(tracks.map(track => track.id), { startTime: epoch.target, signal: epoch.abort.signal, stamp, ...(hevc ? { hevc } : {}) })) {
       this.#trace?.add('sourcePacketWait', performance.now() - requested);
       let staged = false;
@@ -375,7 +380,7 @@ export class ManagedPlayback implements ManagedTransport {
         if (packet.discardPaddingNs !== 0n && (packet.trackId !== this.#audioTrack?.id || this.#audioTrack.codec === 'truehd')) throw new EngineError('UNSUPPORTED_PROFILE', 'Selected-track discard padding requires an admitted audio trim');
         if (packet.trackId === this.#subtitleTrack?.id) {
           const timing = packetSeconds(packet);
-          if (this.#embeddedSubtitlesEnabled) await this.#options.subtitles.addPacket({ kind: this.#subtitleTrack.codec as 'ass' | 'ssa', data: packet.bytes.borrow(), ptsSeconds: timing.timestamp, durationSeconds: timing.duration, epoch: epoch.id });
+          if (this.#embeddedSubtitlesEnabled && this.#subtitleKind) await this.#options.subtitles.addPacket({ kind: this.#subtitleKind, data: packet.bytes.borrow(), ptsSeconds: timing.timestamp, durationSeconds: timing.duration, epoch: epoch.id });
         } else {
           const stage = packet.trackId === this.#videoTrack?.id ? epoch.videoPackets : epoch.audioPackets;
           const bytes = packet.bytes.bytes;
@@ -611,6 +616,8 @@ export class ManagedPlayback implements ManagedTransport {
     let complete = false;
     try {
       const mediaTime = this.#clock();
+      const containerTimedText = this.#subtitleKind === 'srt' && this.#embeddedSubtitlesEnabled;
+      let subtitleWidth: number | undefined, subtitleHeight: number | undefined;
       // Every eligible output is submitted. Multiple submissions in one display
       // interval do not establish distinct physical presentations.
       while (epoch.frames[0] && stampTime(epoch.frames[0]) <= mediaTime + .001) {
@@ -639,7 +646,8 @@ export class ManagedPlayback implements ManagedTransport {
           } else this.#renderMs = await this.#drawVideo(pixels, epoch);
           this.#prefetch(epoch);
           const subtitleStarted = this.#trace ? performance.now() : 0;
-          await this.#options.subtitles.renderAt(pts, pixels.visibleRect.width, pixels.visibleRect.height);
+          if (containerTimedText) { subtitleWidth = pixels.visibleRect.width; subtitleHeight = pixels.visibleRect.height; }
+          else await this.#options.subtitles.renderAt(pts, pixels.visibleRect.width, pixels.visibleRect.height);
           this.#trace?.add('subtitleRender', performance.now() - subtitleStarted);
           this.#trace?.add('combinedSubmissionLateness', Math.max(0, (this.#clock() - pts) * 1000));
           this.#submitted++; if (mediaTime - pts > .02) this.#late++;
@@ -647,6 +655,7 @@ export class ManagedPlayback implements ManagedTransport {
         if (epoch.abort.signal.aborted || this.#epoch !== epoch || this.#state !== 'playing') return;
         this.#wake();
       }
+      if (containerTimedText) await this.#options.subtitles.renderAt(this.#clock(), subtitleWidth, subtitleHeight);
       // AudioWorklet can finish while a draw awaits subtitles or GPU work.
       // Never overwrite that newer final-sample anchor with this draw's tick.
       this.#logicalTime = Math.max(this.#logicalTime, mediaTime);
@@ -664,6 +673,8 @@ export class ManagedPlayback implements ManagedTransport {
     const epoch = this.#epoch; if (!epoch || this.#rendering || this.#state !== 'playing') return;
     if (epoch.videoEos && !epoch.frames.length && epoch.audioOutputEnded) {
       this.#state = 'ended'; this.#wantPlay = false; this.#logicalTime = this.#options.media.duration ?? this.#logicalTime; this.#wake();
+      if (this.#subtitleKind === 'srt' && this.#embeddedSubtitlesEnabled) void this.#options.subtitles.renderAt(this.#logicalTime)
+        .catch(error => { if (this.#epoch === epoch && !epoch.abort.signal.aborted) this.#fail(error); });
     }
   }
   #active(epoch: Epoch): boolean { return epoch.priming || this.#state === 'playing' || this.#state === 'rebuffering' || this.#state === 'seeking'; }
