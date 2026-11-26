@@ -27,6 +27,8 @@ Install a compatible Playwright Chromium, then run `npm run build` and the appli
 - `npm run test:presentation:browser` checks the real audio graph and selected subtitle timing/rendering.
 - `npm run test:pipeline:browser` checks all selected tracks on the committed short compound fixture; [screening options](I06-browser-screening.md) cover generated multi-resolution cases and evidence collection.
 - `node test/mp4-playback-browser.mjs` seeks into oversized classic MP4/MOV and long fragmented AAC fixtures and checks decoded media through EOS.
+- `node test/dolby-base-browser.mjs` checks software playback of HDR base-layer carriage and refusal when no HDR10-compatible base is declared.
+- `node test/webgpu-browser.mjs` checks actual HDR and SDR canvas pixels against a numerical reference. Hosted CI may mark the lane `NOT_RUN_NO_ADAPTER` when its browser exposes no WebGPU adapter.
 - `npm run test:native:browser` checks the short MSE candidate against actual MIME admission and records dropped frames, subtitle-forward counts and lifecycle. It does not measure physical output.
 - `node test/disc-browser.mjs` checks real browser worker/Blob range access and the exact authored title/UDF hashes, not playback.
 

@@ -1,11 +1,12 @@
 import { ADTS, ALL_FORMATS, CustomSource, EncodedPacketSink, HLS, Input, MP3, MPEG_TS, OGG, QTFF, type InputTrack } from 'mediabunny';
-import { BudgetLedger, EngineError, OwnedLease, byteLength, byteRange, sessionStamp, timeBase, type EncodedPacket, type RandomAccessSource, type SessionStamp } from '@ubve/core';
+import { BudgetLedger, EngineError, OwnedLease, byteLength, byteRange, sessionStamp, timeBase, type EncodedPacket, type MediaTime, type RandomAccessSource, type SessionStamp } from '@ubve/core';
 import { BlobSource, SourceCache } from './source.js';
 import { HttpRangeSource } from './http.js';
 import { abortForOperation, operationContext } from './operations.js';
+import { hdr10BaseMode, hevcPacketFilter, type HevcCopyPlan, type HevcPacketMode } from './dolby-vision.js';
 import { preflightForPlayback, type MetadataPreflight } from './preflight.js';
 import { matroskaPackets, readMatroskaMetadata, type MatroskaMetadata, type MatroskaTrack, type MediaAttachment } from './matroska.js';
-import { mp4AudioEditEnd, openClassicAlac } from './mp4-index.js';
+import { mp4AudioEditEnd, mp4VideoEditEnd, openClassicAlac } from './mp4-index.js';
 import { openPagedMp4, type PagedMp4Media } from './mp4-playback.js';
 import { mp3AudioEnd, oggAudioEnd } from './audio-end.js';
 import { openPcmFile, type PcmFile } from './pcm-file.js';
@@ -20,10 +21,14 @@ export interface MediaTrack {
   readonly codecPrivate: Uint8Array; readonly color: VideoColorSpaceInit | null;
   readonly nativeTrack: InputTrack | null; readonly matroskaTrack: MatroskaTrack | null;
   readonly audioEndSample?: bigint | null;
+  readonly videoEditEnd?: MediaTime;
   readonly audioEditUnsupported?: boolean;
   readonly transportPid?: number;
 }
-export interface PacketOptions { readonly startTime?: number; readonly signal?: AbortSignal; readonly stamp?: SessionStamp; }
+export interface PacketOptions { readonly startTime?: number; readonly signal?: AbortSignal; readonly stamp?: SessionStamp;
+  /** Only the managed HEVC decoder requests inspection or base-layer extraction. */
+  readonly hevc?: { readonly trackId: string; readonly mode: HevcPacketMode };
+}
 export interface OpenMediaOptions { readonly signal?: AbortSignal; readonly stamp?: SessionStamp; readonly cacheBytes?: number; readonly sameOriginCredentials?: boolean; }
 export interface MediaPacket extends EncodedPacket { readonly discardPaddingNs: bigint; readonly codecDelayNs: bigint; }
 type Alac = Awaited<ReturnType<typeof openClassicAlac>>;
@@ -60,14 +65,36 @@ export class MediaSourceSession {
     const tracks = trackIds.map(id => { const track = this.tracks.find(track => track.id === id); if (!track) throw new EngineError('INVALID_ARGUMENT', 'Selected track does not exist'); return track; });
     const startTime = options.startTime ?? 0;
     if (startTime < 0 || !Number.isSafeInteger(Math.floor(startTime * 1e9))) throw new EngineError('INVALID_ARGUMENT', 'Seek position exceeds the exact nanosecond input domain');
+    const hevcTrack = options.hevc && tracks.find(track => track.id === options.hevc!.trackId);
+    let filter: ReturnType<typeof hevcPacketFilter> | null = null;
+    if (options.hevc) {
+      if (!hevcTrack || hevcTrack.kind !== 'video' || hevcTrack.codec !== 'hevc') throw new EngineError('INVALID_ARGUMENT', 'HEVC packet inspection needs one selected HEVC video track');
+      const declared = hevcTrack.matroskaTrack?.dolbyVision ?? (this.preflight.dolbyVision.length === 1 ? this.preflight.dolbyVision[0] : undefined);
+      if (options.hevc.mode === 'ordinary' && (declared || this.preflight.dolbyVision.length !== 0))
+        throw new EngineError('UNSUPPORTED_PROFILE', 'A signaled Dolby Vision track cannot be treated as ordinary HEVC by the managed decoder.');
+      if (options.hevc.mode !== 'ordinary' && (this.tracks.filter(track => track.kind === 'video').length !== 1 ||
+          !declared || hdr10BaseMode(declared) !== options.hevc.mode)) throw new EngineError('UNSUPPORTED_PROFILE', 'A unique HDR10-compatible Dolby Vision declaration is required');
+      filter = hevcPacketFilter(options.hevc.mode, hevcTrack.codecPrivate);
+    }
     this.#reading = true;
     const stamp = options.stamp ?? this.stamp, signal = options.signal ? AbortSignal.any([options.signal, this.#abort.signal]) : this.#abort.signal;
     const operation = () => operationContext(stamp, `packet-${++this.#operation}`, signal, 10000);
     const sequences = new Map<string, number>();
-    const allocate = (data: Uint8Array) => {
-      const reservation = this.#packets.tryReserve(byteLength(data.byteLength));
+    const allocate = (data: Uint8Array, plan?: HevcCopyPlan | null) => {
+      const reservation = this.#packets.tryReserve(byteLength(plan?.bytes ?? data.byteLength));
       if (!reservation) throw new EngineError('BACKPRESSURE', 'Selected-track packet ownership exceeds bounded capacity', 'retry-when-capacity');
-      try { return OwnedLease.adopt<Uint8Array>(reservation, data.slice()); } catch (error) { reservation.release(); throw error; }
+      try {
+        const output = plan ? new Uint8Array(plan.bytes) : data.slice();
+        plan?.write(output);
+        return OwnedLease.adopt<Uint8Array>(reservation, output);
+      } catch (error) { reservation.release(); throw error; }
+    };
+    const packetData = (track: MediaTrack, data: Uint8Array, original: EncodedPacket['representation']): Pick<EncodedPacket, 'bytes' | 'representation'> => {
+      const plan = track === hevcTrack ? filter?.(data) : null;
+      const representation: EncodedPacket['representation'] = plan ? { kind: 'repacked', transformations: [
+        options.hevc?.mode === 'profile-7' ? 'Removed Dolby Vision RPU and HEVC enhancement layer' : 'Removed Dolby Vision RPU',
+      ] } : original;
+      return { bytes: allocate(data, plan), representation };
     };
     try {
       if (this.#pcmFile) {
@@ -88,14 +115,14 @@ export class MediaSourceSession {
       } else if (this.#pagedMp4) {
         for await (const { track: { track, timeline, base }, sample } of this.#pagedMp4.samples(trackIds, startTime, operation, preroll)) {
           const { range, index } = sample;
-          const bytes = await this.cache.readValue(range.start, range.end, operation(), data => allocate(data));
-          if (signal.aborted) { bytes.release(); throw signal.reason; }
+          const payload = await this.cache.readValue(range.start, range.end, operation(), data => packetData(track, data, { kind: 'source-exact' }));
+          if (signal.aborted) { payload.bytes.release(); throw signal.reason; }
           yield { id: `${stamp.sessionId}:${stamp.generation}:${track.id}:${index}`, stamp, trackId: track.id,
             decodeSequence: index, presentationSequence: null, codecConfigEpoch: 0, timeBase: base,
             ptsTicks: sample.pts - timeline.start, dtsTicks: sample.dts - timeline.start, durationTicks: sample.duration,
             recovery: sample.sync ? 'key' : 'delta', discardPaddingNs: 0n, codecDelayNs: 0n,
-            representation: { kind: 'source-exact' }, sourceSpans: [{ source: this.source.identity, range }],
-            timingProvenance: { kind: 'container-exact', originalPtsSeconds: null, transformDescription: 'Paged MP4 stts/ctts ticks minus the unit-rate media edit start' }, bytes };
+            sourceSpans: [{ source: this.source.identity, range }],
+            timingProvenance: { kind: 'container-exact', originalPtsSeconds: null, transformDescription: 'Paged MP4 stts/ctts ticks minus the unit-rate media edit start' }, ...payload };
         }
       } else if (this.#alac) {
         const { index, start, end, rate } = this.#alac, track = tracks[0]!;
@@ -133,7 +160,8 @@ export class MediaSourceSession {
             id: `${stamp.sessionId}:${stamp.generation}:${track.id}:${sequence}`, stamp, trackId: track.id, codecConfigEpoch: 0,
             decodeSequence: sequence, presentationSequence: null, timeBase: timeBase(1n, 1000000000n), ptsTicks: raw.ptsNs,
             dtsTicks: null, durationTicks: raw.durationNs, recovery: raw.key ? 'key' : 'delta', timingProvenance: { kind: 'container-exact', originalPtsSeconds: null, transformDescription: `Cluster ticks × TimecodeScale minus CodecDelay; DiscardPadding=${raw.discardPaddingNs}ns is retained for selected-route trim` },
-            representation: { kind: 'source-exact' }, sourceSpans: [{ source: this.source.identity, range: byteRange(raw.sourceStart, raw.sourceStart + raw.data.length) }], bytes: allocate(raw.data),
+            sourceSpans: [{ source: this.source.identity, range: byteRange(raw.sourceStart, raw.sourceStart + raw.data.length) }],
+            ...packetData(track, raw.data, { kind: 'source-exact' }),
           };
           yield packet;
         }
@@ -182,7 +210,8 @@ export class MediaSourceSession {
             durationTicks: apiSecondsTicks(raw.duration), recovery: raw.type, timingProvenance: { kind: 'api-seconds', originalPtsSeconds: raw.timestamp,
               transformDescription: this.container === 'mpegts' ? 'Mediabunny seconds minus the common transport origin, rounded to nanoseconds; original container DTS is unavailable' :
                 'Mediabunny seconds rounded to nanoseconds; original container DTS is unavailable' },
-            representation: { kind: 'opaque-adapter', reason: 'Mediabunny packet accessor does not expose original source spans or all repacking operations' }, sourceSpans: null, bytes: allocate(raw.data),
+            sourceSpans: null,
+            ...packetData(track, raw.data, { kind: 'opaque-adapter', reason: 'Mediabunny packet accessor does not expose original source spans or all repacking operations' }),
           };
           yield packet;
           current.next = await current.sink.getNextPacket(raw);
@@ -214,9 +243,11 @@ export async function openMedia(value: MediaInput, options: OpenMediaOptions = {
   let input: Input | null = null;
   try {
     const preflight = await preflightForPlayback(cache, op());
-    if (preflight.requiresPaged) {
+    const declaration = preflight.dolbyVision.length === 1 ? preflight.dolbyVision[0] : null;
+    const dvSampleEntry = !!declaration && ['dvh1', 'dvhe'].includes(declaration.sampleEntry) && hdr10BaseMode(declaration) !== null;
+    if (preflight.requiresPaged || dvSampleEntry) {
       cache.releaseLocalMetadata();
-      const paged = await openPagedMp4(cache, op());
+      const paged = await openPagedMp4(cache, op(), dvSampleEntry);
       return new MediaSourceSession(null, source, cache, paged.tracks, paged.duration, paged.mimeType, paged.container, null, preflight, stamp, null, null, 0, paged);
     }
     if (preflight.format === 'other') {
@@ -267,6 +298,8 @@ export async function openMedia(value: MediaInput, options: OpenMediaOptions = {
       const description = alac?.cookie ?? raw?.codecPrivate ?? descriptionBytes(videoConfig?.description ?? audioConfig?.description);
       const edit = preflight.format === 'isobmff' && codec === 'aac' && Number.isSafeInteger(rate) && rate! > 0
         ? await mp4AudioEditEnd(cache, i, nativeTracks.length, rate!, op()) : null;
+      const videoEditEnd = preflight.format === 'isobmff' && !preflight.fragments && video
+        ? await mp4VideoEditEnd(cache, i, nativeTracks.length, op()) : null;
       const end = alac ? alac.end - alac.start : providerFormat === OGG && nativeTracks.length === 1 && (codec === 'opus' || codec === 'vorbis')
         ? await oggAudioEnd(cache, codec, description, op()) : providerFormat === MP3 && codec === 'mp3' ? await mp3AudioEnd(cache, op()) : edit?.end ?? null;
       tracks.push(Object.freeze({ id: raw ? `mkv:${raw.number}` : `track:${native!.id}`, kind, codec, codecString: alac ? 'alac' : native ? await native.getCodecParameterString() : null,
@@ -275,11 +308,23 @@ export async function openMedia(value: MediaInput, options: OpenMediaOptions = {
         width: video ? await video.getCodedWidth() : raw?.video['width'] ?? null, height: video ? await video.getCodedHeight() : raw?.video['height'] ?? null,
         channelCount: alac?.channels ?? audioConfig?.numberOfChannels ?? raw?.audio['channels'] ?? null, sampleRate: rate, audioEndSample: end, audioEditUnsupported: edit?.unsupported ?? false,
         videoConfig, audioConfig, codecPrivate: description, color: video ? await video.getColorSpace() : null, nativeTrack: native, matroskaTrack: raw,
+        ...(videoEditEnd ? { videoEditEnd } : {}),
         ...(transportTrack ? { transportPid: transportTrack.pid } : {}),
       }));
     }
     const only = tracks.length === 1 ? tracks[0] : null;
-    let duration = only?.audioEndSample != null && only.sampleRate ? Number(only.audioEndSample) / only.sampleRate : matroska?.duration ?? await input.getDurationFromMetadata();
+    let duration: number | null;
+    if (only?.audioEndSample != null && only.sampleRate) duration = Number(only.audioEndSample) / only.sampleRate;
+    else if (tracks.some(track => track.videoEditEnd)) {
+      // Use the exact movie interval where mapped, but retain other tracks'
+      // duration evidence instead of overwriting the whole source duration.
+      const durations = await Promise.all(tracks.map(track => track.videoEditEnd
+        ? Number(track.videoEditEnd.ticks) / Number(track.videoEditEnd.timeBase.denominator)
+        : track.audioEndSample != null && track.sampleRate ? Number(track.audioEndSample) / track.sampleRate
+          : track.nativeTrack ? input!.getDurationFromMetadata([track.nativeTrack]) : null));
+      const known = durations.filter(value => value !== null);
+      duration = known.length ? Math.max(...known) : null;
+    } else duration = matroska?.duration ?? await input.getDurationFromMetadata();
     // These formats may carry no declared duration. Small inputs can probe the
     // packet tail. Never scan a whole large file just to populate its duration.
     if (duration === null && source.size <= SMALL_DURATION_PROBE_BYTES && (providerFormat === MPEG_TS || providerFormat === ADTS || preflight.format === 'isobmff')) {

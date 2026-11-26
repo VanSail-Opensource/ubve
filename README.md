@@ -20,6 +20,7 @@ The standard document is `/`. Portable software codecs work without shared memor
 - Bounded software fallback for the [modern codec matrix](docs/modern-software-codecs.md), including AVC, HEVC, VP8/VP9, AAC, Opus, ALAC, and conventional AC-3/E-AC-3/DTS Core.
 - Browser-native direct playback candidates, bounded stream-copy remuxing, and a lossless TrueHD-to-FLAC candidate for one native media clock.
 - Canvas presentation with declared SDR transforms and an explicit, unqualified WebGPU presentation candidate. WebGPU does not decode the compressed AV1 stream.
+- [HDR10-compatible base playback](docs/hdr-base-playback.md) for admitted Dolby Vision Profile 8.1 and single-video-track Profile 7 files. Software decodes the HEVC base without applying Dolby Vision metadata or enhancement layers.
 - A [verified packing matrix](docs/packing-formats.md) spanning MP4/MOV, MKV/WebM, MPEG-TS/M2TS, common audio containers and clear local Blu-ray ISO/BDMV clip playback. Large classic MP4/MOV uses paged sample tables, and fragmented MP4 bounds sample metadata per fragment. This is not whole-disc or release qualification.
 
 ## Verify the build

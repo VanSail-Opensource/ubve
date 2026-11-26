@@ -1,7 +1,7 @@
-import { EngineError, sessionStamp } from '@ubve/core';
-import type { AudioPCM, Decoder, EncodedPacket, IntegerAudioPCM, OwnedLease, OwnedOutput, SessionState, VideoPixels } from '@ubve/core';
+import { EngineError, compareTime, mediaTime, sessionStamp, timeBase } from '@ubve/core';
+import type { AudioPCM, Decoder, EncodedPacket, IntegerAudioPCM, MediaTime, OwnedLease, OwnedOutput, SessionState, VideoPixels } from '@ubve/core';
 import { operationContext, packetSeconds } from '@ubve/io-demux';
-import type { MediaSourceSession, MediaTrack } from '@ubve/io-demux';
+import type { Hdr10BaseMode, MediaSourceSession, MediaTrack } from '@ubve/io-demux';
 import { Av1Decoder, PortableDecoder, TrueHdDecoder, integerPcmToFloat, supportsPortableCodec } from '@ubve/wasm-adapters';
 import { CanvasPreconverter, PcmOutput, RawCanvasRenderer, WebGpuRawRenderer, finite } from '@ubve/presentation';
 import type { ConvertedFrame, PcmEvent, SubtitleController } from '@ubve/presentation';
@@ -21,6 +21,7 @@ export interface ManagedPlaybackOptions {
   /** Explicit output policy, never part of exact decoded-source PCM. */
   readonly allowStereoFoldDown?: boolean;
   readonly preferWebGpu?: boolean;
+  readonly hdr10Base?: { readonly mode: Hdr10BaseMode; readonly label: string };
   readonly portableAv1?: boolean;
   readonly tracePerformance?: boolean;
   readonly prefetchCanvas?: boolean;
@@ -92,6 +93,8 @@ export class ManagedPlayback implements ManagedTransport {
   #decoded = 0;
   #submitted = 0;
   #late = 0;
+  #outsideVideoEdit = 0;
+  readonly #videoEditEnd: MediaTime | null;
   #renderMs = 0;
   readonly #trace: PlaybackTrace | null;
   #lastRateAt = 0;
@@ -112,14 +115,20 @@ export class ManagedPlayback implements ManagedTransport {
     this.#trace = options.tracePerformance ? new PlaybackTrace() : null;
     const primary = (kind: MediaTrack['kind']): MediaTrack | undefined => options.media.tracks.find(t => t.kind === kind && t.default) ?? options.media.tracks.find(t => t.kind === kind);
     this.#videoTrack = primary('video'); this.#audioTrack = primary('audio'); this.#subtitleTrack = primary('subtitle');
+    const end = this.#videoTrack?.videoEditEnd, nano = 1_000_000_000n;
+    // This provider's PTS is rounded to nanoseconds. Map the exact movie
+    // boundary into that same observed clock without upgrading PTS provenance.
+    this.#videoEditEnd = end ? mediaTime((2n * end.ticks * end.timeBase.numerator * nano + end.timeBase.denominator) / (2n * end.timeBase.denominator), timeBase(1n, nano)) : null;
     if (this.#videoTrack && !supportsPortableCodec('video', this.#videoTrack.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `Managed ${this.#videoTrack.codec} video is not registered in this candidate.`, 'caller-fix');
     if (this.#audioTrack && this.#audioTrack.codec !== 'truehd' && !supportsPortableCodec('audio', this.#audioTrack.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `Managed ${this.#audioTrack.codec} audio is not registered in this candidate.`, 'caller-fix');
     if (this.#audioTrack?.audioEditUnsupported) throw new EngineError('UNSUPPORTED_PROFILE', 'Software audio requires one contiguous admitted MP4 edit');
     if (!this.#videoTrack && !this.#audioTrack) throw new EngineError('UNSUPPORTED_PROFILE', 'No registered managed video or audio track exists.');
     if (this.#subtitleTrack && !['ass', 'ssa'].includes(this.#subtitleTrack.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `Embedded ${this.#subtitleTrack.codec} streaming is not registered in this candidate.`);
     const transfer = String(this.#videoTrack?.color?.transfer ?? '');
-    const isHdr = transfer === 'pq' || transfer === 'smpte2084' || transfer === 'hlg' || transfer === 'arib-std-b67';
-    if (isHdr && options.quality === 'full' && !options.preferWebGpu) throw new EngineError('OUTPUT_UNAVAILABLE', 'The managed Canvas2D output cannot preserve full HDR. Select Performance for the explicitly declared 720p SDR transform, or explicitly try the unqualified WebGPU HDR candidate.', 'caller-fix');
+    const isHdr = !!options.hdr10Base || transfer === 'pq' || transfer === 'smpte2084' || transfer === 'hlg' || transfer === 'arib-std-b67';
+    if (isHdr && options.quality === 'full' && !options.preferWebGpu) throw new EngineError('OUTPUT_UNAVAILABLE',
+      (options.hdr10Base ? `Dolby Vision ${options.hdr10Base.label} has a supported HDR10 base layer. ` : 'The managed Canvas2D output cannot preserve full HDR. ') +
+      'Select Performance for a 720p SDR preview, or explicitly try WebGPU for experimental HDR output.', 'caller-fix');
     if (transfer === 'hlg' || transfer === 'arib-std-b67') throw new EngineError('UNSUPPORTED_PROFILE', 'HLG is not admitted by the managed renderers.', 'caller-fix');
     if (options.preferWebGpu && (!this.#videoTrack || !navigator.gpu)) throw new EngineError('OUTPUT_UNAVAILABLE', 'The selected WebGPU output needs a browser WebGPU API and a supported video track. No fallback was selected.', 'caller-fix');
     this.#canvas = document.createElement('canvas'); this.#canvas.className = 'managed-video-surface';
@@ -146,7 +155,7 @@ export class ManagedPlayback implements ManagedTransport {
     const self = this, media = this.#options.media;
     const tracks: readonly PlayerTrack[] = media.tracks.map(track => ({ id: track.id, kind: track.kind, label: track.name ?? track.codec.toUpperCase(), codec: track.codec, language: track.language, channels: track.channelCount, selectable: false }));
     return {
-      route: 'C1', description: [self.#videoTrack && `${self.#videoTrack.codec.toUpperCase()} software`, self.#audioTrack && `${self.#audioTrack.codec.toUpperCase()} PCM`,
+      route: 'C1', description: [self.#videoTrack && (self.#options.hdr10Base ? 'HDR10 base-layer HEVC software' : `${self.#videoTrack.codec.toUpperCase()} software`), self.#audioTrack && `${self.#audioTrack.codec.toUpperCase()} PCM`,
         self.#videoTrack && (self.#options.preferWebGpu ? 'WebGPU composition' : 'Canvas2D composition')].filter(Boolean).join(' · '), tracks,
       selectedAudio: this.#audioTrack?.id ?? null,
       selectedSubtitle: this.#subtitleTrack?.id ?? null,
@@ -156,6 +165,7 @@ export class ManagedPlayback implements ManagedTransport {
           : self.#quality === 'performance' ? 'Original decode → ≤720p SDR / sRGB' : 'Original decode → SDR / sRGB',
         audio: self.#audioTrack ? `${self.#audioTrack.codec.toUpperCase()} · ${self.#audioTrack.channelCount} source channels${self.#sourceChannels > self.#audioChannels ? ' · explicit stereo index fold-down' : ' · discrete channel output'}` : 'No audio track' }; },
       notices: ['Managed software candidate. Decode, draw submissions and the PCM graph are observed separately; physical output and full 60/120 gates remain unqualified.',
+        ...(this.#options.hdr10Base ? [`Dolby Vision ${this.#options.hdr10Base.label} → HDR10-compatible HEVC base layer only. Dolby Vision metadata and enhancement are not rendered.`] : []),
         ...(this.#options.preferWebGpu ? ['WebGPU presents decoded planes; bitstream decoding is still WASM. Extended linear HDR presentation does not carry static HDR10 metadata into a native media pipeline. No automatic fallback.'] : []),
         'Channel-index identity is retained. Speaker mapping and output-device routing are unverified.',
         ...(this.#options.allowStereoFoldDown ? ['Explicit stereo output transform: even source channel indices average to left, odd indices average to right. This does not preserve a cinema speaker layout.'] : [])],
@@ -172,7 +182,7 @@ export class ManagedPlayback implements ManagedTransport {
     const epoch = this.#epoch;
     const time = this.#clock();
     const pendingVideoBytes = epoch?.frames.reduce((total, frame) => total + frame.payload.bytes, 0) ?? 0;
-    const transforms = [...(this.#videoTrack ? [`Original ${this.#videoTrack.codec.toUpperCase()} source pictures decoded`] : []), ...(this.#options.preferWebGpu ? ['Explicit WebGPU decoded-plane composition'] : ['Canvas2D decoded-plane composition']),
+    const transforms = [...(this.#options.hdr10Base ? ['HDR10-compatible base-layer pictures only'] : this.#videoTrack ? [`Original ${this.#videoTrack.codec.toUpperCase()} source pictures decoded`] : []), ...(this.#options.preferWebGpu ? ['Explicit WebGPU decoded-plane composition'] : ['Canvas2D decoded-plane composition']),
       ...(this.#quality === 'performance' ? ['Video output capped at 720p', 'PQ/BT.2020 mapped to SDR/sRGB when required', 'Subtitle raster capped at 1080p']
         : [this.#gpuRenderer?.options.output === 'hdr-candidate' ? 'Original raster · extended linear Display P3 candidate' : 'Original SDR output raster', 'Full subtitle raster']),
       ...(this.#sourceChannels > this.#audioChannels ? ['Explicit channel-index stereo fold-down'] : ['Decoded PCM channel indices retained']), 'No temporal frame dropping'];
@@ -186,7 +196,8 @@ export class ManagedPlayback implements ManagedTransport {
 
   diagnostics(): Readonly<Record<string, unknown>> {
     return { state: this.#state, decodedVideoFrames: this.#decoded, submittedVideoFrames: this.#submitted,
-      lateVideoSubmissions: this.#late, deliberateDrops: 0, recoveries: this.#totalRecoveries, lastUnderrun: this.#lastUnderrun,
+      hdr10Base: this.#options.hdr10Base ?? null,
+      lateVideoSubmissions: this.#late, outsideVideoEdit: this.#outsideVideoEdit, deliberateDrops: 0, recoveries: this.#totalRecoveries, lastUnderrun: this.#lastUnderrun,
       audio: this.#epoch?.pcm?.snapshot ?? null, videoDecoder: this.#epoch?.video?.diagnostics() ?? null,
       audioDecoder: this.#epoch?.audio?.diagnostics() ?? null,
       subtitles: this.#options.subtitles.getStatus(),
@@ -349,7 +360,8 @@ export class ManagedPlayback implements ManagedTransport {
     const tracks = [this.#videoTrack, this.#audioTrack, this.#subtitleTrack].filter((track): track is MediaTrack => Boolean(track));
     const stamp = sessionStamp(this.#options.media.stamp.sessionId, epoch.id);
     let requested = this.#trace ? performance.now() : 0;
-    for await (const packet of this.#options.media.packets(tracks.map(track => track.id), { startTime: epoch.target, signal: epoch.abort.signal, stamp })) {
+    const hevc = this.#videoTrack?.codec === 'hevc' ? { trackId: this.#videoTrack.id, mode: this.#options.hdr10Base?.mode ?? 'ordinary' as const } : null;
+    for await (const packet of this.#options.media.packets(tracks.map(track => track.id), { startTime: epoch.target, signal: epoch.abort.signal, stamp, ...(hevc ? { hevc } : {}) })) {
       this.#trace?.add('sourcePacketWait', performance.now() - requested);
       let staged = false;
       try {
@@ -413,7 +425,22 @@ export class ManagedPlayback implements ManagedTransport {
         epoch.videoEos = true; this.#wake(); return;
       }
       if (epoch.abort.signal.aborted) { output.payload.release(); throw cancelled(); }
+      if (this.#options.hdr10Base) {
+        const frame = output.payload.borrow(), signal = frame.signalMetadata;
+        const decodedAs = (field: { readonly state: string; readonly origin?: string; readonly value?: string } | undefined, wanted: string) =>
+          field?.state === 'known' && field.origin === 'decoder' && field.value === wanted;
+        if (frame.format !== 'I420P10' || !decodedAs(signal?.primaries, 'bt2020') || !decodedAs(signal?.transfer, 'smpte2084') ||
+            !decodedAs(signal?.matrix, 'bt2020-ncl') || !decodedAs(signal?.range, 'limited')) {
+          output.payload.release();
+          throw new EngineError('UNSUPPORTED_PROFILE', 'The decoded Dolby Vision base did not confirm limited-range 10-bit BT.2020 PQ. No source-color guess was used.');
+        }
+      }
       this.#decoded++;
+      if (this.#videoEditEnd && compareTime(output.pts, this.#videoEditEnd) >= 0) {
+        this.#outsideVideoEdit++;
+        output.payload.release();
+        continue;
+      }
       const time = stampTime(output);
       if (!epoch.videoPrimed) {
         if (time <= epoch.target) { epoch.preroll?.payload.release(); epoch.preroll = output; continue; }

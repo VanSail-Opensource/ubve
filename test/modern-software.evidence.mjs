@@ -8,7 +8,7 @@ import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { CodecNodeWorker } from './helpers/codec-node-worker.mjs';
 import { sessionStamp } from '../packages/core/dist/index.js';
-import { openMedia, operationContext } from '../packages/io-demux/dist/index.js';
+import { hdr10BaseMode, openMedia, operationContext } from '../packages/io-demux/dist/index.js';
 import { PortableDecoder } from '../packages/wasm-adapters/dist/index.js';
 
 const exec = promisify(callbackExec);
@@ -35,6 +35,15 @@ for (const row of fixturePack.cases) {
     media = await openMedia(await openAsBlob(file), { stamp, signal: abort.signal });
     const track = media.tracks.find(track => track.kind === row.reference.kind);
     assert.ok(track, 'No selected media track');
+    let hevc;
+    if (row.hdr10Base) {
+      const config = track.matroskaTrack?.dolbyVision ?? media.preflight.dolbyVision[0];
+      assert.ok(config && track.codec === 'hevc');
+      assert.equal(hdr10BaseMode(config), row.hdr10Base);
+      hevc = { trackId: track.id, mode: row.hdr10Base };
+      record.hdr10Base = { mode: hevc.mode, config };
+      record.repackedAccessUnits = 0;
+    }
     const options = { codec: track.codec, description: track.codecPrivate, stamp, assetBaseUrl };
     decoder = track.kind === 'video'
       ? await PortableDecoder.create({ ...options, kind: 'video', width: track.width, height: track.height, color: track.color })
@@ -54,6 +63,11 @@ for (const row of fixturePack.cases) {
             previousVideoTime = time;
             frames.push(sha(value.data));
             if (value.signalMetadata?.masteringDisplay.state === 'known') record.hdrSeen = true;
+            if (hevc) {
+              assert.equal(value.format, 'I420P10');
+              assert.deepEqual(value.color, { primaries: 'bt2020', transfer: 'smpte2084', matrix: 'bt2020-ncl', range: 'limited' });
+              if (value.signalMetadata?.chromaLocation.state === 'known') record.chromaLocation = value.signalMetadata.chromaLocation.value;
+            }
           } else {
             const start = output.pts.ticks, trim = start < 0n ? Number(-start) : 0;
             if (trim >= value.frames) continue;
@@ -70,7 +84,8 @@ for (const row of fixturePack.cases) {
       }
     };
     const produce = async () => {
-      for await (const packet of media.packets([track.id], { stamp, signal: abort.signal })) {
+      for await (const packet of media.packets([track.id], { stamp, signal: abort.signal, ...(hevc ? { hevc } : {}) })) {
+        if (hevc && packet.representation.kind === 'repacked') record.repackedAccessUnits++;
         const submitted = decoder.trySubmit(packet, operation('packet-' + packet.decodeSequence));
         try {
           if (submitted.status !== 'accepted') throw submitted.error ?? Error(submitted.reason);
@@ -87,6 +102,7 @@ for (const row of fixturePack.cases) {
     assert.equal(record.decoder.codecEofObserved, true);
     assert.equal(record.decoder.output.items, 0);
     if (row.reference.kind === 'video') {
+      if (hevc) assert.ok(record.repackedAccessUnits > 0, 'Dolby Vision data was not filtered');
       record.pictures = frames.length;
       assert.equal(frames.length, row.reference.frames.length, 'Incorrect EOS picture count');
       const wrong = frames.findIndex((value, i) => value !== row.reference.frames[i]);

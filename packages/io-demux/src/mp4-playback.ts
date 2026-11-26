@@ -51,15 +51,25 @@ function words(...values: readonly (number | (() => number))[]): Part {
 // view of the original descriptors. Some codecs need the first access unit.
 // This private probe contains one original sample per track and only newly
 // generated single-row tables. The real tracks/packets never use this Input.
-async function codecProbe(cache: SourceCache, classic: Classic, operation: OperationContext): Promise<BufferLease> {
+function baseEntry(type: string | undefined, dolby: boolean): string | undefined {
+  return dolby && type === 'dvh1' ? 'hvc1' : dolby && type === 'dvhe' ? 'hev1' : type;
+}
+
+async function codecProbe(cache: SourceCache, classic: Classic, operation: OperationContext, dolby: boolean): Promise<BufferLease> {
   const copy = (start: number, end: number): Part => ({
     length: end - start, async write(bytes, at) {
       await cache.readValue(start, end, operation, raw => bytes.set(raw, at));
     },
   });
-  const copyBox = (box: Classic['movieHeader'], maximum: number) => {
+  const copyBox = (box: Classic['movieHeader'], maximum: number, replacementEntry?: string) => {
     if (box.end - box.body > maximum) throw new EngineError('ITEM_TOO_LARGE', `MP4 ${box.type} exceeds the bounded codec metadata probe`);
-    return boxed(box.type, copy(box.body, box.end));
+    const part = copy(box.body, box.end);
+    return boxed(box.type, !replacementEntry ? part : { length: part.length, async write(bytes, at) {
+      await part.write(bytes, at);
+      // FullBox/count, then sample entry size and FourCC. Only the private
+      // metadata probe is relabelled. The original file is not modified.
+      for (let i = 0; i < 4; i++) bytes[at + 12 + i] = replacementEntry.charCodeAt(i);
+    } });
   };
   const ftyp = classic.fileType ? copyBox(classic.fileType, 4096) : boxed('ftyp', words(0x69736f6d, 0, 0x69736f6d));
   const payload: Part[] = [], tracks: Part[] = [], offsets: number[] = [];
@@ -70,7 +80,8 @@ async function codecProbe(cache: SourceCache, classic: Classic, operation: Opera
     if (length === 0) invalid('MP4 first sample is empty');
     payload.push(copy(start, end));
     const [trackHeader, mediaHeader, handler, sampleDescription] = metadata;
-    const stbl = boxed('stbl', copyBox(sampleDescription, MAX_DESCRIPTION_BYTES), boxed('stts', words(0, 1, 1, Number(first.duration))),
+    const original = index.descriptions[0], alias = baseEntry(original, dolby);
+    const stbl = boxed('stbl', copyBox(sampleDescription, MAX_DESCRIPTION_BYTES, alias !== original ? alias : undefined), boxed('stts', words(0, 1, 1, Number(first.duration))),
       boxed('stsc', words(0, 1, 1, 1, 1)), boxed('stsz', words(0, length, 1)), boxed('stco', words(0, 1, () => offsets[slot]!)));
     tracks.push(boxed('trak', copyBox(trackHeader, 256), boxed('mdia', copyBox(mediaHeader, 256), copyBox(handler, 4096), boxed('minf', stbl))));
   }
@@ -160,8 +171,9 @@ function pagedMedia(entries: readonly SelectedTrack[], duration: number, mimeTyp
   };
 }
 
-export async function openPagedMp4(cache: SourceCache, operation: OperationContext): Promise<PagedMp4Media> {
+export async function openPagedMp4(cache: SourceCache, operation: OperationContext, dolby = false): Promise<PagedMp4Media> {
   const classic = await readMp4PlaybackIndex(cache, operation);
+  if (dolby && classic.tracks.filter(track => track.kind === 'video').length !== 1) refuse('Dolby Vision fallback requires a single video track');
   const ledger = new BudgetLedger({ bytes: byteLength(MAX_CONFIG_BYTES), items: 32, maxSingleItemBytes: byteLength(MAX_DESCRIPTION_BYTES) });
   const leases: BufferLease[] = [];
   const ownDescription = (description?: AllowSharedBufferSource) => {
@@ -187,14 +199,14 @@ export async function openPagedMp4(cache: SourceCache, operation: OperationConte
         Number(alac.end - alac.start) / alac.rate, 'audio/mp4; codecs="alac"', 'mp4', 0, leases);
     }
     const timelines = classic.tracks.map(presentation);
-    probe = await codecProbe(cache, classic, operation);
+    probe = await codecProbe(cache, classic, operation, dolby);
     input = new Input({ source: new BufferSource(probe.borrow()), formats: [MP4, QTFF] });
     const native = await input.getTracks(), entries: SelectedTrack[] = [];
     if (native.length !== classic.tracks.length) refuse('MP4 codec metadata provider did not expose every indexed track');
     for (let i = 0; i < native.length; i++) {
       checkOperation(operation, browserScheduler);
       const reader = native[i]!, item = classic.tracks[i]!, timeline = timelines[i]!;
-      if (reader.type !== item.kind || await reader.getInternalCodecId() !== item.index.descriptions[0]) invalid('MP4 codec metadata does not match its indexed track');
+      if (reader.type !== item.kind || await reader.getInternalCodecId() !== baseEntry(item.index.descriptions[0], dolby)) invalid('MP4 codec metadata does not match its indexed track');
       const codec = await reader.getCodec();
       if (!codec) return refuse(`MP4 sample entry ${JSON.stringify(item.index.descriptions[0])} is not admitted for paged packet playback`);
       const video = reader.isVideoTrack() ? await reader.getDecoderConfig() : null;

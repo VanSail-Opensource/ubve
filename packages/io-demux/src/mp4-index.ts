@@ -1,4 +1,4 @@
-import { EngineError, byteRange, checkOperation, type ByteRange, type OperationContext } from '@ubve/core';
+import { EngineError, byteRange, checkOperation, mediaTime, timeBase, type ByteRange, type MediaTime, type OperationContext } from '@ubve/core';
 import { browserScheduler } from './operations.js';
 import type { SourceCache } from './source.js';
 
@@ -12,7 +12,7 @@ const MAX_EDIT_ENTRIES = 4096;
 const MAX_RESIDENT_CHECKPOINTS = 24_576;
 const MAX_CLOCK = 2n ** 64n - 1n;
 const CONFIG_CHILDREN = new Set(['avcC', 'hvcC', 'vpcC', 'av1C', 'esds', 'dOps', 'dfLa', 'dac3', 'dec3', 'ddts', 'dmlp',
-  'colr', 'pasp', 'btrt', 'clap', 'fiel', 'gama', 'mdcv', 'clli', 'dvcC', 'dvvC', 'dvwC', 'ccst',
+  'colr', 'pasp', 'btrt', 'clap', 'fiel', 'gama', 'mdcv', 'clli', 'dvcC', 'dvvC', 'dvwC', 'hvcE', 'ccst',
   'alac', 'enda', 'pcmC', 'srat', 'chan', 'chnl', 'frma', 'free', 'skip', '\0\0\0\0']);
 
 type Box = { readonly type: string; readonly body: number; readonly end: number };
@@ -667,29 +667,45 @@ export async function openClassicAlac(cache: SourceCache, operation: OperationCo
   return { index, cookie, rate, channels, start, end };
 }
 
-/** Derive the audible end from the actual unit-rate MP4 edit, rather than
- * assuming the media-header duration describes the unpadded presentation. */
-export async function mp4AudioEditEnd(cache: SourceCache, trackOrder: number, expectedTracks: number, rate: number, operation: OperationContext) {
+async function trackEdit(cache: SourceCache, trackOrder: number, expectedTracks: number, handler: number, operation: OperationContext): Promise<{
+  readonly edit: Mp4EditMap | null; readonly unsupported: boolean;
+}> {
   const scanner = new Scanner(cache);
   const root = await scanner.children(required(await scanner.boxes(0, cache.source.size, operation), 'moov'), operation);
   const tracks = root.filter(box => box.type === 'trak'), track = tracks[trackOrder];
-  if (tracks.length !== expectedTracks || !track) return { end: null, unsupported: true };
+  if (tracks.length !== expectedTracks || !track) return { edit: null, unsupported: true };
   const children = await scanner.children(track, operation);
   const mdia = await scanner.children(required(children, 'mdia'), operation);
-  if ((await header(cache, required(mdia, 'hdlr'), 12, operation)).getUint32(8) !== 0x736f756e) return { end: null, unsupported: true };
+  if ((await header(cache, required(mdia, 'hdlr'), 12, operation)).getUint32(8) !== handler) return { edit: null, unsupported: true };
   const edits = one(children, 'edts');
-  if (!edits) return { end: null, unsupported: false };
+  if (!edits) return { edit: null, unsupported: false };
   const movieTimescale = await parseTimescale(cache, required(root, 'mvhd'), operation);
-  const scale = BigInt(movieTimescale);
   const mediaTimescale = await parseTimescale(cache, required(mdia, 'mdhd'), operation);
   try {
     const edit = await editMap(scanner, edits, movieTimescale, mediaTimescale, operation);
-    if (edit.segments.length !== 1 || edit.segments[0]!.mediaStart === null) return { end: null, unsupported: true };
-    // Movie timescales need not represent every audio sample exactly.
-    const end = (2n * edit.duration * BigInt(rate) + scale) / (2n * scale);
-    return end > 0n && end <= BigInt(Number.MAX_SAFE_INTEGER) ? { end, unsupported: false } : { end: null, unsupported: true };
+    if (edit.segments.length !== 1 || edit.segments[0]!.mediaStart === null) return { edit: null, unsupported: true };
+    return { edit, unsupported: false };
   } catch (error) {
-    if (error instanceof EngineError && error.code === 'UNSUPPORTED_PROFILE') return { end: null, unsupported: true };
+    if (error instanceof EngineError && error.code === 'UNSUPPORTED_PROFILE') return { edit: null, unsupported: true };
     throw error;
   }
+}
+
+/** Derive the audible end from the actual unit-rate MP4 edit, rather than
+ * assuming the media-header duration describes the unpadded presentation. */
+export async function mp4AudioEditEnd(cache: SourceCache, trackOrder: number, expectedTracks: number, rate: number, operation: OperationContext) {
+  const { edit, unsupported } = await trackEdit(cache, trackOrder, expectedTracks, 0x736f756e, operation);
+  if (!edit) return { end: null, unsupported };
+  const scale = BigInt(edit.movieTimescale);
+  // Movie timescales need not represent every audio sample exactly.
+  const end = (2n * edit.duration * BigInt(rate) + scale) / (2n * scale);
+  return end > 0n && end <= BigInt(Number.MAX_SAFE_INTEGER) ? { end, unsupported: false } : { end: null, unsupported: true };
+}
+
+/** mvhd/elst uses the movie presentation clock. mdhd alone can understate
+ * the displayed interval of a reordered video track. */
+export async function mp4VideoEditEnd(cache: SourceCache, trackOrder: number, expectedTracks: number, operation: OperationContext): Promise<MediaTime | null> {
+  const { edit } = await trackEdit(cache, trackOrder, expectedTracks, 0x76696465, operation);
+  return edit && edit.duration <= BigInt(Number.MAX_SAFE_INTEGER)
+    ? mediaTime(edit.duration, timeBase(1n, BigInt(edit.movieTimescale))) : null;
 }

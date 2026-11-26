@@ -20,6 +20,8 @@ Custom legacy/PGS foundation is npm libav.js 6.11.9, generated ABI 6.11.9.0.2, F
 
 HDR10 is the primary color requirement. Optional Dolby Vision, Atmos/JOC/TrueHD objects, DTS:X heights, IAMF/MPEG-H/AC4/VVC research remains disabled until exact separate decisions/builds/fixtures. Do not gate primary HDR10 on those optional features. A 16-bit FFV1 archival tuple is not automatically an HDR10 delivery profile.
 
+The [HEVC base-layer fallback](../hdr-base-playback.md) does not implement Dolby Vision reconstruction. It extracts independently decodable HDR10-compatible data from admitted Profile 8.1 and Profile 7 mappings. Full Dolby Vision, object rendering and physical HDR qualification remain separate.
+
 ## Resource, fixture and output exits
 
 Coordinate subtitle/video/audio thread grants across the complete player. Count all hosts/children and dispose before replacement. Required subtitle failure must pause/fail or expose an explicit continue-without-subtitles choice; it cannot count as a full gate pass. Optional malformed/oversized tracks can be disabled with a visible reason. Performance raster caps preserve text/timing/layout and are declared spatial reductions.

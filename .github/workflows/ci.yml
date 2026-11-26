@@ -49,6 +49,12 @@ jobs:
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: node test/mp4-playback-browser.mjs
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+      - run: node test/dolby-base-browser.mjs
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+      - run: node test/webgpu-browser.mjs
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        env:
+          UBVE_WEBGPU_OPTIONAL: '1'
       - run: npm run test:pipeline:browser
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: npm run test:codecs:browser
@@ -65,3 +71,5 @@ jobs:
             evidence/
             .local/modern-browser/
             .local/paged-mp4-browser/
+            .local/dolby-base-browser/
+            .local/webgpu-browser/

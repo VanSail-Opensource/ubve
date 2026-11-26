@@ -75,7 +75,7 @@ def generate():
             {'feature':'dav1d default SIMD/four-thread route','reason':'Retained unresolved pixel mismatches'},
             {'feature':'Qualified managed full HDR output','reason':'Canvas SDR is not full HDR, and the explicit WebGPU candidate is unqualified'},
             {'feature':'Encrypted/remote ISO, menus, BD-J','reason':'Outside the read-only local disc profile'},
-            {'feature':'Atmos/object-audio rendering, Dolby Vision, N3 dual-clock output','reason':'No admitted implementation/reference'},
+            {'feature':'Atmos/object-audio rendering, full Dolby Vision reconstruction, N3 dual-clock output','reason':'No admitted rendering reference. Compatible HEVC HDR10 base-layer decoding is a separate candidate'},
             {'feature':'Complex or protected paged MP4 profiles','reason':'The paged playback candidate admits static clear audio/video descriptions and the verified edit mappings only'},
         ],
         'scope':'Candidate implementation and evidence status only; API probes and short/component tests do not admit a production profile',

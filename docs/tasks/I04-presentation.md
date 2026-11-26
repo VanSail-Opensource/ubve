@@ -4,7 +4,7 @@
 
 ## Output priority and exact color
 
-Preserve native encoded HDR video and an eligible subtitle overlay when the selected route can retain required behavior. Custom composition uses an admitted WebCodecs/WebGPU or original WASM-plane path. WebGPU does not expose a fixed-function bitstream decoder. Native/GPU/physical-output tests are DEFERRED_NOT_QUALIFIED by user request in this environment; source/math/protocol work continues.
+Preserve native encoded HDR video and an eligible subtitle overlay when the selected route can retain required behavior. Custom composition uses an admitted WebCodecs/WebGPU or original WASM-plane path. WebGPU does not expose a fixed-function bitstream decoder. [The component screen](../hdr-base-playback.md#verification) now checks actual WebGPU pixel math and canvas configuration. Native HDR and physical display output are not qualified by that screen.
 
 Primary raw video is I420P10:10-bit values in little-endian16-bit storage, actual plane offsets/strides and visible rectangle. It is not unchanged MSB-aligned P010. The declared dictionary is bt2020/pq/bt2020-ncl with actual source range. Keep mastering/CLL/FALL in an owned epoch descriptor; VideoColorSpace has no standardized static-HDR injection fields. Preserve16-bit archival planes separately or declare precision reduction.
 

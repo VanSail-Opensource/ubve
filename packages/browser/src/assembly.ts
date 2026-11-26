@@ -1,6 +1,6 @@
 import { EngineError } from '@ubve/core';
-import { openMedia, packetSeconds } from '@ubve/io-demux';
-import type { MediaSourceSession, MediaTrack } from '@ubve/io-demux';
+import { hdr10BaseMode, openMedia, packetSeconds } from '@ubve/io-demux';
+import type { DolbyVisionConfig, MediaSourceSession, MediaTrack } from '@ubve/io-demux';
 import { createNativeStream } from '@ubve/native-bridge';
 import type { NativeStream } from '@ubve/native-bridge';
 import { SubtitleController } from '@ubve/presentation';
@@ -10,6 +10,19 @@ import { ManagedPlayback } from './managed.js';
 import { isDiscImageName, openBluRayClip } from './disc-input.js';
 
 export type RoutePreference = 'automatic' | 'native' | 'experimental' | 'managed';
+
+function dolbyLabel(config: DolbyVisionConfig): string {
+  return config.profile === null ? `${config.sampleEntry} (profile unavailable)` :
+    `P${config.profile}${config.profile === 8 && config.compatibilityId === 1 ? '.1' : ''}`;
+}
+
+function nativeDolbyMime(config: DolbyVisionConfig, audio: MediaTrack | undefined): string {
+  if (config.profile === null || ![5, 7, 8].includes(config.profile) || !config.level || !config.rpuPresent || !config.baseLayerPresent || (audio && !audio.codecString)) return '';
+  const tag = ['hvc1', 'dvh1'].includes(config.sampleEntry) ? 'dvh1' : ['hev1', 'dvhe'].includes(config.sampleEntry) ? 'dvhe' : null;
+  if (!tag) return '';
+  const dv = `${tag}.${String(config.profile).padStart(2, '0')}.${String(config.level).padStart(2, '0')}`;
+  return `video/mp4; codecs="${[dv, ...(audio?.codecString ? [audio.codecString] : [])].join(', ')}"`;
+}
 export interface ReferencePlayerFactoryOptions {
   readonly video: HTMLVideoElement;
   readonly overlay: HTMLElement;
@@ -62,23 +75,26 @@ export async function preparePlayback(input: MediaInput, video: HTMLVideoElement
       clip.validate(media);
     } else media = await openMedia(input, { signal, sameOriginCredentials: managed?.sameOriginMediaCredentials === true });
     if (signal.aborted) throw new DOMException('Open was cancelled', 'AbortError');
-    if (media.preflight.dolbyVision.length) {
-      const descriptions = media.preflight.dolbyVision.map(({ sampleEntry, profile, compatibilityId }) => {
-        if (profile === null) return `${sampleEntry} (profile unavailable)`;
-        return `P${profile}${profile === 8 && compatibilityId === 1 ? '.1' : ''}`;
-      });
-      const first = media.preflight.dolbyVision[0]!;
-      throw new EngineError('UNSUPPORTED_PROFILE', `Dolby Vision ${[...new Set(descriptions)].join(', ')} is signaled in this file. Dolby Vision output and an implicit compatibility-base fallback are not admitted by this player.`, 'caller-fix',
-        { sampleEntry: first.sampleEntry, dolbyVisionProfile: first.profile, dolbyVisionLevel: first.level, dolbyVisionCompatibilityId: first.compatibilityId });
-    }
+    const primaryVideo = selectDefault(media.tracks, 'video'), audio = selectDefault(media.tracks, 'audio');
+    const dolbyConfigs = [...media.preflight.dolbyVision, ...media.tracks.flatMap(track => track.matroskaTrack?.dolbyVision ? [track.matroskaTrack.dolbyVision] : [])];
+    const dolby = dolbyConfigs[0];
+    if (dolby && (dolbyConfigs.length !== 1 || media.tracks.filter(track => track.kind === 'video').length !== 1))
+      throw new EngineError('UNSUPPORTED_PROFILE', 'Dolby Vision needs an unambiguous single-video-track mapping.', 'caller-fix');
+    const label = dolby ? dolbyLabel(dolby) : null;
+    const baseMode = dolby && primaryVideo?.codec === 'hevc' ? hdr10BaseMode(dolby) : null;
     const preparedMedia = media;
     const software = (): PreparedPlayback => {
+      if (dolby && !baseMode) throw new EngineError('UNSUPPORTED_PROFILE', `Dolby Vision ${label} has no verified HDR10-compatible HEVC base layer for software playback.`, 'caller-fix',
+        { sampleEntry: dolby.sampleEntry, dolbyVisionProfile: dolby.profile, dolbyVisionLevel: dolby.level, dolbyVisionCompatibilityId: dolby.compatibilityId });
       if (!managed || !subtitles) throw new EngineError('INVALID_ARGUMENT', 'Managed playback requires an output host and subtitle controller');
-      return new ManagedPlayback({ media: preparedMedia, video, subtitles, signal, assetBaseUrl, ...managed }).asPrepared();
+      return new ManagedPlayback({ media: preparedMedia, video, subtitles, signal, assetBaseUrl, ...managed,
+        ...(baseMode && label ? { hdr10Base: { mode: baseMode, label } } : {}) }).asPrepared();
     };
     if (preference === 'managed' || 'disc' in input) return software();
-    if (preference === 'experimental') return prepareNativeCandidate(media, video, signal, assetBaseUrl, subtitles);
-    const primaryVideo = selectDefault(media.tracks, 'video'), audio = selectDefault(media.tracks, 'audio');
+    if (preference === 'experimental') {
+      if (dolby) throw new EngineError('UNSUPPORTED_PROFILE', 'Dolby Vision is not admitted for experimental remux. Use Automatic or Managed playback.', 'caller-fix');
+      return prepareNativeCandidate(media, video, signal, assetBaseUrl, subtitles);
+    }
     const requiredSubtitle = media.tracks.find(track => track.kind === 'subtitle' && (track.forced || track.default));
     const capability = (error: EngineError): PreparedPlayback => {
       if (preference === 'automatic' && managed && subtitles) return software();
@@ -87,14 +103,15 @@ export async function preparePlayback(input: MediaInput, video: HTMLVideoElement
     if (audio?.codec === 'truehd') return capability(new EngineError('UNSUPPORTED_PROFILE', 'TrueHD has no admitted native soundtrack path here. Select Managed or Experimental remux / audio bridge.', 'caller-fix'));
     if (audio && ['dts', 'dts-hd'].includes(audio.codec)) return capability(new EngineError('UNSUPPORTED_PROFILE', `${audio.codec.toUpperCase()} has no admitted native soundtrack route here.`, 'caller-fix'));
     if (requiredSubtitle) return capability(new EngineError('UNSUPPORTED_PROFILE', 'The source requires an embedded subtitle track that native direct playback cannot preserve. Select a complete managed/remux route.', 'caller-fix'));
-    const mime = media.mimeType;
+    const mime = dolby ? nativeDolbyMime(dolby, audio) : media.mimeType;
     const details = { mimeType: mime || null, videoCodec: primaryVideo?.codecString ?? null, audioCodec: audio?.codecString ?? null };
-    if (media.preflight.format === 'isobmff' && (!mime.includes('codecs=') || (primaryVideo && !primaryVideo.codecString) || (audio && !audio.codecString))) {
+    if (dolby && !mime) return capability(new EngineError('UNSUPPORTED_PROFILE', `No exact native Dolby Vision ${label} container and codec tuple is admitted.`, 'caller-fix'));
+    if (!dolby && media.preflight.format === 'isobmff' && (!mime.includes('codecs=') || (primaryVideo && !primaryVideo.codecString) || (audio && !audio.codecString))) {
       return capability(new EngineError('UNSUPPORTED_PROFILE', 'The exact selected MP4 codec configuration is unknown. Generic container acceptance does not admit this source.', 'caller-fix', details));
     }
     const nativeProbe = mime ? video.canPlayType(mime) : null;
     if (nativeProbe === '') return capability(new EngineError('UNSUPPORTED_PROFILE', `Native direct playback is not advertised for ${mime} by this browser. Repackaging cannot add a missing decoder.`, 'caller-fix', details));
-    const source = describeMedia(media), tracks = mapTracks(media.tracks, false);
+    const source = { ...describeMedia(media), ...(dolby ? { mime } : {}) }, tracks = mapTracks(media.tracks, false);
     // The element owns the original File during native playback. Retain only
     // the small, inspected metadata projection, not a second byte source/cache.
     await media.dispose(); media = null;
@@ -103,6 +120,7 @@ export async function preparePlayback(input: MediaInput, video: HTMLVideoElement
       ...direct, tracks, source,
       selectedAudio: audio?.id ?? null,
       notices: [...direct.notices ?? [], ...(nativeProbe ? [`Native MIME probe: ${mime} (${nativeProbe}).`] : []),
+        ...(dolby ? [`Original Dolby Vision ${label} bytes are passed to the browser. Dolby Vision rendering is unverified.`] : []),
         'Native media buffers are opaque; codec/profile acceptance is not full output qualification.'],
       telemetry: () => ({ explicitBytes: 0 }),
     };

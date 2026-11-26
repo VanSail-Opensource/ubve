@@ -94,7 +94,7 @@ export function classifyOpenFailure(stage, diagnosticCode, nativeCode, message) 
   const text = String(message ?? '');
   const declaredProfileRefusal = diagnosticCode === 'UNSUPPORTED_PROFILE' && (
     /^Native direct playback is not advertised for /i.test(text) ||
-    /^Dolby Vision .+ is signaled in this file\. Dolby Vision output and an implicit compatibility-base fallback are not admitted by this player\.$/i.test(text)
+    /^Dolby Vision .+ (?:is signaled in this file\. Dolby Vision output and an implicit compatibility-base fallback are not admitted by this player|has no verified HDR10-compatible HEVC base layer for software playback)\.$/i.test(text)
   );
   if (stage === 'open' && (nativeCode === 4 || diagnosticCode === 'UNSUPPORTED_CONTAINER' || declaredProfileRefusal ||
     ((diagnosticCode === 'UNSUPPORTED_CODEC' || diagnosticCode === 'UNSUPPORTED_PROFILE' || diagnosticCode === null) &&

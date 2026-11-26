@@ -1,4 +1,5 @@
 import { EngineError, type OperationContext } from '@ubve/core';
+import { readDolbyVisionConfig, type DolbyVisionConfig } from './dolby-vision.js';
 import type { SourceCache } from './source.js';
 
 interface Element { id: number; start: number; data: number; end: number; unknown: boolean; }
@@ -7,6 +8,7 @@ export interface MatroskaTrack {
   language: string; name: string | null; default: boolean; forced: boolean; defaultDurationNs: bigint | null;
   codecDelayNs: bigint; seekPreRollNs: bigint; video: Record<string, number>; audio: Record<string, number>;
   color: Readonly<Record<string, number>>; mastering: Readonly<Record<string, number>>;
+  dolbyVision?: DolbyVisionConfig;
 }
 export interface MediaAttachment { id: string; name: string; mimeType: string; data: Uint8Array; }
 export interface MatroskaMetadata { timecodeScaleNs: bigint; duration: number | null; tracks: MatroskaTrack[]; attachments: MediaAttachment[]; segmentStart: number; segmentEnd: number; firstCluster: number; cues: { timeNs: bigint; position: number; track: number }[]; }
@@ -79,6 +81,17 @@ function parseTrack(bytes: Uint8Array): MatroskaTrack {
       case 0x56bb: result.seekPreRollNs = integer(entry.data); break;
       case 0x23314f: if (float(entry.data) !== 1) throw new EngineError('UNSUPPORTED_PROFILE', 'Non-unit Matroska TrackTimestampScale is unavailable'); break;
       case 0x537f: if (integer(entry.data, true) !== 0n) throw new EngineError('UNSUPPORTED_PROFILE', 'Nonzero Matroska TrackOffset is unavailable'); break;
+      case 0x41e4: {
+        const mapping = children(entry.data), type = mapping.find(field => field.id === 0x41e7);
+        const value = type ? integer(type.data) : 0n;
+        // Matroska carries the same DV decoder configuration record as ISO BMFF.
+        if (value === 0x64766343n || value === 0x64767643n) {
+          if (result.dolbyVision) return bad('Matroska track declares multiple Dolby Vision configurations');
+          const extra = mapping.find(field => field.id === 0x41ed);
+          if (!extra || extra.data.length < 4 || extra.data.length > 64) return bad('Invalid Matroska Dolby Vision configuration');
+          result.dolbyVision = Object.freeze(readDolbyVisionConfig('V_MPEGH/ISO/HEVC', extra.data));
+        }
+      } break;
       case 0x6d80: throw new EngineError('UNSUPPORTED_CODEC', 'Matroska content encoding/encryption is outside this profile');
       case 0xe0: for (const video of children(entry.data)) {
         const names: Record<number, string> = { 0xb0: 'width', 0xba: 'height', 0x54b0: 'displayWidth', 0x54ba: 'displayHeight', 0x9a: 'interlaced', 0x53b8: 'stereoMode' };
@@ -104,7 +117,10 @@ function parseTrack(bytes: Uint8Array): MatroskaTrack {
       } break;
     }
   }
-  if (!result.number || !result.codecId) return bad('Incomplete Matroska track'); return result;
+  if (!result.number || !result.codecId) return bad('Incomplete Matroska track');
+  if (result.dolbyVision && (result.type !== 'video' || result.codecId !== 'V_MPEGH/ISO/HEVC'))
+    throw new EngineError('UNSUPPORTED_PROFILE', 'Only Matroska HEVC Dolby Vision track mappings are admitted');
+  return result;
 }
 
 export async function readMatroskaMetadata(cache: SourceCache, operation: OperationContext): Promise<MatroskaMetadata> {

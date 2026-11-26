@@ -244,8 +244,8 @@ test('local fragmented MP4 preflight reads only framed metadata and preserves DV
     const report = await preflightMetadata(cache, op());
     assert.equal(report.format, 'isobmff');
     assert.deepEqual(report.dolbyVision, [
-      { sampleEntry: 'hvc1', profile: 8, level: 10, compatibilityId: 1 },
-      { sampleEntry: 'dvh1', profile: 5, level: 9, compatibilityId: 0 },
+      { sampleEntry: 'hvc1', profile: 8, level: 10, compatibilityId: 1, rpuPresent: true, enhancementLayerPresent: false, baseLayerPresent: true },
+      { sampleEntry: 'dvh1', profile: 5, level: 9, compatibilityId: 0, rpuPresent: true, enhancementLayerPresent: false, baseLayerPresent: true },
     ]);
     assert.equal(cache.snapshot().bytes, 0);
     assert.ok(source.stats.deliveredBytes < 600, `sparse preflight read ${source.stats.deliveredBytes} bytes`);
@@ -306,4 +306,16 @@ test('local MP4 preflight and the provider reuse one bounded exact moov read', a
     assert.equal(source.ledger.snapshot().bytes, 0);
     assert.equal(cache.snapshot().provider.activeBytes, 0);
   } finally { await reader?.cancel(); reader?.releaseLock(); await cache.close(); }
+});
+
+test('classic MP4 video uses its movie edit duration when mdhd understates the presentation', async () => {
+  const bytes = await readFile(new URL('./fixtures/modern/hevc-main10.mp4', import.meta.url));
+  const mdhd = bytes.indexOf('mdhd');
+  assert.ok(mdhd > 0 && bytes[mdhd + 4] === 0, 'fixture has a version-zero mdhd');
+  bytes.writeUInt32BE(2560, mdhd + 20); // 0.2 seconds of declared media-clock duration
+  const media = await openMedia(new Blob([bytes]));
+  try {
+    assert.equal(media.duration, 1.2);
+    assert.deepEqual(media.tracks[0].videoEditEnd, { ticks: 1200n, timeBase: { numerator: 1n, denominator: 1000n } });
+  } finally { await media.dispose(); }
 });

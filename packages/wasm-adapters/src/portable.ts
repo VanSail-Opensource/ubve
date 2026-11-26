@@ -59,7 +59,7 @@ function videoPixels(o: PortableVideoOptions, h: PortableHeader, epoch: number, 
   const transfer = ({ 1: 'bt709', 6: 'smpte170m', 13: 'iec61966-2-1', 16: 'smpte2084', 18: 'arib-std-b67' } as Record<number, string>)[s[10]!];
   const matrix = ({ 1: 'bt709', 5: 'bt470bg', 6: 'smpte170m', 9: 'bt2020-ncl', 10: 'bt2020-cl' } as Record<number, string>)[s[11]!];
   const range = ranges[s[12]!];
-  const chroma = ['unspecified', 'left', 'center', 'topleft', 'top', 'bottomleft', 'bottom'][s[40]!];
+  const chroma = ['unspecified', 'left', 'center', 'top-left', 'top', 'bottom-left', 'bottom'][s[40]!];
   const observe = <T>(decoder: T | null | undefined, container: T | null | undefined = null): MetadataValue<T> => decoder != null ? knownMetadata(decoder, 'decoder') : container != null ? knownMetadata(container, 'browser-api') : unknownMetadata('Not signaled by this decoder or source');
   const rational = (i: number): ExactRational => ({ numerator: BigInt(s[17 + 2 * i]!), denominator: BigInt(s[18 + 2 * i]!) });
   const mastering = s[16] === 3 ? {

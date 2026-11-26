@@ -8,6 +8,8 @@ export interface WebGpuRendererOptions {
   readonly allowSdrToneMap: boolean;
   readonly maximumHeight?: number;
   readonly chromaLocation: 'center' | 'left' | 'topleft';
+  /** Enable an explicit copy of the current canvas texture for numerical verification. */
+  readonly allowReadback?: boolean;
 }
 
 /** Raw integer YUV textures, range/chroma reconstruction, PQ EOTF and one
@@ -112,6 +114,8 @@ export class WebGpuRawRenderer {
     try { device = await finite(pendingDevice, 5_000, 'WebGPU device'); }
     catch (error) { void pendingDevice.then(late => late.destroy(), () => undefined); throw error; }
     let context: GPUCanvasContext | null = null;
+    device.pushErrorScope('validation');
+    let validationScope = true;
     try {
       context = canvas.getContext('webgpu');
       if (!context) throw new Error('Canvas WebGPU context unavailable');
@@ -121,6 +125,7 @@ export class WebGpuRawRenderer {
       // Older/clamping implementations are rejected after getConfiguration().
       const colorSpace = hdr ? 'display-p3-linear' : 'srgb';
       context.configure({ device, format, alphaMode: 'opaque', colorSpace: colorSpace as PredefinedColorSpace,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | (options.allowReadback ? GPUTextureUsage.COPY_SRC : 0),
         toneMapping: { mode: hdr ? 'extended' : 'standard' } });
       const accepted = context.getConfiguration();
       if (!accepted || accepted.format !== format || String(accepted.colorSpace) !== colorSpace
@@ -131,8 +136,14 @@ export class WebGpuRawRenderer {
       const pipeline = await finite(device.createRenderPipelineAsync({ layout: 'auto',
         vertex: { module: shader, entryPoint: 'vertex' }, fragment: { module: shader, entryPoint: 'fragment', targets: [{ format }] },
         primitive: { topology: 'triangle-list' } }), 5_000, 'WebGPU render pipeline');
+      validationScope = false;
+      const error = await finite(device.popErrorScope(), 5_000, 'WebGPU initialization validation');
+      if (error) throw new Error(error.message);
       return new WebGpuRawRenderer(canvas, context, device, pipeline, options);
-    } catch (error) { context?.unconfigure(); device.destroy(); throw error; }
+    } catch (error) {
+      if (validationScope) void device.popErrorScope().catch(() => undefined);
+      context?.unconfigure(); device.destroy(); throw error;
+    }
   }
 
   present(frame: RawPlaneFrame): { readonly output: 'sdr' | 'hdr-candidate'; readonly qualification: 'DEFERRED_NOT_QUALIFIED' } {
@@ -141,6 +152,7 @@ export class WebGpuRawRenderer {
     if (!(frame.data.buffer instanceof ArrayBuffer)) throw new Error('Shared WASM planes require an owned stable handoff before GPU upload');
     if (frame.format === 'RGBA8') throw new Error('This renderer requires original planar YUV samples');
     const hdr = frame.color.transfer === 'pq' || frame.color.transfer === 'smpte2084';
+    if (!hdr && this.options.output === 'hdr-candidate') throw new Error('The HDR canvas requires a PQ source');
     if (hdr && this.options.output === 'sdr' && !this.options.allowSdrToneMap) throw new Error('Explicit SDR tone-map consent is required');
     if (!['bt709', 'bt2020'].includes(frame.color.primaries ?? '') || !['bt709', 'bt2020-ncl'].includes(frame.color.matrix ?? '')
       || (!hdr && frame.color.transfer !== 'bt709') || frame.color.range === null) throw new Error('Unknown or unsupported raw color interpretation');

@@ -1,4 +1,5 @@
 import { EngineError, type OperationContext } from '@ubve/core';
+import { readDolbyVisionConfig, type DolbyVisionConfig } from './dolby-vision.js';
 import type { SourceCache } from './source.js';
 
 // Include the pinned MP4 detector's direct matches and bounded skipped
@@ -13,12 +14,7 @@ const LIMIT = 262144;
 const INDEX_WINDOW_BYTES = 16 * 1024 * 1024;
 const MAX_FRAGMENT_TRACKS = 65536;
 const text = new TextDecoder();
-export interface IsoDolbyVisionConfig {
-  readonly sampleEntry: string;
-  readonly profile: number | null;
-  readonly level: number | null;
-  readonly compatibilityId: number | null;
-}
+export type IsoDolbyVisionConfig = DolbyVisionConfig;
 export interface MetadataPreflight { format: 'isobmff' | 'matroska' | 'other'; boxes: number; entries: number; tracks: number; moovBytes: number;
   /** The upstream provider must not receive the original sample tables. */
   readonly requiresPaged?: boolean;
@@ -74,7 +70,6 @@ async function inspectMetadata(cache: SourceCache, operation: OperationContext, 
   const countBox = () => { if (++result.boxes > LIMIT) throw new EngineError('ITEM_TOO_LARGE', 'MP4 box count exceeds admission'); };
   const readVisualEntry = async (sampleEntry: string, body: number, end: number) => {
     if (!VISUAL_ENTRIES.has(sampleEntry)) return;
-    const unknown = { sampleEntry, profile: null, level: null, compatibilityId: null };
     let config: IsoDolbyVisionConfig | null = null;
     // The fixed ISO VisualSampleEntry fields occupy 78 bytes after the box
     // header. Search only its framed direct children, never encoded payload.
@@ -83,13 +78,9 @@ async function inspectMetadata(cache: SourceCache, operation: OperationContext, 
       countBox(); enforceClear(child.type); childStart = child.end;
       if (child.type !== 'dvcC' && child.type !== 'dvvC' && child.type !== 'dvwC') continue;
       if (config) throw new EngineError('INVALID_PACKET', 'MP4 Dolby Vision sample entry declares multiple configurations');
-      config = await cache.readLocalProbe(child.body, Math.min(child.end, child.body + 5), operation, bytes => {
-        if (bytes.length < 4 || bytes[0] !== 1) return unknown;
-        const profile = bytes[2]! >>> 1, level = ((bytes[2]! & 1) << 5) | (bytes[3]! >>> 3);
-        return { sampleEntry, profile, level, compatibilityId: bytes.length >= 5 ? bytes[4]! >>> 4 : null };
-      });
+      config = await cache.readLocalProbe(child.body, Math.min(child.end, child.body + 5), operation, bytes => readDolbyVisionConfig(sampleEntry, bytes));
     }
-    if (!config && DOLBY_VISION_VISUAL_ENTRIES.has(sampleEntry)) config = unknown;
+    if (!config && DOLBY_VISION_VISUAL_ENTRIES.has(sampleEntry)) config = readDolbyVisionConfig(sampleEntry, new Uint8Array());
     if (config) {
       if (dolbyVision.length >= 32) throw new EngineError('ITEM_TOO_LARGE', 'MP4 Dolby Vision configuration count exceeds 32');
       dolbyVision.push(Object.freeze(config));
