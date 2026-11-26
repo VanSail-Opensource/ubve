@@ -39,7 +39,7 @@
     "build:notices": "node scripts/prepare-notices.mjs",
     "test:qualification": "node scripts/python.mjs -m unittest discover -s qualification -v",
     "support:generate": "node scripts/python.mjs scripts/generate-support.py",
-    "release:check": "node scripts/python.mjs scripts/generate-support.py --require-release",
+    "release:check": "npm run check:static",
     "check:static": "node scripts/check-static.mjs",
     "audit:assets": "node scripts/audit-distributed-assets.mjs",
     "test:jellyfin": "node test/jellyfin-browser.mjs",

@@ -1,6 +1,6 @@
 # UBVE phase and qualification status
 
-The [v8 specification](specification/Universal-Browser-Video-Engine-v8.0.md) remains authoritative. The I00–I12 implementation PRs are separate from their production-evidence exits. **No exact production configuration is qualified. Cloudflare Pages is preview-only.**
+The [v8 specification](specification/Universal-Browser-Video-Engine-v8.0.md) remains authoritative for playback qualification. The I00–I12 implementation PRs are separate from their production-evidence exits. **No exact playback configuration is qualified. Publishing the candidate to Cloudflare Pages does not change that status.**
 
 | Phase | Verified implementation boundary | Still open |
 | --- | --- | --- |

@@ -71,4 +71,4 @@ for (const file of providerManifest.files) {
 for (const forbidden of ['functions', '_worker.js', 'tests', 'test']) {
   await assert.rejects(stat(inside(forbidden)), { code: 'ENOENT' });
 }
-console.log(`Verified standard/isolated Pages documents, static routing and ${providerManifest.files.length} same-origin provider files. Release ready: ${support.releaseReady}.`);
+console.log(`Verified standard/isolated Pages documents, static routing and ${providerManifest.files.length} same-origin provider files. Exact playback qualified: ${support.releaseReady}.`);

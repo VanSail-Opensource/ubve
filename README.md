@@ -35,8 +35,8 @@ npm run check:static
 
 The optional [LAN test lab](docs/device-lab.md) lets the master pair browser devices, queue software playback and timing screens, and retain every attempt. It is not deployed with the static player.
 
-## Playback gates
+## Playback qualification
 
 The [v8 specification](docs/specification/Universal-Browser-Video-Engine-v8.0.md) requires genuine 60/120 source cadence, no late or dropped eligible pictures, exact selected audio/subtitle behavior, sustained trials and separate physical-output evidence. Full HDR10 and declared performance mode are separate admissions. Dolby Vision and object-audio rendering are not claimed.
 
-Component correctness, headless short-clip playback and API admission are useful evidence. None qualifies 4K60 HDR10, 120 fps playback, or cross-platform physical HDR output. `npm run release:check` fails closed until the required release evidence is present.
+FPS targets are not deployment gates. `npm run release:check` validates the static artifact for publication. `npm run support:generate` records playback evidence separately. Component correctness, short-clip playback and API admission do not qualify 4K60 HDR10, 120 fps playback or cross-platform physical HDR output.

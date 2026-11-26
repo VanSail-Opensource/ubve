@@ -17,7 +17,8 @@ Run commands at the repository root with Node **24.22.3** and npm **11.19.1**. T
 | `npm run build` | Compile packages and build self-hosted assets and both Vue documents. |
 | `npm run check:assets` / `npm run check:static` | Verify built media-provider hashes or the complete static output's two entry documents, headers and packaging. |
 | `npm run audit:assets` | Inspect dependency notices and emitted asset/source provenance. The report is not a distribution approval. |
-| `npm run support:generate` / `npm run release:check` | Derive status with the pinned evaluator. The release command fails if the deployment condition is unmet. |
+| `npm run release:check` | Validate the built static artifact for Pages publication, including an honestly unqualified candidate. |
+| `npm run support:generate` | Report exact playback status with the pinned evaluator, without making FPS a deployment gate. |
 
 ## Browser evidence
 

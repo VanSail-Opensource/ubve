@@ -1,6 +1,8 @@
 # I12 — Exact v8 qualification and static release
 
-**Status:** production release pending. **Dependencies:** I06/I11 and every claimed extension's exact exit: I07 HTTP, I08 native, selected I09 subtitles/output and I10 disc/index. **Owner:** release/qualification integrator. **Owned paths:** real release manifests/schema/support generator, assets/notices and deployment records. No task self-promotes support.
+**Status:** exact playback qualification pending. **Dependencies:** I06/I11 and every claimed extension's exact exit: I07 HTTP, I08 native, selected I09 subtitles/output and I10 disc/index. **Owner:** release/qualification integrator. **Owned paths:** real release manifests/schema/support generator, assets/notices and deployment records. No task self-promotes support.
+
+The [static Pages publication check](../cloudflare-pages.md) is separate. The implementation candidate may be hosted with its generated `NOT_QUALIFIED` support status. The following requirements still govern exact playback qualification and support claims.
 
 ## Executable authority and exact identity
 

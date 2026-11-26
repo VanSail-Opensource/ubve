@@ -6,11 +6,12 @@ The deployment target is the static Vite output at `apps/vue-player/dist`. It co
 npm ci --ignore-scripts
 npm test
 npm run build
-npm run check:static
 npm run release:check
 ```
 
-The static audit validates both HTML entries, document-specific isolation, self-hosted assets against the generated hash manifest, cache policies and the public support report. **A successful static audit is not release qualification.** Production deployment is conditional on the strict evidence verdict, completion of the claimed phase exits and the distributed-source/license audit. An unqualified checkout must not trigger a production deployment. Do not configure an automatic release-on-push integration before these conditions hold.
+The static audit validates both HTML entries, document-specific isolation, self-hosted assets against the generated hash manifest, cache policies and the public support report. A passing artifact may be published to the Pages production hostname as an implementation candidate. The distribution inventory is still run in CI and its open findings remain recorded.
+
+FPS targets and sustained playback trials are evidence for performance claims, not a deployment prerequisite. `npm run support:generate` uses the unchanged v8 evaluator to report results. The support report's `releaseReady` field describes exact playback qualification, not whether the static site can be published. The Pages project uses manual Direct Upload, with `main` for production and `candidate` for previews.
 
 | Document | Expected response | Playback use |
 | --- | --- | --- |
@@ -19,7 +20,7 @@ The static audit validates both HTML entries, document-specific isolation, self-
 | `/assets/*` | Immutable cache for content-hashed bundles | Bundled Vue app and shared chunks. |
 | `/vendor/*` | Revalidate provider assets | Same-origin pinned worker/WASM/font assets. |
 
-After a release is eligible, publish the exact audited directory to the intended Pages project. Verify the two live document responses, successful same-origin worker/WASM loads, support report equality and 404 handling for a missing asset. Record the deployment URL/ID, exact Git commit and built asset manifest. A chosen Pages URL does not widen format, device or display qualification.
+Publish the exact audited directory to the intended Pages project. Verify the two live document responses, successful same-origin worker/WASM loads, support report equality and 404 handling for a missing asset. Record the deployment URL/ID, exact Git commit and built asset manifest. A Pages URL does not widen format, device or display qualification.
 
 Self-hosted worker asset responses also carry `COEP: require-corp`. It is required by the isolated player, including the ASS and nested codec workers. The standard document itself remains non-isolated.
 
