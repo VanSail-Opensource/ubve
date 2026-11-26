@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "abi": "ubve-software-decode-v1",
+  "ffmpeg": {
+    "version": "9.0.2",
+    "sourceSha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+  },
+  "libaom": {
+    "revision": "b141d9c4",
+    "sourceSha256": "d2b7a1c7f4e47d058066e4d3ed50207718a5a242aa0796be9b9dc4705caa39d8"
+  },
+  "emscripten": {
+    "version": "6.0.0",
+    "revision": "afa15e0c56d1292e073c2c91bafc1d5e0cdf0dd3",
+    "emsdk": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de"
+  },
+  "inputs": {
+    "scripts/build-software-codecs.sh": "2dcc29a32aff8546ce38624472ef70c7d5f0b959f0edd6ad565beb76c2259de8",
+    "packages/wasm-adapters/native/decode.c": "4eec4594b3cfb2100ef25abb3d91a0a3cd7e00660d98a2411c7d0e44a6c5e369"
+  },
+  "files": [
+    {
+      "file": "FFmpeg-COPYING.LGPLv2.1",
+      "bytes": 26517,
+      "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30"
+    },
+    {
+      "file": "audio.mjs",
+      "bytes": 15505,
+      "sha256": "2da00b2fb128f393f6c4704929264c36199ab6de5506a20219ab90cfcbfe6587"
+    },
+    {
+      "file": "audio.wasm",
+      "bytes": 1294000,
+      "sha256": "95a73a0cd2b5f69802bb3d502b3c408ce81740c203397f21de1a99dc3793f081"
+    },
+    {
+      "file": "libaom-LICENSE",
+      "bytes": 1316,
+      "sha256": "4764a286d8b2faeaf42f4418e7d7a28d58fc8fd4d00a3d0a7f44b0a4099de7f2"
+    },
+    {
+      "file": "libaom-PATENTS",
+      "bytes": 5701,
+      "sha256": "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61"
+    },
+    {
+      "file": "video.mjs",
+      "bytes": 17633,
+      "sha256": "3046239b7cdfd82d4001ee15270d2a26697dadfe1e0e958e86eea1b29183bb23"
+    },
+    {
+      "file": "video.wasm",
+      "bytes": 3689651,
+      "sha256": "4dcbbe9c4883b065b1102cfbaca49b138d3340360155ecf563e067925c7e6423"
+    }
+  ]
+}

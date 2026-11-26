@@ -17,7 +17,7 @@ export class Av1Decoder extends PacketDecoder<VideoPixels> {
     super(options.stamp, maximumFrameBytes * (options.outputFrames ?? 4), options.outputFrames ?? 4);
     this.#maximumFrameBytes = maximumFrameBytes;
     this.options = options;
-    this.effective = { codecId: 'av1', workers: (options.threads ?? 4) + 1, sharedMemory: true, outputLayout: 'I420P10-or-I420P8', resources: { explicitInputBudgetEnforced: true, explicitOutputBudgetEnforced: true, internalHeap: 'opaque', internalHeapLimitBytes: null, internalHeapEstimateBytes: byteLength(256 * 1024 * 1024), runtimeLifetime: 'session', completeShutdown: 'not-established' } };
+    this.effective = { codecId: 'av1', workers: (options.threads ?? 1) + 1, sharedMemory: true, outputLayout: 'I420P10-or-I420P8', resources: { explicitInputBudgetEnforced: true, explicitOutputBudgetEnforced: true, internalHeap: 'opaque', internalHeapLimitBytes: null, internalHeapEstimateBytes: byteLength(256 * 1024 * 1024), runtimeLifetime: 'session', completeShutdown: 'not-established' } };
   }
   static async create(options: Av1DecoderOptions): Promise<Av1Decoder> {
     const decoder = new Av1Decoder(options);
@@ -27,7 +27,7 @@ export class Av1Decoder extends PacketDecoder<VideoPixels> {
   protected async reopen(): Promise<void> {
     const base = new URL(this.options.assetBaseUrl ?? '/vendor/', globalThis.location?.href ?? 'http://localhost/');
     this.#worker = new CodecWorkerClient(new URL('av1/dav1d.worker.js', base), 'module');
-    this.#environment = await this.#worker.call('init', { width: this.options.width, height: this.options.height, description: this.options.description ?? new Uint8Array(), threads: this.options.threads ?? 4, wasmUrl: new URL('av1/av1-atomic.wasm', base).href }, [], 10000);
+    this.#environment = await this.#worker.call('init', { width: this.options.width, height: this.options.height, description: this.options.description ?? new Uint8Array(), threads: this.options.threads ?? 1, wasmUrl: new URL('av1/av1-atomic.wasm', base).href }, [], 10000);
     this.#pending.clear(); this.#nextToken = 0;
   }
   protected async decode(packet: EncodedPacket, consumed: () => void): Promise<void> {

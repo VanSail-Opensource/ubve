@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>UBVE lab · Controller</title><link rel="stylesheet" href="/lab.css"></head>
+<body>
+  <main>
+    <header><p class="eyebrow">UBVE · software playback screening</p><h1>Device lab</h1><p id="build"></p></header>
+    <p id="status" role="status">Opening controller…</p>
+    <section><h2>Devices</h2><button id="pair">Create pairing link</button>
+      <p id="pair-link"></p><ul id="devices"></ul></section>
+    <section><h2>Queue a test</h2><form id="queue">
+      <label>Device <select id="target" required></select></label><label>Fixture <select id="fixture" required></select></label>
+      <label>Source <select id="transport"><option value="range">Stream HTTP ranges</option><option value="file">Preload a File</option></select></label>
+      <label>Scenario <select id="scenario"><option value="lifecycle">Playback and seek</option><option value="timing">Exclusive timing screen</option></select></label>
+      <label>AV1 decoder <select id="av1"><option value="automatic">Automatic software</option><option value="portable">Force portable libaom</option></select></label>
+      <label>Comparison label <input id="pair-label" maxlength="40" placeholder="optional"></label>
+      <label class="inline"><input type="checkbox" id="fold" checked> Explicit stereo fold-down for this test</label>
+      <label class="inline"><input type="checkbox" id="prefetch"> Try one-frame Canvas worker (timing only)</label>
+      <button>Queue test</button>
+    </form></section>
+    <section><h2>Attempts</h2><div class="scroll"><table><thead><tr><th>Fixture</th><th>Device</th><th>State</th><th>Build</th><th>Receipt</th></tr></thead><tbody id="attempts"></tbody></table></div></section>
+  </main>
+  <script type="module" src="/controller.js"></script>
+</body></html>

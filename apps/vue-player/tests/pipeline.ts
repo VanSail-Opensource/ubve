@@ -14,7 +14,9 @@ async function run(): Promise<void> {
   const file = input.files?.[0]; if (!file) { output.textContent = 'Select the exact fixture first'; return; }
   button.disabled = true; output.textContent = 'Running'; output.dataset.status = 'running';
   const records: unknown[] = [], began = performance.now();
-  const player = createReferencePlayer({ video, overlay, routePreference: () => 'managed', allowStereoFoldDown: () => true });
+  const params = new URLSearchParams(location.search);
+  const player = createReferencePlayer({ video, overlay, routePreference: () => 'managed', allowStereoFoldDown: () => true,
+    tracePerformance: params.get('trace') === '1', prefetchCanvas: params.get('prefetch') === '1' });
   const foreground = () => ({ visibility: document.visibilityState, hasFocus: document.hasFocus() });
   const foregroundEvents: unknown[] = [{ event: 'initial', elapsedMs: 0, ...foreground() }];
   const recordForeground = (event: Event): void => { foregroundEvents.push({ event: event.type, elapsedMs: performance.now() - began, ...foreground() }); };
@@ -51,6 +53,13 @@ async function run(): Promise<void> {
     await player.setQuality('performance'); await player.open(file); checkpoint('open-ready');
     stage = 'play'; await player.play(); checkpoint('play-acknowledged');
     stage = 'first-eos'; await waitForEnd(); checkpoint('eos');
+    if (params.get('trace') === '1') {
+      const canvas = document.querySelector<HTMLCanvasElement>('canvas.managed-video-surface');
+      if (canvas) {
+        const data = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data;
+        if (data) evidence.eosRasterSha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), b => b.toString(16).padStart(2, '0')).join('');
+      }
+    }
     stage = 'paused-seek'; await player.seek(0.2); await player.pause(); checkpoint('paused-seek');
     stage = 'resume'; await player.play(); checkpoint('resume-acknowledged');
     stage = 'seek-eos'; await waitForEnd(); checkpoint('seek-eos');

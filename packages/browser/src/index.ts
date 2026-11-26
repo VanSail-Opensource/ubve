@@ -50,3 +50,5 @@ export { createReferencePlayer, preparePlayback, qualityTarget } from './assembl
 export type { ReferencePlayerFactoryOptions, RoutePreference } from './assembly.js';
 export { ManagedPlayback, stereoIndexFold } from './managed.js';
 export type { ManagedPlaybackOptions } from './managed.js';
+export { inspectBluRayClips, isDiscImageName } from './disc-input.js';
+export type { BluRayClipInput, BluRayClipChoice, LocalBluRay } from './disc-input.js';

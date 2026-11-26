@@ -4,12 +4,31 @@ import type { PcmConfiguration, PcmEvent, PcmSnapshot } from './audio-protocol.j
 export interface PcmOutputOptions {
   readonly sampleRate: number;
   readonly channelLabels: readonly string[];
+  /** The caller retains the lifetime of a previously admitted browser audio context. */
+  readonly borrowedContext?: AudioContext;
   readonly workletUrl?: string;
   readonly blockFrames?: number;
   readonly poolBlocks?: number;
   readonly primeMs?: number;
   readonly firstMediaSample?: bigint;
   readonly onEvent?: (event: PcmEvent) => void;
+}
+
+const borrowedContexts = new WeakSet<AudioContext>();
+const workletModules = new WeakMap<AudioContext, { readonly url: string; readonly load: Promise<void> }>();
+
+function loadWorklet(context: AudioContext, url: string): Promise<void> {
+  const previous = workletModules.get(context);
+  if (previous) {
+    if (previous.url !== url) throw new Error('A PCM context cannot change its worklet module URL');
+    return previous.load;
+  }
+  const load = context.audioWorklet.addModule(url).catch(error => {
+    workletModules.delete(context);
+    throw error;
+  });
+  workletModules.set(context, { url, load });
+  return load;
 }
 
 type Pending = { readonly expected: string; readonly timer: ReturnType<typeof setTimeout>;
@@ -46,6 +65,7 @@ export class PcmOutput {
   readonly node: AudioWorkletNode;
   readonly gain: GainNode;
   readonly config: PcmConfiguration;
+  readonly #releaseContext: () => Promise<void>;
   #producer: MessagePort;
   #free: { id: number; buffer: ArrayBuffer }[] = [];
   #inFlight = new Map<number, number>();
@@ -63,14 +83,11 @@ export class PcmOutput {
   #listeners = new Set<(event: PcmEvent) => void>();
   #capacityWaiters = new Set<(error?: Error) => void>();
 
-  private constructor(context: AudioContext, node: AudioWorkletNode, config: PcmConfiguration, producer: MessagePort) {
+  private constructor(context: AudioContext, node: AudioWorkletNode, gain: GainNode, config: PcmConfiguration, producer: MessagePort,
+    releaseContext: () => Promise<void>) {
     this.context = context; this.node = node; this.config = config; this.#producer = producer;
+    this.gain = gain; this.#releaseContext = releaseContext;
     this.#epoch = config.epoch; this.#nextWritten = config.firstMediaSample;
-    this.gain = context.createGain();
-    this.gain.channelCount = config.channels;
-    this.gain.channelCountMode = 'explicit';
-    this.gain.channelInterpretation = 'discrete';
-    node.connect(this.gain); this.gain.connect(context.destination);
     for (let id = 0; id < config.poolBlocks; id++) this.#free.push({ id, buffer: new ArrayBuffer(config.blockFrames * config.channels * 4) });
     producer.onmessage = event => {
       const message = event.data as { type: string; id: number; epoch: number; buffer: ArrayBuffer };
@@ -114,9 +131,19 @@ export class PcmOutput {
       blockFrames, poolBlocks, primeFrames, epoch: 0, firstMediaSample: checkedSample(options.firstMediaSample ?? 0n),
     };
     validatePcmConfiguration(config);
-    const context = new AudioContext({ sampleRate: options.sampleRate, latencyHint: 'playback' });
+    const context = options.borrowedContext ?? new AudioContext({ sampleRate: options.sampleRate, latencyHint: 'playback' });
+    if (options.borrowedContext) {
+      if (borrowedContexts.has(context)) throw new Error('The borrowed audio context already owns a PCM output');
+      borrowedContexts.add(context);
+    }
+    const releaseContext = async (): Promise<void> => {
+      if (options.borrowedContext) borrowedContexts.delete(context);
+      else if (context.state !== 'closed') await finite(context.close(), 1_000, 'AudioContext close').catch(() => undefined);
+    };
     let instance: PcmOutput | null = null;
+    let node: AudioWorkletNode | null = null, channel: MessageChannel | null = null;
     try {
+      if (context.state === 'closed') throw new Error('The borrowed audio context has closed');
       if (context.sampleRate !== options.sampleRate) throw new Error('E_RATE_UNQUALIFIED: browser changed the requested sample rate');
       if (context.destination.maxChannelCount < config.channels) {
         throw new Error(`Output supports ${context.destination.maxChannelCount} channels; explicit downmix is required for ${config.channels}`);
@@ -124,19 +151,27 @@ export class PcmOutput {
       context.destination.channelCount = config.channels;
       context.destination.channelCountMode = 'explicit';
       context.destination.channelInterpretation = 'discrete';
-      await finite(context.audioWorklet.addModule(options.workletUrl ?? '/vendor/ubve/pcm-worklet.js'), 10_000, 'AudioWorklet module load');
-      const node = new AudioWorkletNode(context, 'ubve-pcm-v1', {
+      await finite(loadWorklet(context, options.workletUrl ?? '/vendor/ubve/pcm-worklet.js'), 10_000, 'AudioWorklet module load');
+      node = new AudioWorkletNode(context, 'ubve-pcm-v1', {
         numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [config.channels],
         channelCount: config.channels, channelCountMode: 'explicit', channelInterpretation: 'discrete', processorOptions: config,
       });
-      const channel = new MessageChannel();
-      instance = new PcmOutput(context, node, config, channel.port1);
+      channel = new MessageChannel();
+      const gain = context.createGain();
+      gain.channelCount = config.channels;
+      gain.channelCountMode = 'explicit';
+      gain.channelInterpretation = 'discrete';
+      instance = new PcmOutput(context, node, gain, config, channel.port1, releaseContext);
+      node.connect(gain); gain.connect(context.destination);
       if (options.onEvent) instance.#listeners.add(options.onEvent);
       await instance.#control('bind', 'bound', { port: channel.port2 }, [channel.port2]);
       return instance;
     } catch (error) {
-      if (instance) await instance.dispose();
-      else await context.close().catch(() => undefined);
+      if (instance) await instance.dispose().catch(() => undefined);
+      else {
+        node?.port.close(); channel?.port1.close(); channel?.port2.close();
+        await releaseContext();
+      }
       throw error;
     }
   }
@@ -197,7 +232,7 @@ export class PcmOutput {
   }
 
   async #prepareStart(signal: AbortSignal): Promise<PcmEvent> {
-    await withStartSignal(finite(this.context.resume(), 5_000, 'AudioContext resume (user gesture may be required)'), signal);
+    if (this.context.state !== 'running') await withStartSignal(finite(this.context.resume(), 5_000, 'AudioContext resume (user gesture may be required)'), signal);
     // Queue messages and the start control use different ports. A snapshot
     // handshake alone cannot order those ports; await a concrete primed snapshot.
     await this.#waitPrimed(signal);
@@ -255,7 +290,7 @@ export class PcmOutput {
       this.#free.length = 0; this.#inFlight.clear(); this.#listeners.clear();
       for (const notify of this.#capacityWaiters) notify(error);
       this.#capacityWaiters.clear();
-      await finite(this.context.close(), 1_000, 'AudioContext close').catch(() => undefined);
+      await this.#releaseContext();
     }
   }
 

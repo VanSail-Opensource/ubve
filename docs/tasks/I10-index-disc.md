@@ -56,3 +56,5 @@ After package compilation, `node test/disc-browser.mjs` runs the actual module
 Worker and FileReaderSync under Playwright. Run evidence records the exact
 runtime and fixture hashes, browser version, hash matches and worker closure.
 The recorded Linux headless result is component evidence only.
+
+The [packing matrix](../packing-formats.md) adds actual browser playback of an explicitly chosen original Blu-ray clip from a local ISO or BDMV folder. It does not substitute raw clip playback for the playlist span or prove transitions, PGS, remote ISO, or whole-title support.

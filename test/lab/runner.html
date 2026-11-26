@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>UBVE lab · Test device</title><link rel="stylesheet" href="/lab.css"></head>
+<body><main>
+  <header><p class="eyebrow">UBVE · software playback screening</p><h1>Test device</h1></header>
+  <p id="status" role="status">Joining the lab…</p>
+  <form id="pair" hidden>
+    <label>Device name <input id="name" maxlength="80" required placeholder="e.g. Living room tablet"></label>
+    <label>Model and OS <input id="platform" maxlength="80" required placeholder="e.g. iPad Air, iPadOS 27"></label>
+    <button>Pair device</button>
+  </form>
+  <div class="actions"><button id="setup-audio" hidden>Enable audio for this tab</button><button id="stop" hidden>Stop test</button></div>
+  <div class="screen"><video id="video" muted playsinline></video><div id="overlay"></div></div>
+</main><script type="module" src="/runner.js"></script></body></html>

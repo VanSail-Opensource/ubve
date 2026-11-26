@@ -1,0 +1,996 @@
+{
+  "schema": "ubve-modern-software-fixtures-v1",
+  "cases": [
+    {
+      "id": "avc-baseline",
+      "path": "avc-baseline.mp4",
+      "sha256": "128cd091144dd69a2b6e0368235c82e5edf9b098f8f3c1a4a42203fd8a22acbc",
+      "bytes": 25347,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "h264",
+        "profile": "Constrained Baseline",
+        "kind": "video",
+        "format": "yuv420p",
+        "frames": [
+          "35a7cf3bf9fe79ee38be53c29d0119e456d85ff0d2150754a011f9fdfa31bce1",
+          "ded1581f6d8921a046f947acc5d7b196841d211412b07a7995187b98c3fae3ff",
+          "d6c36b7b2791df10bdf5e31252ed1d2f5556592235f570c955a86d7bde1dd927",
+          "c2b8a4b34b0a33f314e89c351a26644de34047e0298077a103a51582b05d57da",
+          "64fa02ff0b5a1c7627ff0f7c814f797929d526ddd5bde19a01cdb8f0ae30216f",
+          "5253155547a017dcebd0942596d8e20668bb89b8940ed8077e5547818ecb11e8",
+          "4f94085eda760c55f08a986429ac20ae535ee9bf41f8ba4f9d0e9f271d2ff4eb",
+          "97a4471055a594171724a8b5efb2c4137cbd0fbc650d57c722027796fd48aba7",
+          "338b7433858ccbe07196bd759a42aad0ab4f9317e468827380874832309001af",
+          "e18b39a738fad696430cca245f4b746b2e8bf0463c662897b54655e3441dd3a0",
+          "fee5ecf9a908150ad8e8d5b9cd5d7cbc249c9966f5c2b247b568765969933796",
+          "7eac7f693095abb181a8fd9f2027501cfaf4a1092325cedfc1566978a2674d1c",
+          "c8cbb91579b97febd88ed6d6260240f8c91216b53679db57a6b68a41b01047af",
+          "a89d82d353cd96223e61a8182f92bd8ce83305e88989090b4c794d07248942e5",
+          "7614ab74b8faf6a729f29d9e272c32c604244e364d9026b8c52074d79004b32c",
+          "d776db370a428df5f33691d538d803431799eb3ab0c5bce18f4d26c707f461f3",
+          "75e08ebdeeab081a33c8eeb6bb1e3202148454f6ea920d5e56f541f14bbc45b7",
+          "f2aa669cc66de85c36554bcce02ae26e6641f3d2a50cd6568b48ca50b6ceb69b",
+          "7357406f25a462b11e873169f3272a3b144e53d8d8b66d1bfb1a612eb075a9a7",
+          "06915da8f15dec3053a4c961468fc238ac2663067cd5ae07ebb623337db29e63",
+          "03aa4e8f6996d7f1ef265cd376c332068279b00215cbfa890f5deb489c2f968f",
+          "362decdd80ce62c5f0bb26eb0726e8d8d6fbc8c8afd5f64c070e6271e15483b6",
+          "c902645eef9636ea74e52c416ed61a1e23dc761c211a0d1470573b5e5ab2db1a",
+          "2610eed6ca4e50faff1ebdbf56c9488273f69362e4618bd03713f7dc2aa8a8d1",
+          "fee54e68815f4d8442767b3812f2a5e75710673d5776bb1916e7d854c54b6df2",
+          "f6c6e73b7e9724d740001cc9ba6ff2121535641123bfe312a2a0121b89eb317e",
+          "3979c2ead1da091792c0eff3eeaa030d4cb56f52540a17c5894fb96472b729ae",
+          "dd55e3c20f355cc21e22163def02b3c93afeab3d487e495b4ddc2fb89cdce753",
+          "8f52ad4e8fbb17a1c6e8c24e0479cea695b3d7e440f0bbf1f442944e4eb3498a",
+          "0f02ec74c7f2d10bc141c97f2ca5cabf283c776afab5561752c14c997423ae53"
+        ]
+      }
+    },
+    {
+      "id": "avc-main",
+      "path": "avc-main.mp4",
+      "sha256": "f5c214a4f6a33baef342ef8b686238660afd85bccd93a795cd9b643d318d9f42",
+      "bytes": 23318,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "h264",
+        "profile": "Main",
+        "kind": "video",
+        "format": "yuv420p",
+        "frames": [
+          "545c5b42ba35efb8f92cf1ba0d8a0e0aaedc33ec5e06e639ea74a935d5a56cdd",
+          "a84414aa8102998c9e448252e8ed4e5fb4fb19167011c47fd34a9b3b3723379d",
+          "f4a30f4c1dfce73561a9c87db79132ebbe84de7c38dc54b765090fe582512996",
+          "8496c00cfc7c8d2c1585bdfd428b19ca385d1cce8f6a65f8e74d720c7069aacd",
+          "5c50e3e5a2cebd3b60cd8345e095bdd1edb487cdbe4b57c39cfb1c868e4d5171",
+          "5de146a480eb230fc50bf63b370e94f9d6669f91920daab0f54316d016bef8b2",
+          "05cfd346681f2aaaf1687fe59508c5d74e2d854feacc7752aaa92d79accf925c",
+          "71aff32df677c2df087eff2fbad4593536d7076d6b76929da018f60ea505b730",
+          "c327bef514f01f8f7a56848384bdece84d53c029a317a3afcf2409ed6eceb104",
+          "b8311cf1108be9ef2f2c53861f5d6e05b335ed8e091bb0b9031312fae9d26d43",
+          "ec161219ff1eb7f662dd3ff4a6bbcc9c592c17fb2c1f5c40fd6120431f15502e",
+          "5ab9b8e7a042aa4988484ac76ec2f17fefb63117d1864bada7aa3879f12e5c66",
+          "f317e40d586bb2702c2ec5f09ac71005502e1e1b2d505f9d072be3d92102f24c",
+          "83184792a1d755b653e79e2ba92909c5888e14fa9e41a7e2e85d7d421fa7dd92",
+          "9634776c04261e2a4fa98eae55041ce7f835e5e6796f28f3d3da27530d6eaf17",
+          "9e44c7401545637fcdc54bf5dbfb971bf7cfb63bf8626893b476b76ebf12af67",
+          "20beb8327b8aa9614dd3a1311063e559385c5933f8cca8017541576478d2f57d",
+          "7e42e1be3a153773680f8759c3036988aaa631a028b04248467d4cb0575aeafc",
+          "e51664fae3bd386b93463195a3f6368f119d8188dd6f5554835d84fc4cf27817",
+          "2cba9f59443e58e67d4d57afb1e4f26fa02a2faf44c4bb63bfa7418eb9817f63",
+          "6c849cc14d72a433202eba070cb1e5e437966385b036ab8436874d0040f4d0f7",
+          "c17444e991bf38bb3caa16722b7d70e6e27a650f527cb5a9a46a2ff42ba4bf2f",
+          "5cdff6e4771bd3c582e98886649dcb00637e51d44c352659747b22a11ce41df1",
+          "a92759d3ec263fd12f9c822bf58e679114ca94c1a0f0f117c685cd7d5aa72b20",
+          "f45875668d20bddd5d5c8dc693e9786b0b0fb95e43548420c5fe64118968c959",
+          "39263f057911946df9f0c8ce7c572ecae822f2055f6b0ba4e3666cdacfb063e0",
+          "42fe8f1494797b6a70bd71459b767969f9db67f6d841b3404a5181a4c5deb277",
+          "64fa9517d84aa340283770f9181b22ba1d03245ea30836056f8d8d478af31921",
+          "f7513afdeac6b07e36f2c0916fd6dd3c695e9f62cfd0fdaa8bf114647c4a2ef9",
+          "a7f1147465b7209912e49bebda61f7296aba724ab6f4f194dd47a4768d73857a"
+        ]
+      }
+    },
+    {
+      "id": "avc-high",
+      "path": "avc-high.mkv",
+      "sha256": "184782cb64b4be083de2d5b0cbd012f382df6254a549b259e6e734693deeb6df",
+      "bytes": 23243,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "h264",
+        "profile": "High",
+        "kind": "video",
+        "format": "yuv420p",
+        "frames": [
+          "6b283d0e5de5ee23c439d3b8db094d1db11f7d4b5e23e1fc08d05e68bce506f2",
+          "35d94c1558984c5bbb6aecbc55d1701c5f7d28157575c713abdff97da59ba380",
+          "e7179b3985cfbf7a6a6fbcca9793eec328711c7dadf9a0c4f39f6de6e81785eb",
+          "bf2205825940e8b4b1888d39849159106416f174239ba79886aaac28283544be",
+          "e5933360f18f412137d1511bc43ba024f9cc7d334c0aa05aa4153b27bdad516f",
+          "1769fbf1b9bbb37479ba8fa3ebac069f532f40083a270cd2cb7db1bd4a6a469f",
+          "d1c6714e052b6840e615b46324dea95aaefff9ffcc2f14f82e3e92584ae1b52b",
+          "e168d559e177a65c3dfc4f0e248b0b115406b0a76f49347bae3c82d1eef180e2",
+          "c5aff5e52fd7a13709d385f154c2e47627582ac307c6a1b5390ab0959e83299a",
+          "aa37bcd39ad7422fd42193c0fdd17cab83343665ce6b170dcd87f95fc5117587",
+          "0a88e484b59fc7b008f2a790a973d0bd353d3496c521cdeb506ae8b44cf803e0",
+          "2443ccc628476a68c633744f784173dc747d9c322307642fcb44d5cf001e75b1",
+          "b3eebe3aa9233c2f49113c77a532bf14891c595dc91f5efb1d0495d206358090",
+          "4224116af27e644edcf422b718887ae31d71de2f189d29abf2992dc956f039ec",
+          "6f432cd2e9a80ac79b110126c669fd00be5ffb2861d269174c82d581cbe372bf",
+          "3f34e0ea238361ad20926f3c6e8e6ed32c0c3f9e9251695cd00e1c0ba2d0ded1",
+          "dc3a33a375e8ab048e544c6e42f351d2f2fbe7580fdd90d88eef3e71d966d9c6",
+          "58e8c4cd85d56204c311167c6f4904d7602468f0c9b033b2a6b6931ab0ca4ba1",
+          "7edd61462acde42e4ea7c46cec0c9b576b9e2f76b72fa423d1bce459e5b2a132",
+          "6bf530d6fe2996909ac125ee323a84cd9153eb616168080e79f1ee8247346164",
+          "db91c8902060ed1766732b80f8237fcee9ca28467d4edcdc0c7b7c193eb6807e",
+          "b15525aa45d307704687fa73f1465cf073f72e20e29ca43723b1e57569c8ba70",
+          "2f1ebded1240e067fb5d6f62f633d8b616e1a1f126fd05e1469a6aef037aa65a",
+          "c286b7db73a9226006ac56e0436ee266352967b03b6c68fed75daadbe1474e3e",
+          "23c8f5774ebf313999c337287ae9d21054ef4e558fff4d6696f945a944659c01",
+          "11205769c17ab20300a3067cd7406216b973ad6cc06ac9b6dc837a5ad943b015",
+          "db3d43ecf172d17a9b2e703a7bc235c4aa3b2d1bb1f6fef48c5115eedab11946",
+          "1960d8b916fecc1287decd09c445f3fb9ed4979d2e6179708fbf5a2f93c14512",
+          "569730dcae2cdea4c31c487db55576dd74abac59e25d54afc3b5c9a042d3e30b",
+          "af48586d60a373248008899d3f5aaa4ba3c671f5cadb6be6da8e9b2c8877ba99"
+        ]
+      }
+    },
+    {
+      "id": "hevc-main",
+      "path": "hevc-main.mov",
+      "sha256": "18a6194f81181021ad05c2d70ce0c856826dd7e080f3a2b95e22c0a577b5ab74",
+      "bytes": 21968,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "hevc",
+        "profile": "Main",
+        "kind": "video",
+        "format": "yuv420p",
+        "frames": [
+          "cb474056d4fbcb1161887117855198755c3f54f03c8c3c671aab8313f3375fbb",
+          "77e625b870fa03f2a354aa40891cf7ae34d92fe227a4cff553ec0c9512f89ed3",
+          "0b264cbb20e09a743228b4a6c5aa81f156d205789b0e698e9d1ccdaa6d422211",
+          "e286d380062b70acd680103dacde052e7e9231e0f19e451fefe95afd8a35aeba",
+          "a9a5719574f6920d0887a34f6903b862e4144b32361f80db4cf933063f5a9660",
+          "9a72421b185f38e2d00afafec3649407af33c4dcfc610d4cb9cee5ea59825ed3",
+          "277d8a820e658d82cd5b74f1f49ccf9a119ce6e83627dd2f780d3eaca36b46d8",
+          "d7659dec476d0ff16413c18879fa5893d6c5dd8b29a8e4a8dc0125ea5084da7d",
+          "cba911ff1731ea350c7e190157456499185681236417023e3ec0c29cf865ab9a",
+          "a2e449234af9ac3bf3c7bb225b8022be39cc48272792cd2acede5f2bced7da5b",
+          "99af2b46f99573e028e9a693a3423f71d669db94151ff9f8d8acd176f3ae7cb3",
+          "d04354fd4d1251dfe37c11b26c2366c9be7525614bea4443a0bf757946346ca1",
+          "51ae9b7c80adb345eb06cdcba262cd49735e7ae02713440d3982e75f8e957949",
+          "f68a4b322e874b052d4a244284b4823cf09e410ae3e414afcdc0d189e83e3edf",
+          "0184f6364611fdcfe8fa2af80864e212c315f98f14f36abfe93cac96c10ea8f2",
+          "11680dc52a117e79c9bcd5abf2e5dd1704c0ed3458e8f5bbf0beff5a1f3367b9",
+          "edc9f2060087784ed9158e26b5d23c4be32e2fe05fa540093229c607bca784fe",
+          "3eaead80b7d0fd1aa389803fb048de1243ba5e47d56a3b827ed3a7ef8a3e3e2e",
+          "68d0dddae01d41539cfc3df44e87ac6fc2afd42d6ad64fa1adc52b2db50f1f83",
+          "96c81eb8b8be3ff094406f434bf2684148d1933266f99b9edf29b2b38d2a8c69",
+          "500d430be2878754ed26645368bf3ce218cd499d82b7f979bd7449eca8995af1",
+          "d548408e1edfebf174d3f4e118785c1953b21b9b26ad8828d032b6f5fd590172",
+          "bead46d5a9af917d92cbf9e680d282c409b22045a0fc326951b1e846ee0ecde3",
+          "e4a77c2f9f2cce57afd8d87fd2b129f7478dc49a71f06098ffaf91b553058be1",
+          "a38bc2807cccc085d4a2ac9d6b3af70b2baec29f57a8d8153d98df1dc9e065d9",
+          "2dcda4472ccbefb8256763f73709d5593648fd3c030ac2f92b2814a9b6aae219",
+          "81c47d3f2e9a77ab496ac6d19289a94eb10752875f86d0573c4ee47a39ff022f",
+          "5ac331f4846d5579bfe78e3eba6318fdc87caedfa6da00110c58f43135275097",
+          "5748bc7b682d81c6ffe4ec1a05c20619042675625cfbeb98d91d3cd8aed376d4",
+          "d37e63eea093957a36e92bf50e3fca1f0322587546af51fd4b65d4193081c786"
+        ]
+      }
+    },
+    {
+      "id": "hevc-main10",
+      "path": "hevc-main10.mp4",
+      "sha256": "a3208c18938579be516db4e4af675489387a3b22b8cd204398cf4a076757f0b9",
+      "bytes": 21948,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "hevc",
+        "profile": "Main 10",
+        "kind": "video",
+        "format": "yuv420p10le",
+        "frames": [
+          "941b0f0f6a4698330cded0650f82bbc9c42dcd8d234c669e600556c98b86bc38",
+          "492e5592641a53eba25d9b3c520eaa3628db7b67b1029292588c37bdac83537d",
+          "58822206979c15e7d75c86dfda01d143e227e2db62359d124df009ab31420657",
+          "4633c0a24d404f5d280be67e12d444806d29cf10ee14ad1e812522963504904e",
+          "645a8ebdf151d5c47f841146581f4222a2c33e68e273473a3d978255a3560755",
+          "0fb4c25f3d7c51ac6d5d452dce106cfd7292d8aa33a969d4817ebc1474b8dcab",
+          "f62695c96ebe31807fcfe5dcd8946e8b0a08cb769f8fbeddd2974645875f0d76",
+          "f3518a0a4115a84aed154aafe9aa07a0e72150003c0e95e74be7642e39901380",
+          "996a18fba66515265e86e05afbaa860c752f16330a12a2d81aa39c04b70d0118",
+          "36ebb26059f09c7654d2ffd3c89b10bdf546d19614a22e85beb8f884cbeccf0a",
+          "dbbc353c2cff4c9656a94f117a42206ebab200717cf32208eae384d4c9398de6",
+          "86edeabffccff5fd7b2a8bf11487cc604b5467f767a955b9498641957afdde64",
+          "c0970ff65c237d53d849e5705f8e85b013d9fb69391bb3cfa39ebcae05eef9fd",
+          "1315708f729389796a8b59928438f383c66b7c8c2801b723c4fd1309aa461644",
+          "6054c743d3edd6138c7d1aa1f8c652f970ac622dd7db9b3c892e38bdaf4365cf",
+          "8e0898524466cdf2821fc008e94894d2005805c7e8e862a3c95395d9727f2f7a",
+          "69258770a83bea68b18cfa465b84a18c8a0240a9833ace7b392f94096f787818",
+          "5938a88963334d999b4162d95af5f3b2deacb9858f13d208f51e4ba9a0b8a495",
+          "187b8268bfd8f82c0dffe6764109c54d084c80105b13662626cb1634cefc948e",
+          "c0a872ab1fef83224b1d71207264077c7ab2482535f9c177c03af7425fbc9c6b",
+          "22ee80a842ba149fc8e56a93cd69502a70ab3f3137c6ae15e3913e995e804113",
+          "27dddeb9c987a160b6ec4ef9542a60d06775d829eb2fda2feef01db753ee0d91",
+          "2722bdfc121d33d05a05515f319e991882ca368428f4d45dafd5d2dbaf310e39",
+          "d71daac1ee6c3fd1489ca2fb0ef00ba6345721cf31ba30dd8d67907301d3beb7",
+          "52bb80323830bf2fd1c48cbe9f849c6d057ecb93ba1ea98136e7f4520779d71b",
+          "c552fc19da7a78556c8e59262abadc944335cd88932c4b0ae17c53f5d7b934c3",
+          "734ceda62f6677adca7afb2d1e63e6e148c094565637e38ba24dedaa5a72eff8",
+          "5dfc054d2639db0f70767e540095e4849a39e59e31278bde7f297f1b93062ea8",
+          "042c5efb474be416e5ad14aef6458a0d575fc4efec452c387c5997ef729accd6",
+          "213edbe89f9a59948c2db7d5295556c812deaa5dda8c015c1a17babfc4e248fc"
+        ]
+      }
+    },
+    {
+      "id": "hevc-main10-hdr10",
+      "path": "hevc-main10-hdr10.mkv",
+      "sha256": "6a16edc10d50555215914444da22be212970ccc08e9f037406c2c9e4228ee7bf",
+      "bytes": 17500,
+      "quality": "performance",
+      "expected": {
+        "videoFrames": 48
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "hevc",
+        "profile": "Main 10",
+        "kind": "video",
+        "format": "yuv420p10le",
+        "frames": [
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "f3f47fdf35c18ab956736669c3b18eeaacbae26f5677b2bd3c2c34b1e1a81b0a",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8",
+          "5a7243a719bc288eb2ad512b952cef2678b1f19aba09470663c818605be2aff8"
+        ]
+      }
+    },
+    {
+      "id": "av1-main8",
+      "path": "av1-main8.webm",
+      "sha256": "5445d98debf7c24503f511019eff8985040502c0b343d9a86cec0c520dcd9e76",
+      "bytes": 12579,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "av1",
+        "profile": "Main",
+        "kind": "video",
+        "format": "yuv420p",
+        "frames": [
+          "474017a250d7b78d129deb6b77494ca2527c8b790260bc317201c62fb2f4b8b7",
+          "bcb96c264edde1dd2e889684609a3dadd3b3c1ecbc3bc37540fa0ca6c3f9031b",
+          "5da2c4369a719c4ac3bcabdd0d330512adf94ed11902af5de676b801d12b0319",
+          "2a6a07ec91b9b6b4b3f87432fc9e034298628aec1f8475bd13a2e1746d950f00",
+          "2e4f80b59d2c1acea15199bb8d787da13aa6543c011924eac0a26829cf393209",
+          "d264f4987bd0cd4dec1f7027322100b59b5652f940ddc2c85ab2e4c3f3eef948",
+          "c5535a133b7cc519f0d659cbb203418bf971a74fa48ff9743feab29adc940e7a",
+          "148c02215f67b653702d14c997c8803b504d83f8ba4866a2b3fd13ce71139a69",
+          "fab75f4aa9f9dc77ab0d7c99654dd15db05569e117c5bbe29c2c256ef2f4fd1c",
+          "cc8ad293b51aaada6a1ad277ccfc262645da053ba051bbf3f52f11a2a6c9d496",
+          "03f7db6b4333362c6871dd122adc00793e0a05627e624d2705e72baf70925e3f",
+          "cdcae904145c67329d43555d0bf91baf0e4db58209eca5e0370a5f4c9a910317",
+          "6b854fed755754143ed443736944e6204c807748b3c6d25728d8f9aeb104fe3d",
+          "af2f66ea42bebd60d04227125a00bea5c94b520d6c6c39c24d2c1817858b2bdf",
+          "f668bfa08939c576a0c099a1c3c0eb8c9b9428b0e0404772cfed9af14da71cbf",
+          "a902333733b1877bc5045484ead5741751a0bbecadc4f1f3d790d152f6ccdd53",
+          "235a267ded0d425a26df43a06fb0eabdf65d25d6f5fa8118b8bda0c4e09156de",
+          "dcad5c78ddaa98fa35e17faf6fe1779340b93acae8144382aa94c9bf8d2e627f",
+          "0a595bbe4130387e514ab421dd00f3e45fbdc8a62bf561b736d0a5cf6562ffdd",
+          "b4d54ffd152f313cf7a85eb3100afc2533940f70da2b91303472ca2b5d3619b7",
+          "032fb3eb84265c88da395362dab9e2dd99353b15e9949810c8d09a816055337c",
+          "93a36fee8e24292fd8ddf7818a37b5b16a12d10e751a6337603bc84da235395c",
+          "fc8737d8c8fefc09c4ff5b5f086f790df03ac594694260735752f53ae59da66e",
+          "d6cef1e74d6c9b8080d755bb922ff131de40b8f6bae055f5044672392eb9163e",
+          "24b6af1a829837d7ce40ba3c7f452e40c4ba5064ec476448d7222b0c28de7d35",
+          "7136ef6999de8af63c25e32e5532ccf2a716785c4fbffda3ca6c47dd4dc1b856",
+          "56791d2b176ec0451789f958506a91f3eca9ca587a742bab201f8e23ae657e59",
+          "bd59a8f87553738a5200f48559e4af16ce729122b4e9e2fc835828a6687babf5",
+          "c88933d53410e676b2c62d022a0a05795027983be310a299d1a0f1541fb490d3",
+          "29114e8e01e1c5367d2249af48e6a933a759c14f655da40e906e7ede622acaa8"
+        ]
+      }
+    },
+    {
+      "id": "vp8",
+      "path": "vp8.webm",
+      "sha256": "ae3c17dd463171f3d172f5356153544f795a46c8fcde2ca07afb8a63d8dbb16e",
+      "bytes": 31524,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "vp8",
+        "profile": "0",
+        "kind": "video",
+        "format": "yuv420p",
+        "frames": [
+          "b91365d0aa8755d20b8f702772ae9a00aa9c3a9b721c9e66b8fb4d4ac91c3c59",
+          "ac8d000cf80f946094b7982c6baddff8c16ca9448b7c63840f3566f82282dd11",
+          "ab137c611107dce113062167150272ec9cd324a48754a7bb364452f763383b0c",
+          "e296f6f6e5ec6051c00c20736fca32d4f6a826945a4c28283630b46548748bc1",
+          "43649a59d7fc108f92fc8f65f0830621064dfb7389e64327bb5cf27d791ce6cf",
+          "da46ea523e6accc29f8a88a69d9789dbfe916dd2972473eb0ba069b09bf43765",
+          "f8c69bf00ed57475538194b13ed46a01913e37512f1ceb084aa7b3e0ef947374",
+          "00da3ee59989ceba8beb4c3e2d58d1cd9f78f173d3099a2bf643847cf7fc98e9",
+          "207b9900cc0e926eb74b3632e3d7f9b4e9d785a05a766ae4fa05032bb38380d3",
+          "b83c23f2de2c062d5ffa41e569928e88653211d1aba401f00a9aefbbb6ab1268",
+          "f43918a5d384de6467e3ed47802e567cfa7817212d949e1b1bde7fca6c238d63",
+          "d3e7397bff77ef3fc4f67a5d2e94f63a4c5f939aef306bcc60e327df3916a9eb",
+          "0c86d79057ab5b4b0548fac80506b574d3bbccb5c583fbada2514ec366988d1c",
+          "e44c3c335d363adf3ee91e48cede11e9990aa0d4205e127dd1a898648c4e5f34",
+          "a54f88384a3e9266ceb5a0a31bbff430aceb148f0396d01f22d1c59d40941165",
+          "ca5238439f47f0d54a04c3d42960ed6862598c9bf0e0b8500f0c15effcd6005b",
+          "2bd6e731f6399aa69edf509e871d2f8d250869609dcee855ac4858f13f8a5469",
+          "9b1424a698f38725da06da8468842fe562729eab242b2562e8ff1eb6405e865a",
+          "3163a3c2914c84226ec18b721b2203372f3abfceba374ce9d9df01d3123264b7",
+          "2976664009b36510b5308c34717e90ee6398230f5e2cfe69a197f4fa21a8f6a7",
+          "282eb860a6db9b78dbad531bb471b0dacaaff05b1ffde9ccd3b5577538dd457e",
+          "459b2ada1ee2ed46504ac911d4802f1a74cb11cf7375c0161ce7172fc22ec50b",
+          "4e98bba0858cd7be1d5e7e6a1d46eec5883e44c00c33d3829201c3ee786ece2c",
+          "e8557d882c102c89be7ac9cacc8d944740ae0ace254a3d581ad1dc7832d3838f",
+          "d8dc52640fee6996868ff01cf27af0afbd18f51a09d68d7a9ead4e4985952c94",
+          "c57f963ef2e32d480473f9502d39dfd7b60a7385ab7b966efb41868d899da346",
+          "41539129baaebfaa8c1473c66b7c020f75881599fde46ab761af71a11ecd0df2",
+          "86e16b2b371897bde48037463dccbbf696625d8837fbbf62f90e79f390acfafe",
+          "5d2f4e7f1747fd9d9bfae6382a6b8fa68e90510f82ab4b4e2489d9d76d028dca",
+          "a5d4db6b327f36d6e6c2eff14717edd7db57f674f4b75d0e61200c46c6101b81"
+        ]
+      }
+    },
+    {
+      "id": "vp9-profile0",
+      "path": "vp9-profile0.webm",
+      "sha256": "8218d93a9db3ed16a80c5a915f22dd768edcaed644787f791aea9995b1d6907d",
+      "bytes": 31158,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "vp9",
+        "profile": "Profile 0",
+        "kind": "video",
+        "format": "yuv420p",
+        "frames": [
+          "08d0ca6d33bf58323e78e275d895c5dd1faf2b474768d71735ca21e6cee173f5",
+          "ef90190f4813c5003a0c63ddbde951442f00d17e9ea843da3baf155b37b371ef",
+          "8d33a50b64d3f81f1bc09880cbbd195871399a1bdedde34cc0898e9e77e9cc7f",
+          "6d45779b8428ce16872bf82093c1f2e3b0bacd021141f20963b4dfb3dc77220c",
+          "3171af4d8cd706e14d456d7a919ea171c5ed6f1eddf42f0d97b6126903b171c9",
+          "73fe3a14f15f4c4a1cc5fb5dfc48810533443859483170f5e7577b7b81896a65",
+          "89180ffcfaa6e73e4de10c173a4d3564075165a386681438c6a390a4b70583b0",
+          "d073b4d749335484e0645adb6f2d9a26d1016397782bfa5937952e8800bc1a69",
+          "9794f42209657fe7a2b2c73f299261d8243d4adfc23b2c4a2637b2f547de14f6",
+          "c0e9ab1ec4c1b942e821509b5716394ca46d10ba1637c5fc103ddc69a2dc376e",
+          "a07743f90d300d4bcdd96afb2ded1c35e3be1522a7a2659879f126d25a700a40",
+          "f57e4b5fa5a857786698604401b5a834d7308edddaff2417efe820390e0e0bc3",
+          "1a0aa3deef1264a1b42ac29226431efab0b84ac28dd5459c258567964f970937",
+          "ebfa2c116b0ea239ca479eace31bf77f17c92c9ceb3ca90bd704e15bf80c8ce0",
+          "7a305f980c36aca007ef4d85c9e7e39c1fa79e0c1fba1e6e9055212cb770478d",
+          "c23efb788a71f5505f01609d15a2ee3c255a4fd8e23b8c551313f7a78592331b",
+          "13120eb8efad7c1ac028720b562d65edc751776917db1cc9e6a4dae00151fb20",
+          "0a53dd38e37c0389eeda05725729d2d628a3465d6da6cb275fcc392bb0141f6c",
+          "0524eaa719f4f8f05bb11ed540427c84e8add5917cec380228200b2d03b49f53",
+          "3df698c6b6d7ff9b202d89dd772df94ac79e31a8ed5134aafca50ae058704565",
+          "fe7196d1b41fb6cf67c560bc9f332c78423d0d767dd6acef169ff4af64607ab7",
+          "02ee8e085adb3d29ce7e3353a2bd4395985e86193ea3e06fb218098c7f0a6732",
+          "d01a67597461216153b46828dc2ffe90cede6d85c283052e0b8e4121aa5d2475",
+          "caa94ccef5b3a996114e398883540e38c951464193ca18bd0f222003a77dbbe4",
+          "e08a39030aef0e4e75320164b15d6f361f4124d46b262b1b2aa8748963f78613",
+          "0a07124f7a04f4fc3f2c33a6dd79d18e8895b58e721fafb10e21968f7bdcecd1",
+          "82eb3b61915ff067c699cffd891957a8caa619545491713279744a7e6d2f488f",
+          "da126eecd86034179ea9e378945e496c4e2cc6f4864d24c6a941845be1052cdc",
+          "89c7212e7a006c0d6f812186e52ec945c23539c7347d186cf932f7694e816418",
+          "ddaf5fe017cde89fd8dcf26255b8214fffdc930c017e9e5897929e391517dc05"
+        ]
+      }
+    },
+    {
+      "id": "vp9-profile2",
+      "path": "vp9-profile2.mp4",
+      "sha256": "5d0d8f094da8ffa14f43ba76fedfdf5c6d0a6dbc4ec361363b28d336737901e5",
+      "bytes": 24245,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 30
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "vp9",
+        "profile": "Profile 2",
+        "kind": "video",
+        "format": "yuv420p10le",
+        "frames": [
+          "88331cf1e48d2f113875af1248eb995fb07105e01d4517c9b5ae10665fbfe034",
+          "7a61f2c61259a0b802f23c8cb695e8c394d32691fdba2115147459cb38b46cf7",
+          "f3c5bc7da9022698a2c55762ec2037aa245b7ba806fb49fd01758c09d964aa21",
+          "63c6d9684e21885d0ad8c1569977784e1ae3c163b00461ce75cf3cbb48c97eaf",
+          "ca655d048ef510065c6c2fe3874af248bfece68fccf0296add81a8dc51bd2bd0",
+          "da425488efe89291aa9e77068dc2b2d8e01caa462730b1e85b4a779fed316fa5",
+          "80def7d85fe2fdd4e01461d185fd76ffba347f784cab7df75b50f44db394f6df",
+          "6336324c83446cc0f9557cbf8285660222f516a8c5ada6c2783c7cacb9735242",
+          "befa4a31726810d6ff1c1c5705c6691e67220d7e97d95ef1be6e9140be523465",
+          "16538c48ba1c5441a6453bebc908ab5161f102b33c1b2db85156982c20e79b32",
+          "753703db078dceba211858c3e91793b87f07f094eefe80d20982ffef521ec1b8",
+          "39673d419f4d1796c59e585367517a59585d149f0c9f35c228a326efc81e7df9",
+          "0a39d7c1a05884da532c69dc5c4fb5f7e0cc01b464aa69b56364ab9aed750bed",
+          "de5db97f33fe8896138a6a0cbd36e8ffc024e76675437bb7bfb7ac7738f98e93",
+          "b2bb580bd5ae07bb98f2ef7ce4bd6a0e3b674ee2f87924d49d8cd2d8556179a7",
+          "ae0166829d2ec03d7963d8172cb86e8e924cec82e10f6f016a5ecd0263554440",
+          "8b212d134264388eb16af5177b2dc7099b0ea35343c2c2dd023b5b6510abec52",
+          "056cb0f1baafbcb2d70eeda9074188fcef27f3d6a5ed89495af099727ad940c6",
+          "e7aac4d7201a9579ddfa354df99f06cd2db30d7acca161e2bd8b215e2d27cab3",
+          "044f19e105706bdcab231541a534503b20a7f6f7255191ea8d3709256ba377bc",
+          "be9515fd0e5e7aa61774a10d7c9060ab0e2b01f2c788f9b7a28cc8028ff80b45",
+          "77db230b53d69c442bad746a82d2e016424660b2d110b8bc17975189d197595a",
+          "f3a8bd7951d4a61ec442496e5d4235bba32627f3b95f76ac7fa674e32062cf9a",
+          "9219f438acd533db5fbfcf6337c1674c45a6c9aed2294c26c8b4803a4e53c509",
+          "0c7bbb4480e931929f22b25c5cde89d9ebcc817d53d63ea1caad297ed6ac0f53",
+          "cf64db0014820b2dd9a07c2afe30778ea5b89ad28582aa26e150468f0c8612e5",
+          "1e5726d9e0c7ca4e6b89c21472872df765b168daa236c44d659c03138a95503e",
+          "9e590926305c4ccad5e5ba413813f506d6c3ac70a4a9b57583dbd5b0976c860b",
+          "d9bfe1fdb3cadd8391f346c16b0f30baaa52dd726ef29690994795e4c6a9306c",
+          "6f4ee9926e378fa6eea532f4efd09abc928afcce5e0c6492699a2a4b689c8176"
+        ]
+      }
+    },
+    {
+      "id": "aac-lc",
+      "path": "aac-lc.m4a",
+      "sha256": "98139c45c41a06e7bfa59fb8e64e1eb5d485143b2f7cbbc4e84450f11a55a311",
+      "bytes": 22057,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "aac",
+        "profile": "LC",
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "9af68355bb515ff320e3dd82050bd7dad79f2423f27a8956290af75866a80196",
+        "pcmFile": "aac-lc.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "aac-lc-44100",
+      "path": "aac-lc-44100.m4a",
+      "sha256": "7bfadd3ca419076a9e4fc6eb8c12384ff524967d5b418f65b6b6db48abcb983b",
+      "bytes": 16958,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 56448
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "aac",
+        "profile": "LC",
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 44100,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "058d030d521e53955f1e760b672a9c03d19cee11a06a7ec5f6e0fabddf2482cf",
+        "pcmFile": "aac-lc-44100.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "opus-webm",
+      "path": "opus-webm.webm",
+      "sha256": "161de020e9917261e4009c9a9402c5759eef59d4b36f6a9bc7b211eb5a51d151",
+      "bytes": 14806,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "opus",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "3a3bc79bcbb214d57eca14df233f988f2f7a419ba15bc722e68b0c891d6c4e14",
+        "pcmFile": "opus-webm.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "opus-ogg",
+      "path": "opus-ogg.ogg",
+      "sha256": "4d12df9ac5ce1b2e2528272bfc919b37161437cd7c1918a55d86deee32c37966",
+      "bytes": 14053,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "opus",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "3a3bc79bcbb214d57eca14df233f988f2f7a419ba15bc722e68b0c891d6c4e14",
+        "pcmFile": "opus-ogg.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "opus-mkv",
+      "path": "opus-mkv.mkv",
+      "sha256": "43161bdf2fad6c89da6c137311bf8a15435a60579bd73d35633abe6020baa466",
+      "bytes": 14860,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "opus",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "3a3bc79bcbb214d57eca14df233f988f2f7a419ba15bc722e68b0c891d6c4e14",
+        "pcmFile": "opus-mkv.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "vorbis-webm",
+      "path": "vorbis-webm.webm",
+      "sha256": "16f8f0632b1b111109278f35f6cab5fb061e1fc9240413c167e36c172f4ebc55",
+      "bytes": 11012,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "vorbis",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "562133ec5a7cc3862c8e31d766f58cddbb5a70ec6bc1db4f68c513cd372cf0ad",
+        "pcmFile": "vorbis-webm.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "vorbis-ogg",
+      "path": "vorbis-ogg.ogg",
+      "sha256": "0f087c8d4dfcbc6137b7d01f5123177407f1dffa917171cc5b620a4ed8a48b5e",
+      "bytes": 9954,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "vorbis",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "562133ec5a7cc3862c8e31d766f58cddbb5a70ec6bc1db4f68c513cd372cf0ad",
+        "pcmFile": "vorbis-ogg.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "mp3",
+      "path": "mp3.mp3",
+      "sha256": "4405c38801a479ba3ec5e179e56ba074cc166c26785ce0a1d0ae8c48ac95d436",
+      "bytes": 10101,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "mp3",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "7dcfce0af5feb4698114c158ebe65c9d24885b26338087abf42c513103e5c7db",
+        "pcmFile": "mp3.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "alac-16",
+      "path": "alac-16.m4a",
+      "sha256": "a5ed3c037d5a802d14fd41e2d6ba880f7e77a757ec1e4a57b151f61bbed2f890",
+      "bytes": 53577,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "alac",
+        "profile": null,
+        "kind": "audio",
+        "format": "s32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "8874f8c35f72bd25ab79099b086ddc0303ac0edcbc62ea1ecc4519b20e3731e0"
+      }
+    },
+    {
+      "id": "alac-24",
+      "path": "alac-24.m4a",
+      "sha256": "281366435e2b749c70566a9ffc072f765c6f79736a383b2e8f7e4d74ed8872f4",
+      "bytes": 176462,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "alac",
+        "profile": null,
+        "kind": "audio",
+        "format": "s32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "4bfacbf2e9ba5eed9cb22b0f9dfc3485790d1b37d70489989618fc0cc6973715"
+      }
+    },
+    {
+      "id": "flac-16",
+      "path": "flac-16.flac",
+      "sha256": "f6d37efe8ed675120f9ac22cad4b31b8be0fa6d8a4ad64ec36191c70ce59e4a0",
+      "bytes": 52753,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "flac",
+        "profile": null,
+        "kind": "audio",
+        "format": "s32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "8874f8c35f72bd25ab79099b086ddc0303ac0edcbc62ea1ecc4519b20e3731e0"
+      }
+    },
+    {
+      "id": "flac-24",
+      "path": "flac-24.mkv",
+      "sha256": "0da2f7be80f0da761f309562fc85efd2f5b603de4ef849af0dbd3f7350137243",
+      "bytes": 136154,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "flac",
+        "profile": null,
+        "kind": "audio",
+        "format": "s32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "4bfacbf2e9ba5eed9cb22b0f9dfc3485790d1b37d70489989618fc0cc6973715"
+      }
+    },
+    {
+      "id": "pcm-16",
+      "path": "pcm-16.wav",
+      "sha256": "4b6a8ca690faf6d347a320da3a0f4982854e9acd943c6863fe15dd0af6c794dd",
+      "bytes": 245838,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "pcm_s16le",
+        "profile": null,
+        "kind": "audio",
+        "format": "s32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": null,
+        "sha256": "8874f8c35f72bd25ab79099b086ddc0303ac0edcbc62ea1ecc4519b20e3731e0"
+      }
+    },
+    {
+      "id": "pcm-24",
+      "path": "pcm-24.mov",
+      "sha256": "b1111d6eeb61cd0e2bb07031c510979edd63381ffac36c86d50d1d91dfcf0fb3",
+      "bytes": 369380,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "pcm_s24be",
+        "profile": null,
+        "kind": "audio",
+        "format": "s32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": "stereo",
+        "sha256": "4bfacbf2e9ba5eed9cb22b0f9dfc3485790d1b37d70489989618fc0cc6973715"
+      }
+    },
+    {
+      "id": "pcm-f32",
+      "path": "pcm-f32.wav",
+      "sha256": "97b3b1166083d8b0069c220d9c86535944e166787c8a6d046c3765580be06111",
+      "bytes": 491612,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "pcm_f32le",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 2,
+        "layout": null,
+        "sha256": "6f2a3dbb0c1156842ba39a943f1af93ceeba605c61349f10ca58d8cecc6d36cd",
+        "pcmFile": "pcm-f32.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "ac3-51",
+      "path": "ac3-51.mkv",
+      "sha256": "7d5723fcf6b750cde0e3bd8a9f4c9a5f07ab0b705a9b9209b016538810b4d9a8",
+      "bytes": 63840,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "ac3",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 6,
+        "layout": "5.1(side)",
+        "sha256": "7a812ba1e837acedd3dc793da70f5c4e711af70a4919095eebe4e57779e31d28",
+        "pcmFile": "ac3-51.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "eac3-51",
+      "path": "eac3-51.mkv",
+      "sha256": "9d6e4244db3d632f5d4da81ada47850c6396598ce062f4f0426b99f393c81237",
+      "bytes": 63842,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "eac3",
+        "profile": null,
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 6,
+        "layout": "5.1(side)",
+        "sha256": "4c46b9d3d1b142722276a87ed502c3399f18bb61d22b694e2d5195f6d618cf6c",
+        "pcmFile": "eac3-51.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "dts-core-51",
+      "path": "dts-core-51.mkv",
+      "sha256": "ce5c6a32c594066ba881cdbc4c6061b7c10c70685cc2ee842036b6b4d78dd34e",
+      "bytes": 124277,
+      "quality": "full",
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "dts",
+        "profile": "DTS",
+        "kind": "audio",
+        "format": "f32le",
+        "rate": 48000,
+        "channels": 6,
+        "layout": "5.1(side)",
+        "sha256": "43549d1770fef8f76fda702404cecef6b885065b322bf828fce4ad275622fd2d",
+        "pcmFile": "dts-core-51.f32le.gz",
+        "absoluteTolerance": 0.0001,
+        "rmsTolerance": 1e-05
+      }
+    },
+    {
+      "id": "avc-aac",
+      "path": "avc-aac.mp4",
+      "sha256": "2c43aef4e3e927a08f497826dda2d809bd92a91e775807848314c04ba1e76f9a",
+      "bytes": 40466,
+      "quality": "full",
+      "audioSampleRate": 44100,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 56448
+      },
+      "reference": {
+        "tool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "codec": "h264",
+        "profile": "Main",
+        "kind": "video",
+        "format": "yuv420p",
+        "frames": [
+          "545c5b42ba35efb8f92cf1ba0d8a0e0aaedc33ec5e06e639ea74a935d5a56cdd",
+          "a84414aa8102998c9e448252e8ed4e5fb4fb19167011c47fd34a9b3b3723379d",
+          "f4a30f4c1dfce73561a9c87db79132ebbe84de7c38dc54b765090fe582512996",
+          "8496c00cfc7c8d2c1585bdfd428b19ca385d1cce8f6a65f8e74d720c7069aacd",
+          "5c50e3e5a2cebd3b60cd8345e095bdd1edb487cdbe4b57c39cfb1c868e4d5171",
+          "5de146a480eb230fc50bf63b370e94f9d6669f91920daab0f54316d016bef8b2",
+          "05cfd346681f2aaaf1687fe59508c5d74e2d854feacc7752aaa92d79accf925c",
+          "71aff32df677c2df087eff2fbad4593536d7076d6b76929da018f60ea505b730",
+          "c327bef514f01f8f7a56848384bdece84d53c029a317a3afcf2409ed6eceb104",
+          "b8311cf1108be9ef2f2c53861f5d6e05b335ed8e091bb0b9031312fae9d26d43",
+          "ec161219ff1eb7f662dd3ff4a6bbcc9c592c17fb2c1f5c40fd6120431f15502e",
+          "5ab9b8e7a042aa4988484ac76ec2f17fefb63117d1864bada7aa3879f12e5c66",
+          "f317e40d586bb2702c2ec5f09ac71005502e1e1b2d505f9d072be3d92102f24c",
+          "83184792a1d755b653e79e2ba92909c5888e14fa9e41a7e2e85d7d421fa7dd92",
+          "9634776c04261e2a4fa98eae55041ce7f835e5e6796f28f3d3da27530d6eaf17",
+          "9e44c7401545637fcdc54bf5dbfb971bf7cfb63bf8626893b476b76ebf12af67",
+          "20beb8327b8aa9614dd3a1311063e559385c5933f8cca8017541576478d2f57d",
+          "7e42e1be3a153773680f8759c3036988aaa631a028b04248467d4cb0575aeafc",
+          "e51664fae3bd386b93463195a3f6368f119d8188dd6f5554835d84fc4cf27817",
+          "2cba9f59443e58e67d4d57afb1e4f26fa02a2faf44c4bb63bfa7418eb9817f63",
+          "6c849cc14d72a433202eba070cb1e5e437966385b036ab8436874d0040f4d0f7",
+          "c17444e991bf38bb3caa16722b7d70e6e27a650f527cb5a9a46a2ff42ba4bf2f",
+          "5cdff6e4771bd3c582e98886649dcb00637e51d44c352659747b22a11ce41df1",
+          "a92759d3ec263fd12f9c822bf58e679114ca94c1a0f0f117c685cd7d5aa72b20",
+          "f45875668d20bddd5d5c8dc693e9786b0b0fb95e43548420c5fe64118968c959",
+          "39263f057911946df9f0c8ce7c572ecae822f2055f6b0ba4e3666cdacfb063e0",
+          "42fe8f1494797b6a70bd71459b767969f9db67f6d841b3404a5181a4c5deb277",
+          "64fa9517d84aa340283770f9181b22ba1d03245ea30836056f8d8d478af31921",
+          "f7513afdeac6b07e36f2c0916fd6dd3c695e9f62cfd0fdaa8bf114647c4a2ef9",
+          "a7f1147465b7209912e49bebda61f7296aba724ab6f4f194dd47a4768d73857a"
+        ]
+      }
+    }
+  ]
+}

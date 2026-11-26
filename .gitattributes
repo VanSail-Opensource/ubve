@@ -1,0 +1,16 @@
+/packages/disc/runtime/*.mjs text eol=lf
+/packages/disc/native/*.c text eol=lf
+/packages/wasm-adapters/runtime/*.mjs text eol=lf
+/packages/wasm-adapters/runtime/*LICENSE* text eol=lf
+/packages/wasm-adapters/runtime/*COPYING* text eol=lf
+/packages/wasm-adapters/runtime/*PATENTS* text eol=lf
+# Verbatim upstream notices include trailing blank lines.
+/packages/wasm-adapters/runtime/libaom-LICENSE whitespace=-blank-at-eof
+/packages/wasm-adapters/runtime/libaom-PATENTS whitespace=-blank-at-eof
+/packages/wasm-adapters/native/decode.c text eol=lf
+/scripts/build-software-codecs.sh text eol=lf
+/qualification/verdict.py text eol=lf
+/qualification/record.schema.json text eol=lf
+/qualification/failure-ledger/*.json text eol=lf
+/qualification/implementation-records/*.json text eol=lf
+/evidence/**/*.json text eol=lf

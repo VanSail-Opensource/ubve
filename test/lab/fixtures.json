@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {
+      "id": "av1-truehd-ass-720p60",
+      "path": "test/fixtures/primary/combined-720p60.mkv",
+      "sha256": "4e681a037ee5a4fdf57ac7512e702012d15b986133e27410e826c45fe76ad187",
+      "bytes": 4536776,
+      "quality": "performance",
+      "audioSampleRate": 48000,
+      "expected": { "videoFrames": 48, "pcmFrames": 38400, "subtitleEvents": 24, "fonts": 1 }
+    }
+  ]
+}

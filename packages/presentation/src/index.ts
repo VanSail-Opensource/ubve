@@ -7,3 +7,5 @@ export * from './webgpu-renderer.js';
 export * from './subtitle-input.js';
 export * from './pgs.js';
 export * from './subtitles.js';
+export { CanvasPreconverter } from './preconvert.js';
+export type { ConvertedFrame } from './preconvert.js';

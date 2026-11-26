@@ -20,10 +20,11 @@ export class RawCanvasRenderer {
     if (!context) throw new Error('Canvas2D presentation is unavailable');
     this.context = context;
   }
-  present(frame: RawPlaneFrame): { readonly transform: RgbaTransform['transform']; readonly submitted: number; readonly cpuMs: number } {
+  present(frame: RawPlaneFrame): { readonly transform: RgbaTransform['transform']; readonly submitted: number; readonly cpuMs: number; readonly conversionMs: number; readonly uploadMs: number } {
     if (this.#disposed) throw new Error('Raw renderer is disposed');
     const started = performance.now();
     const rgba = rawToRgba(frame, this.#options, this.#image?.data);
+    const converted = performance.now();
     if (this.canvas.width !== rgba.width || this.canvas.height !== rgba.height) {
       this.canvas.width = rgba.width; this.canvas.height = rgba.height;
     }
@@ -31,8 +32,24 @@ export class RawCanvasRenderer {
       this.#image = new ImageData(rgba.data as Uint8ClampedArray<ArrayBuffer>, rgba.width, rgba.height);
     }
     this.context.putImageData(this.#image, 0, 0);
-    return { transform: rgba.transform, submitted: ++this.#submitted, cpuMs: performance.now() - started };
+    const complete = performance.now();
+    return { transform: rgba.transform, submitted: ++this.#submitted, cpuMs: complete - started, conversionMs: converted - started, uploadMs: complete - converted };
   }
   setOptions(options: RawRendererOptions): void { this.#options = options; }
+  presentConverted(rgba: RgbaTransform): number {
+    if (this.#disposed) throw new Error('Raw renderer is disposed');
+    const start = performance.now();
+    if (this.canvas.width !== rgba.width || this.canvas.height !== rgba.height) {
+      this.canvas.width = rgba.width; this.canvas.height = rgba.height;
+    }
+    if (!this.#image || this.#image.width !== rgba.width || this.#image.height !== rgba.height) {
+      this.#image = new ImageData(rgba.width, rgba.height);
+    }
+    // Keep the renderer-owned raster independent of the returned worker lease.
+    this.#image.data.set(rgba.data);
+    this.context.putImageData(this.#image, 0, 0);
+    this.#submitted++;
+    return performance.now() - start;
+  }
   dispose(): void { if (this.#disposed) return; this.#disposed = true; this.#image = null; this.canvas.width = this.canvas.height = 0; }
 }

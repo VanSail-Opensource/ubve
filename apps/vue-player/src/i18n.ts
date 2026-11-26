@@ -2,6 +2,7 @@ export type Locale = 'en' | 'zh-CN' | 'zh-TW';
 export const messages = {
   en: {
     player: 'Player', library: 'Your queue', local: 'Local playback', open: 'Open media', openUrl: 'Open URL',
+    discFolder: 'Open Blu-ray folder', discTitle: 'Select a Blu-ray clip', discHint: 'Clips play as stored, without playlist cuts, menus, or extras.', discReading: 'Reading local disc…',
     tagline: 'A clear view. Every detail.', drop: 'Drop a film. Make yourself at home.', dropHint: 'Choose a local video or audio file to begin.', choose: 'Choose a file', or: 'or', private: 'Local files stay on your device.',
     queueEmpty: 'Your next watch starts here.', queueHint: 'Add files to build a session queue.', add: 'Add files', clear: 'Clear queue',
     source: 'Source', output: 'Playback', quality: 'Quality mode', full: 'Full quality', performance: 'Performance',
@@ -25,11 +26,12 @@ export const messages = {
     webGpuOutput: 'Try WebGPU presentation', webGpuOutputHint: 'Applies on next open. AV1 decode still uses WASM. HDR is unverified and no fallback is selected.', webGpuUnavailable: 'The WebGPU API is unavailable in this browser or document.', reopenGpuQuality: 'Close this source before changing the WebGPU output mode.',
     invalidUrl: 'Enter a valid HTTP or HTTPS media URL.', managedRate: 'Managed audio uses a fixed 1× sample clock.', customControlsRequired: 'This output requires the player’s own controls.',
     pgsPalette: 'PGS palette interpretation', submitted: 'Draws submitted', deliberateDrops: 'Deliberate drops',
-    openIsolated: 'Open the isolated player', reselectAfterSwitch: 'to try managed AV1. Reselect your source after switching.', isolationUnavailable: 'Managed AV1 is unavailable because this document does not have shared memory.',
+    openIsolated: 'Open the isolated player', reselectAfterSwitch: 'to try the shared-memory AV1 decoder. This page uses the portable decoder. Reselect your source after switching.', isolationUnavailable: 'Shared memory is unavailable. Managed AV1 uses the portable decoder.',
     unsupported: 'Unavailable for this source', subtitleOffsetHint: 'Positive values show subtitles later.',
   },
   'zh-CN': {
     player: '播放器', library: '播放队列', local: '本地播放', open: '打开媒体', openUrl: '打开链接',
+    discFolder: '打开蓝光文件夹', discTitle: '选择蓝光片段', discHint: '按原始片段播放，不应用播放列表剪辑，也不加载菜单或花絮。', discReading: '正在读取本地光盘…',
     tagline: '清晰呈现每个细节。', drop: '拖入影片，即刻开始。', dropHint: '选择本地视频或音频文件。', choose: '选择文件', or: '或', private: '本地文件始终保留在你的设备上。',
     queueEmpty: '下一部影片，从这里开始。', queueHint: '添加文件，创建本次播放队列。', add: '添加文件', clear: '清空队列',
     source: '源文件', output: '播放状态', quality: '画质模式', full: '完整画质', performance: '性能模式',
@@ -53,11 +55,12 @@ export const messages = {
     webGpuOutput: '尝试 WebGPU 画面输出', webGpuOutputHint: '下次打开时生效。AV1 仍由 WASM 解码。HDR 未验证，不自动回退。', webGpuUnavailable: '当前浏览器或页面不提供 WebGPU API。', reopenGpuQuality: '请关闭当前媒体后，再切换 WebGPU 输出模式。',
     invalidUrl: '请输入有效的 HTTP 或 HTTPS 媒体链接。', managedRate: '软件解码音频目前使用固定的 1× 采样时钟。', customControlsRequired: '当前输出需要使用播放器的控件。',
     pgsPalette: 'PGS 调色板解读方式', submitted: '已提交绘制', deliberateDrops: '主动丢帧',
-    openIsolated: '打开隔离版播放器', reselectAfterSwitch: '以尝试 AV1 软件解码。切换后需重新选择媒体。', isolationUnavailable: '此页面没有共享内存，无法使用 AV1 软件解码。',
+    openIsolated: '打开隔离版播放器', reselectAfterSwitch: '以尝试共享内存 AV1 解码器。此页面使用便携版解码器。切换后需重新选择媒体。', isolationUnavailable: '共享内存不可用，AV1 软件解码将使用便携版解码器。',
     unsupported: '当前源不可用', subtitleOffsetHint: '正值使字幕延后显示。',
   },
   'zh-TW': {
     player: '播放器', library: '播放佇列', local: '本機播放', open: '開啟媒體', openUrl: '開啟連結',
+    discFolder: '開啟藍光資料夾', discTitle: '選擇藍光片段', discHint: '按原始片段播放，不套用播放清單剪輯，也不載入選單或花絮。', discReading: '正在讀取本機光碟…',
     tagline: '清晰呈現每個細節。', drop: '拖入影片，即刻開始。', dropHint: '選擇本機影片或音訊檔案。', choose: '選擇檔案', or: '或', private: '本機檔案始終保留在你的裝置上。',
     queueEmpty: '下一部影片，從這裡開始。', queueHint: '新增檔案，建立本次播放佇列。', add: '新增檔案', clear: '清空佇列',
     source: '來源檔案', output: '播放狀態', quality: '畫質模式', full: '完整畫質', performance: '效能模式',
@@ -81,7 +84,7 @@ export const messages = {
     webGpuOutput: '嘗試 WebGPU 畫面輸出', webGpuOutputHint: '下次開啟時生效。AV1 仍由 WASM 解碼。HDR 未驗證，不自動回退。', webGpuUnavailable: '目前瀏覽器或頁面不提供 WebGPU API。', reopenGpuQuality: '請關閉目前媒體後，再切換 WebGPU 輸出模式。',
     invalidUrl: '請輸入有效的 HTTP 或 HTTPS 媒體連結。', managedRate: '軟體解碼音訊目前使用固定的 1× 取樣時鐘。', customControlsRequired: '目前輸出需要使用播放器的控制項。',
     pgsPalette: 'PGS 調色盤解讀方式', submitted: '已提交繪製', deliberateDrops: '主動捨棄影格',
-    openIsolated: '開啟隔離版播放器', reselectAfterSwitch: '以嘗試 AV1 軟體解碼。切換後需重新選擇媒體。', isolationUnavailable: '此頁面沒有共用記憶體，無法使用 AV1 軟體解碼。',
+    openIsolated: '開啟隔離版播放器', reselectAfterSwitch: '以嘗試共用記憶體 AV1 解碼器。此頁面使用可攜版解碼器。切換後需重新選擇媒體。', isolationUnavailable: '共用記憶體無法使用，AV1 軟體解碼將使用可攜版解碼器。',
     unsupported: '目前來源無法使用', subtitleOffsetHint: '正值使字幕延後顯示。',
   },
 } as const;

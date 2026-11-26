@@ -21,6 +21,9 @@
       "path": "../core"
     },
     {
+      "path": "../disc"
+    },
+    {
       "path": "../io-demux"
     },
     {

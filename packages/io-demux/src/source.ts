@@ -153,7 +153,8 @@ export class SourceCache {
    * requested bytes. Keep the stream open to receive that acknowledgement.
    * The application-owned lease is retired only after that handoff or abort.
    */
-  readProviderStream(start: number, end: number, operation: OperationContext, localMetadata = false): ReadableStream<Uint8Array> {
+  readProviderStream(start: number, end: number, operation: OperationContext, localMetadata = false,
+    validate?: (bytes: Uint8Array, start: number) => void): ReadableStream<Uint8Array> {
     if (this.#closed) throw new EngineError('DISPOSED', 'Cache closed');
     checkedSourceRange(byteRange(start, end), this.source.size);
     if (end <= start || end - start > 32 * 1024 * 1024) throw new EngineError('ITEM_TOO_LARGE', 'Provider stream requires 1 to 32 MiB of source bytes');
@@ -189,7 +190,8 @@ export class SourceCache {
             ? await this.#readLocalOwned(start, end, guarded, true)
             : await this.readOwned(start, end, guarded);
           if (retired) { lease.release(); return; }
-          try { checkOperation(guarded, browserScheduler); } catch (error) { lease.release(); throw error; }
+          try { checkOperation(guarded, browserScheduler); validate?.(lease.borrow(), start); }
+          catch (error) { lease.release(); throw error; }
           outbound = lease;
           this.#providerBytes += lease.bytes; this.#providerReadBytes += lease.bytes; this.#providerReads++;
           this.#providerPeak = Math.max(this.#providerPeak, this.#providerBytes);

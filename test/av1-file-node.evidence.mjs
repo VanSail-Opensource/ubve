@@ -14,6 +14,8 @@ const workerThreads = Number(process.env.UBVE_AV1_WORKER_THREADS ?? '1');
 assert.ok([1, 2, 4].includes(workerThreads), 'Decoder worker count must be 1, 2 or 4');
 const prefixPictures = Number(process.env.UBVE_AV1_PREFIX_PICTURES ?? '0');
 assert.ok(Number.isSafeInteger(prefixPictures) && prefixPictures >= 0 && prefixPictures <= 60480, 'Picture prefix must be a nonnegative safe integer no greater than 60,480');
+const timeoutMs = Number(process.env.UBVE_AV1_VERIFY_TIMEOUT_MS ?? '180000');
+assert.ok(Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 1_800_000, 'Component verification timeout must be between 1 second and 30 minutes');
 const nativeReference = process.env.UBVE_AV1_NATIVE_REFERENCE ?? 'libaom-av1';
 assert.ok(['libaom-av1', 'libdav1d'].includes(nativeReference), 'Reference must be libaom-av1 or libdav1d');
 const file = resolve(fixture);
@@ -40,7 +42,7 @@ const row = {
   coverage: { scope: prefixPictures ? 'source-picture-prefix' : 'whole-source', requestedPictures: prefixPictures || null, eosCovered: false },
   source: { file: basename(file), sha256: sourceSha256, publisherChecksumVerified: !!expectedSourceSha256, bytes: Number(info.format.size), format: info.format.format_name, width: video.width, height: video.height, nominalCadence: video.r_frame_rate, pixFmt: video.pix_fmt, nonTestedAudioCodecs: membership },
   reference: { decoder: `FFmpeg/${nativeReference}`, output: `${video.pix_fmt} full ordered planes`, sha256: null, frames: null },
-  workerThreads,
+  workerThreads, verificationTimeoutMs: timeoutMs,
 };
 let codec;
 try {
@@ -49,10 +51,10 @@ try {
   // Open UBVE before the native reference so unsupported sources fail without a
   // lengthy reference decode. This test supplies a disk-backed Blob, not all file bytes.
   codec = await CodecNodeProbe.open(blob, { threads: workerThreads, outputFrames: 4 });
-  const got = await codec.run({ allowUnknownHdrFields: true, pixelFormat: formats[video.pix_fmt], timeoutMs: 180_000, prefixPictures });
+  const got = await codec.run({ allowUnknownHdrFields: true, pixelFormat: formats[video.pix_fmt], timeoutMs, prefixPictures });
   row.coverage.eosCovered = !prefixPictures;
   row.observed = { frames: got.videoSha256.length, sha256: describeHashList(got.videoSha256), color: got.firstColor, firstStaticHdr: got.hdr ?? null, allHdrFieldsAdmitted: got.allHdrFieldsAdmitted, timingProvenance: got.timingProvenance, decoderThreads: got.observedVideoThreads };
-  const hashText = await checked('ffmpeg', ['-nostdin', '-loglevel', 'error', ...fileArgs, '-threads', '2', '-c:v', nativeReference, '-i', file, '-map', '0:v:0', '-threads', '2', '-pix_fmt', video.pix_fmt, '-fps_mode', 'passthrough', ...(prefixPictures ? ['-frames:v', String(prefixPictures)] : []), '-f', 'framehash', '-hash', 'sha256', '-'], { timeout: 180_000, maxBuffer: 4 * 1024 ** 2 });
+  const hashText = await checked('ffmpeg', ['-nostdin', '-loglevel', 'error', ...fileArgs, '-threads', '2', '-c:v', nativeReference, '-i', file, '-map', '0:v:0', '-threads', '2', '-pix_fmt', video.pix_fmt, '-fps_mode', 'passthrough', ...(prefixPictures ? ['-frames:v', String(prefixPictures)] : []), '-f', 'framehash', '-hash', 'sha256', '-'], { timeout: timeoutMs, maxBuffer: 4 * 1024 ** 2 });
   const frames = hashText.split('\n').filter(line => /^\d+,/.test(line)).map(line => line.split(',').at(-1).trim());
   assert.ok(frames.length, 'Independent decode produced no pictures');
   if (prefixPictures) assert.equal(frames.length, prefixPictures, 'Independent decode ended within the requested picture prefix');

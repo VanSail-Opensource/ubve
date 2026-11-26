@@ -1,6 +1,7 @@
 import { CancellationController, EngineError, EpochController, checkOperation, mediaTime, timeBase } from '@ubve/core';
 import type { OperationContext, Session, SessionSnapshot, SessionState, SourceDescriptor } from '@ubve/core';
 import type { BrowserPlayer, CreatePlayer, OpenOptions } from './index.js';
+import type { BluRayClipInput } from './disc-input.js';
 
 /** The original injected facade remains usable by independent adapter authors. */
 export const createPlayer: CreatePlayer = (options): BrowserPlayer => {
@@ -63,7 +64,7 @@ export const createPlayer: CreatePlayer = (options): BrowserPlayer => {
 
 export type QualityMode = 'full' | 'performance';
 export type PlaybackRoute = 'N0' | 'N1' | 'N2' | 'N3' | 'C0' | 'C1';
-export type MediaInput = File | { readonly url: string; readonly label?: string };
+export type MediaInput = File | { readonly url: string; readonly label?: string } | BluRayClipInput;
 
 export interface PlayerTrack {
   readonly id: string;
@@ -639,6 +640,8 @@ export class ReferencePlayer {
 
 export function describeInput(input: MediaInput): PlayerSourceInfo {
   if (input instanceof File) return { name: input.name, kind: 'local', bytes: input.size, mime: input.type || null, width: null, height: null, color: 'Browser output mapping · unverified', audio: 'Browser audio output' };
+  if ('disc' in input) return { name: input.label ?? `${input.disc instanceof File ? input.disc.name : 'Blu-ray folder'} · title ${input.title + 1}, clip ${input.clip + 1}`,
+    kind: 'local', bytes: input.disc instanceof File ? input.disc.size : null, mime: 'video/mp2t', width: null, height: null, color: 'Blu-ray clip output · unverified', audio: 'Selected clip audio' };
   const url = new URL(input.url);
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new EngineError('INVALID_ARGUMENT', 'Media URLs must use HTTPS or HTTP');
   const leaf = url.pathname.split('/').pop() || url.hostname;
@@ -650,6 +653,7 @@ export function describeInput(input: MediaInput): PlayerSourceInfo {
 
 export async function prepareDirectPlayback(input: MediaInput, signal: AbortSignal): Promise<PreparedPlayback> {
   if (signal.aborted) throw abortError();
+  if ('disc' in input) throw new EngineError('UNSUPPORTED_PROFILE', 'Native direct playback cannot open a Blu-ray clip');
   describeInput(input);
   const local = input instanceof File;
   const url = local ? URL.createObjectURL(input) : input.url;

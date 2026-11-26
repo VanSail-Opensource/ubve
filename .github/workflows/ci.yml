@@ -49,6 +49,8 @@ jobs:
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - run: npm run test:pipeline:browser
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+      - run: npm run test:codecs:browser
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
       - name: Screen native MSE candidate
         run: npm run test:native:browser
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
@@ -57,4 +59,6 @@ jobs:
         if: always()
         with:
           name: browser-candidate-evidence
-          path: evidence/
+          path: |
+            evidence/
+            .local/modern-browser/

@@ -7,6 +7,11 @@ Run commands at the repository root with Node **24.22.3** and npm **11.19.1**. T
 | `npm test` | Strict core, package, worklet and Vue type checks, AST import boundaries, Node correctness tests and the Python qualification/failure-ledger tests. |
 | `npm run test:io` / `npm run test:http` | Local exact source and selected-packet checks, or strict HTTP source checks including actual loopback Fetch. |
 | `npm run test:codecs` | Real pinned AV1/TrueHD workers on Node with exact plane/PCM/HDR reference and lifecycle checks. No browser presentation measurements. |
+| `npm run test:codecs:modern` / `npm run test:codecs:browser` | Authored portable software matrix against independent references or through the actual Chromium managed player. Build the assets first. |
+| `npm run lab:build` / `npm run lab:serve` | Build an isolated test bundle or serve the master and private-LAN runner. See the [lab runbook](device-lab.md). |
+| `npm run lab:run` | Queue a playlist and wait for its receipts without interaction on the enrolled browser. |
+| `npm run test:lab` / `npm run bench:paired` | Loopback HTTPS, job state and range regression checks or a comparison of retained paired lab attempts. |
+| `npm run test:packing` / `npm run test:packing:browser` / `npm run test:packing:picker` | Locked container parsing, trusted HTTPS File/range playback, or the actual ISO and BDMV picker in Chromium. See the [packing matrix](packing-formats.md). |
 | `npm run test:native:wasm` | Real pinned TrueHD/FLAC workers and bounded fMP4 bridge. `UBVE_REQUIRE_FFMPEG_EVIDENCE=1` requires native FFmpeg cross-checks as test preparation, not browser-native evidence. |
 | `npm run test:disc` | Disc/title/range correctness against actual pinned UDF WASM and authored fixtures. |
 | `npm run build` | Compile packages and build self-hosted assets and both Vue documents. |

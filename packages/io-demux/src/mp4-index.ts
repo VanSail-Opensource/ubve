@@ -412,3 +412,67 @@ export async function openMp4PagedIndex(cache: SourceCache, operation: Operation
   checkOperation(operation, browserScheduler);
   return Object.freeze(indices);
 }
+
+/** Classic audio-only ALAC, outside the provider's codec registry. */
+export async function openClassicAlac(cache: SourceCache, operation: OperationContext) {
+  const [index, ...others] = await openMp4PagedIndex(cache, operation);
+  if (!index || others.length || index.descriptions.length !== 1 || index.descriptions[0] !== 'alac') {
+    return refuse('Software ALAC requires one classic audio track and one sample configuration');
+  }
+  const scanner = new Scanner(cache);
+  const moov = await scanner.children(required(await scanner.boxes(0, cache.source.size, operation), 'moov'), operation);
+  const trak = await scanner.children(required(moov, 'trak'), operation);
+  const mdia = await scanner.children(required(trak, 'mdia'), operation);
+  const hdlr = await header(cache, required(mdia, 'hdlr'), 12, operation);
+  if (hdlr.getUint32(8) !== 0x736f756e) return refuse('ALAC track handler is not audio');
+  const info = await scanner.children(required(mdia, 'minf'), operation);
+  const stbl = await scanner.children(required(info, 'stbl'), operation);
+  const stsd = required(stbl, 'stsd');
+  const entry = required(await scanner.boxes(stsd.body + 8, stsd.end, operation), 'alac');
+  if ((await header(cache, entry, 28, operation)).getUint16(8) !== 0) return refuse('Unsupported ALAC audio sample-entry version');
+  const atom = required(await scanner.boxes(entry.body + 28, entry.end, operation), 'alac');
+  if (atom.end - atom.body !== 28) return fail('Invalid ALAC cookie extent');
+  const cookie = new Uint8Array(36);
+  new DataView(cookie.buffer).setUint32(0, cookie.length);
+  cookie.set([0x61, 0x6c, 0x61, 0x63], 4);
+  await cache.readValue(atom.body, atom.end, operation, bytes => cookie.set(bytes, 8));
+  const config = view(cookie), rate = config.getUint32(32), channels = config.getUint8(21);
+  if (config.getUint32(8) !== 0 || config.getUint8(16) !== 0 ||
+      ![16, 24].includes(config.getUint8(17)) || rate !== index.timescale ||
+      rate < 8000 || rate > 192000 || channels < 1 || channels > 8 ||
+      config.getUint32(12) < 1 || config.getUint32(12) > 65536) return refuse('ALAC sample geometry exceeds its exact profile');
+  const edit = index.edits?.segments[0];
+  if (index.edits && (index.edits.segments.length !== 1 || edit?.mediaStart == null)) return refuse('Software ALAC needs a single contiguous edit');
+  const start = edit?.mediaStart ?? 0n;
+  const editSamples = edit ? edit.movieEnd * BigInt(rate) / BigInt(index.edits!.movieTimescale) : index.decodeDuration;
+  const end = start + editSamples < index.decodeDuration ? start + editSamples : index.decodeDuration;
+  if (end <= start || end > BigInt(Number.MAX_SAFE_INTEGER)) return refuse('ALAC presentation interval is not admitted');
+  return { index, cookie, rate, channels, start, end };
+}
+
+/** Derive the audible end from the actual unit-rate MP4 edit, rather than
+ * assuming the media-header duration describes the unpadded presentation. */
+export async function mp4AudioEditEnd(cache: SourceCache, trackOrder: number, expectedTracks: number, rate: number, operation: OperationContext) {
+  const scanner = new Scanner(cache);
+  const root = await scanner.children(required(await scanner.boxes(0, cache.source.size, operation), 'moov'), operation);
+  const tracks = root.filter(box => box.type === 'trak'), track = tracks[trackOrder];
+  if (tracks.length !== expectedTracks || !track) return { end: null, unsupported: true };
+  const children = await scanner.children(track, operation);
+  const mdia = await scanner.children(required(children, 'mdia'), operation);
+  if ((await header(cache, required(mdia, 'hdlr'), 12, operation)).getUint32(8) !== 0x736f756e) return { end: null, unsupported: true };
+  const edits = one(children, 'edts');
+  if (!edits) return { end: null, unsupported: false };
+  const movieTimescale = await parseTimescale(cache, required(root, 'mvhd'), operation);
+  const scale = BigInt(movieTimescale);
+  const mediaTimescale = await parseTimescale(cache, required(mdia, 'mdhd'), operation);
+  try {
+    const edit = await editMap(scanner, edits, movieTimescale, mediaTimescale, operation);
+    if (edit.segments.length !== 1 || edit.segments[0]!.mediaStart === null) return { end: null, unsupported: true };
+    // Movie timescales need not represent every audio sample exactly.
+    const end = (2n * edit.duration * BigInt(rate) + scale) / (2n * scale);
+    return end > 0n && end <= BigInt(Number.MAX_SAFE_INTEGER) ? { end, unsupported: false } : { end: null, unsupported: true };
+  } catch (error) {
+    if (error instanceof EngineError && error.code === 'UNSUPPORTED_PROFILE') return { end: null, unsupported: true };
+    throw error;
+  }
+}

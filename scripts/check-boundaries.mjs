@@ -81,14 +81,14 @@ const list = async directory => {
 
 async function main() {
   const failures = [];
-  for (const packageName of ['core', 'testkit', 'browser']) {
+  for (const packageName of ['core', 'testkit', 'io-demux', 'wasm-adapters', 'native-bridge', 'presentation', 'disc', 'browser']) {
     const sourceRoot = path.join(root, 'packages', packageName, 'src');
     for (const file of await list(sourceRoot)) {
       failures.push(...checkSourceBoundaries(await readFile(file, 'utf8'), file));
     }
   }
   if (failures.length) { for (const failure of failures) console.error(failure); process.exitCode = 1; }
-  else console.log('Import boundaries passed for core, testkit and browser.');
+  else console.log('Import boundaries passed for all engine packages and testkit.');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

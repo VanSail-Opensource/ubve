@@ -1,6 +1,6 @@
 # UBVE phase and qualification status
 
-The [v8 specification](specification/Universal-Browser-Video-Engine-v8.0.md) remains authoritative. The I00–I12 implementation PRs are separate from their production-evidence exits. **No exact production configuration is qualified. Cloudflare Pages deployment has not occurred.**
+The [v8 specification](specification/Universal-Browser-Video-Engine-v8.0.md) remains authoritative. The I00–I12 implementation PRs are separate from their production-evidence exits. **No exact production configuration is qualified. Cloudflare Pages is preview-only.**
 
 | Phase | Verified implementation boundary | Still open |
 | --- | --- | --- |
@@ -19,3 +19,17 @@ The [v8 specification](specification/Universal-Browser-Video-Engine-v8.0.md) rem
 | I12 release | Static build, standard/isolated document checks, asset hashes, staged notices, raw-receipt integrity and fail-closed support report | Exact sustained and physical-output records, complete corresponding-source inventory and remaining playback exits |
 
 The short software screens use a declared SDR output transform, muted PCM graph and browser-observed counters. They do not establish physical cadence, full HDR fidelity or 60/120 fps. The native short screens establish actual MIME admission and media-element behavior, not acceleration. The strict evaluator and all originally retained failures remain unchanged. Unsupported, missing and deferred evidence is not a pass.
+
+## Portable software and LAN follow-up
+
+I02/I03 add pinned software video and audio coverage and exact audio-end handling. The locked authored matrix passed all 29 component and non-isolated Chromium screens. Two independently referenced Fraunhofer HE-AAC samples passed separately. The [codec notes](modern-software-codecs.md) distinguish the admitted format envelope from the exact tested tuples.
+
+I04/I07 add an authenticated HTTPS runner and master-only orchestration. A real iPad Air M3 on iPadOS 27.0.1 and Edge 158 enrolled both 44,100 and 48,000 Hz graphs. On build `28870cf757eb`, six of seven jobs completed over LAN ranges without gestures after enrollment. Both primary lifecycle jobs decoded and submitted 48 pictures and consumed 38,400 PCM sample frames. The remaining Opus job produced 62,088 instead of 61,440 samples. Trusted Chromium reproduced the same failure on that build, then build `24a14f85217d` passed the exact Opus and MP3 end checks plus both primary lifecycle repetitions. The trim fix has not been rerun on iPad. The [lab runbook](device-lab.md) describes unattended playlists and the one-time browser setup.
+
+I06/I11 retain bounded stage histograms and an opt-in worker conversion candidate. Three comparable short Windows browser pairs did not establish a playback timing improvement, so the default stays inline. See the [optimization assessment](I11-optimization-assessment.md). The next performance target remains the per-picture conversion cost, with sustained exact evidence still open.
+
+## Packing-format follow-up
+
+I02/I07 verify 21 locked container/profile fixtures through the isolated HTTPS lab in Chromium 151.0.7922.34. All 21 File jobs and all 20 applicable HTTPS range jobs passed. Refusal coverage includes corrupt/scrambled transport, truncated PCM chunks, and remote ISO. The [packing matrix](packing-formats.md) records the exact codecs and exclusions rather than assigning support by suffix alone.
+
+I10 verifies the production Vue picker in Windows Chromium 158.0.8127.37. An explicitly selected clip played from both a clear Blu-ray UDF ISO and its authored BDMV folder. The real disc worker matched the ISO clip bytes to the separate folder reference. The playback checks observed 36 submitted pictures and 73,728 PCM sample frames. This is clip playback, not playlist, full-title, menu, or physical output evidence. Whole-title transitions and long and fragmented index coverage remain open.

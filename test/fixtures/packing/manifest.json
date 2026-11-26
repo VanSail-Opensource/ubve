@@ -1,0 +1,574 @@
+{
+  "schema": "ubve-packing-fixtures-v1",
+  "referenceTool": "ffmpeg version 9.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+  "discAuthoring": {
+    "tool": "tsMuxeR 2.7.0 Linux",
+    "sha256": "e1e2caeb624876c22d1ee1cb545d4ded9da4c5138b2259f36fd236b0f67e2e47"
+  },
+  "cases": [
+    {
+      "id": "quicktime-mov",
+      "path": "test/fixtures/packing/compound.mov",
+      "container": "quicktime",
+      "bytes": 40516,
+      "sha256": "45f3c5d31abc9c85b51d9641b2002e2e27e6a30f87bca70f7f39921c704dd2ed",
+      "audioSampleRate": 44100,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 56448
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "id": "0x1",
+            "time_base": "1/12800",
+            "start_pts": 0,
+            "duration_ts": 15360,
+            "nb_read_frames": "30"
+          },
+          {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "sample_rate": "44100",
+            "channels": 2,
+            "id": "0x2",
+            "time_base": "1/44100",
+            "start_pts": 0,
+            "duration_ts": 56448,
+            "nb_read_frames": "56"
+          }
+        ],
+        "pcmFloat32Sha256": "058d030d521e53955f1e760b672a9c03d19cee11a06a7ec5f6e0fabddf2482cf"
+      }
+    },
+    {
+      "id": "3gpp-3gp",
+      "path": "test/fixtures/packing/compound.3gp",
+      "container": "mp4",
+      "bytes": 40309,
+      "sha256": "eba1aae9a039cbfdb0af4770870794349fb07efe0fce2be92048a17c12330183",
+      "audioSampleRate": 44100,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 56448
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "id": "0x1",
+            "time_base": "1/12800",
+            "start_pts": 0,
+            "duration_ts": 15360,
+            "nb_read_frames": "30"
+          },
+          {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "sample_rate": "44100",
+            "channels": 2,
+            "id": "0x2",
+            "time_base": "1/44100",
+            "start_pts": 0,
+            "duration_ts": 56448,
+            "nb_read_frames": "56"
+          }
+        ],
+        "pcmFloat32Sha256": "058d030d521e53955f1e760b672a9c03d19cee11a06a7ec5f6e0fabddf2482cf"
+      }
+    },
+    {
+      "id": "3gpp2-3g2",
+      "path": "test/fixtures/packing/compound.3g2",
+      "container": "mp4",
+      "bytes": 40309,
+      "sha256": "b2d960049c9d370dbd95b4ec4edd0bb5ba5b4440f28ab119dce9b9cb4792a994",
+      "audioSampleRate": 44100,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 56448
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "id": "0x1",
+            "time_base": "1/12800",
+            "start_pts": 0,
+            "duration_ts": 15360,
+            "nb_read_frames": "30"
+          },
+          {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "sample_rate": "44100",
+            "channels": 2,
+            "id": "0x2",
+            "time_base": "1/44100",
+            "start_pts": 0,
+            "duration_ts": 56448,
+            "nb_read_frames": "56"
+          }
+        ],
+        "pcmFloat32Sha256": "058d030d521e53955f1e760b672a9c03d19cee11a06a7ec5f6e0fabddf2482cf"
+      }
+    },
+    {
+      "id": "fragmented-mp4",
+      "path": "test/fixtures/packing/frag-negative_cts_offsets.mp4",
+      "container": "mp4",
+      "bytes": 40562,
+      "sha256": "95529aae7ab6802a0f54b40bdadf4862f41cdfe7ce9fc70c675462a9a6fec15c",
+      "audioSampleRate": 44100,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 58368
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "id": "0x1",
+            "time_base": "1/12800",
+            "start_pts": 512,
+            "duration_ts": 15360,
+            "nb_read_frames": "30"
+          },
+          {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "sample_rate": "44100",
+            "channels": 2,
+            "id": "0x2",
+            "time_base": "1/44100",
+            "start_pts": 0,
+            "duration_ts": 58368,
+            "nb_read_frames": "57"
+          }
+        ],
+        "pcmFloat32Sha256": "95434c0bb074f32373310c72a1ec0eb32990b8fba8cdbb844ca664d62093c460"
+      }
+    },
+    {
+      "id": "mpeg-ts",
+      "path": "test/fixtures/packing/sample.ts",
+      "container": "mpegts",
+      "bytes": 48504,
+      "sha256": "1ab875a11128d5ab578afbd706a32050324f36ded89eac727686cb4ae402727a",
+      "audioSampleRate": 44100,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 58368
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "id": "0x100",
+            "time_base": "1/90000",
+            "start_pts": 133200,
+            "duration_ts": 108000,
+            "nb_read_frames": "30"
+          },
+          {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "sample_rate": "44100",
+            "channels": 2,
+            "id": "0x101",
+            "time_base": "1/90000",
+            "start_pts": 131110,
+            "duration_ts": 104489,
+            "nb_read_frames": "57"
+          }
+        ],
+        "pcmFloat32Sha256": "95434c0bb074f32373310c72a1ec0eb32990b8fba8cdbb844ca664d62093c460"
+      }
+    },
+    {
+      "id": "m2ts-ac3",
+      "path": "test/fixtures/packing/compound-ac3.m2ts",
+      "container": "mpegts",
+      "bytes": 67584,
+      "sha256": "86bf8de62b15ef796d692b2426e71a1a97bde13288a757caeb908d543d6fccfa",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 62976
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "id": "0x1011",
+            "time_base": "1/90000",
+            "start_pts": 133200,
+            "duration_ts": 108000,
+            "nb_read_frames": "30"
+          },
+          {
+            "codec_name": "ac3",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "id": "0x1100",
+            "time_base": "1/90000",
+            "start_pts": 132720,
+            "duration_ts": 115200,
+            "nb_read_frames": "41"
+          }
+        ],
+        "pcmFloat32Sha256": "1136f213f43a179373078096b028830b7166137f7e8e6140fd1488df0f4ec38b"
+      }
+    },
+    {
+      "id": "vp9-opus-webm",
+      "path": "test/fixtures/packing/vp9-opus.webm",
+      "container": "webm",
+      "bytes": 45618,
+      "sha256": "2927f7353c7b1d59efa0f2ad5fa08bbd80210307fb7fe59750aa85a01cc6c737",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "codec_type": "video",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "nb_read_frames": "30"
+          },
+          {
+            "codec_name": "opus",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "nb_read_frames": "65"
+          }
+        ],
+        "pcmFloat32Sha256": "3a3bc79bcbb214d57eca14df233f988f2f7a419ba15bc722e68b0c891d6c4e14"
+      }
+    },
+    {
+      "id": "flac-mka",
+      "path": "test/fixtures/packing/flac.mka",
+      "container": "matroska",
+      "bytes": 136145,
+      "sha256": "b2a9ddc1d68a60a6fac32e209eff966a8de75175d14ea9604fb13e8d4247aef8",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "flac",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "nb_read_frames": "60"
+          }
+        ],
+        "pcmFloat32Sha256": "902ed794fbc78c9737a373618311f3f892c17b67f186ce13a171a85714d3fa8c"
+      }
+    },
+    {
+      "id": "aac-adts",
+      "path": "test/fixtures/packing/sample.aac",
+      "container": "adts",
+      "bytes": 16330,
+      "sha256": "26d225864ca93801c802e9c9ef40b39d17c7ba460f2a47e206fc1a48bdb60dbf",
+      "audioSampleRate": 44100,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 58368
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "sample_rate": "44100",
+            "channels": 2,
+            "time_base": "1/28224000",
+            "duration_ts": 37419657,
+            "nb_read_frames": "57"
+          }
+        ],
+        "pcmFloat32Sha256": "95434c0bb074f32373310c72a1ec0eb32990b8fba8cdbb844ca664d62093c460"
+      }
+    },
+    {
+      "id": "aiff-pcm",
+      "path": "test/fixtures/packing/sample.aiff",
+      "container": "aiff",
+      "bytes": 368694,
+      "sha256": "35b342deb8de72a81c4ee5954c653cd660b1c81fd294954bf99c95b5e434e115",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "pcm_s24be",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "time_base": "1/48000",
+            "start_pts": 0,
+            "duration_ts": 61440,
+            "nb_read_frames": "91"
+          }
+        ],
+        "pcmFloat32Sha256": "2a22c03d69a6d319e6b8dcf06497507d7548725df060ea0419301c60e17c8b34"
+      }
+    },
+    {
+      "id": "aifc-pcm",
+      "path": "test/fixtures/packing/float.aifc",
+      "container": "aiff",
+      "bytes": 491592,
+      "sha256": "3af92db58dd6d8d61d075efd448b0f4d65d42fe58c22b30391e1d8d8a22e10fe",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "pcm_f32be",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "time_base": "1/48000",
+            "start_pts": 0,
+            "duration_ts": 61440,
+            "nb_read_frames": "120"
+          }
+        ],
+        "pcmFloat32Sha256": "2a22c03d69a6d319e6b8dcf06497507d7548725df060ea0419301c60e17c8b34"
+      }
+    },
+    {
+      "id": "caf-pcm",
+      "path": "test/fixtures/packing/sample.caf",
+      "container": "caf",
+      "bytes": 368770,
+      "sha256": "324e70c843edc51f0490bbec0874e5ce54d8d70ca4d81a24a0fda4572acc9de7",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "pcm_s24le",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "time_base": "1/48000",
+            "start_pts": 0,
+            "duration_ts": 61440,
+            "nb_read_frames": "91"
+          }
+        ],
+        "pcmFloat32Sha256": "2a22c03d69a6d319e6b8dcf06497507d7548725df060ea0419301c60e17c8b34"
+      }
+    },
+    {
+      "id": "rf64-pcm",
+      "path": "test/fixtures/packing/sample.rf64.wav",
+      "container": "wave",
+      "bytes": 368778,
+      "sha256": "4f5f889e0842ed98fd99b7b6e3f6069c7170e6ae64e0d8e4b173c789896c17bf",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "pcm_s24le",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "time_base": "1/48000",
+            "duration_ts": 61440,
+            "nb_read_frames": "15"
+          }
+        ],
+        "pcmFloat32Sha256": "2a22c03d69a6d319e6b8dcf06497507d7548725df060ea0419301c60e17c8b34"
+      }
+    },
+    {
+      "id": "classic-mp4",
+      "path": "test/fixtures/modern/avc-aac.mp4",
+      "container": "mp4",
+      "bytes": 40466,
+      "sha256": "2c43aef4e3e927a08f497826dda2d809bd92a91e775807848314c04ba1e76f9a",
+      "audioSampleRate": 44100,
+      "expected": {
+        "videoFrames": 30,
+        "pcmFrames": 56448
+      },
+      "reference": {
+        "lockedCase": "avc-aac"
+      }
+    },
+    {
+      "id": "alac-m4a",
+      "path": "test/fixtures/modern/alac-24.m4a",
+      "container": "mp4",
+      "bytes": 176462,
+      "sha256": "281366435e2b749c70566a9ffc072f765c6f79736a383b2e8f7e4d74ed8872f4",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "lockedCase": "alac-24"
+      }
+    },
+    {
+      "id": "wav-pcm",
+      "path": "test/fixtures/modern/pcm-f32.wav",
+      "container": "wave",
+      "bytes": 491612,
+      "sha256": "97b3b1166083d8b0069c220d9c86535944e166787c8a6d046c3765580be06111",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "lockedCase": "pcm-f32"
+      }
+    },
+    {
+      "id": "ogg-opus",
+      "path": "test/fixtures/modern/opus-ogg.ogg",
+      "container": "ogg",
+      "bytes": 14053,
+      "sha256": "4d12df9ac5ce1b2e2528272bfc919b37161437cd7c1918a55d86deee32c37966",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "lockedCase": "opus-ogg"
+      }
+    },
+    {
+      "id": "native-flac",
+      "path": "test/fixtures/modern/flac-16.flac",
+      "container": "flac",
+      "bytes": 52753,
+      "sha256": "f6d37efe8ed675120f9ac22cad4b31b8be0fa6d8a4ad64ec36191c70ce59e4a0",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "lockedCase": "flac-16"
+      }
+    },
+    {
+      "id": "mp3",
+      "path": "test/fixtures/modern/mp3.mp3",
+      "container": "mp3",
+      "bytes": 10101,
+      "sha256": "4405c38801a479ba3ec5e179e56ba074cc166c26785ce0a1d0ae8c48ac95d436",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 0,
+        "pcmFrames": 61440
+      },
+      "reference": {
+        "lockedCase": "mp3"
+      }
+    },
+    {
+      "id": "matroska-hdr10",
+      "path": "test/fixtures/primary/combined-720p60.mkv",
+      "sha256": "4e681a037ee5a4fdf57ac7512e702012d15b986133e27410e826c45fe76ad187",
+      "bytes": 4536776,
+      "quality": "performance",
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 48,
+        "pcmFrames": 38400,
+        "subtitleEvents": 24,
+        "fonts": 1
+      },
+      "container": "matroska",
+      "reference": {
+        "lockedCase": "av1-truehd-ass-720p60"
+      }
+    },
+    {
+      "id": "clear-bluray-iso",
+      "path": "test/fixtures/packing/clear-bd.iso",
+      "container": "bluray-udf",
+      "bytes": 1835008,
+      "sha256": "9895b55e09ac53ccbe15cff27951c72fc177edf3cf9dd1620dbaf104402be3e0",
+      "discClip": {
+        "title": 0,
+        "clip": 0
+      },
+      "audioSampleRate": 48000,
+      "expected": {
+        "videoFrames": 36,
+        "pcmFrames": 73728
+      },
+      "reference": {
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "id": "0x1011",
+            "time_base": "1/90000",
+            "start_pts": 54000000,
+            "duration_ts": 135000,
+            "nb_read_frames": "36"
+          },
+          {
+            "codec_name": "ac3",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "id": "0x1100",
+            "time_base": "1/90000",
+            "start_pts": 54000000,
+            "duration_ts": 138240,
+            "nb_read_frames": "48"
+          }
+        ],
+        "pcmFloat32Sha256": "29683a900d2a3e542b9ca43ff07158ec2dae6bcc993a67fd449b145424212568"
+      },
+      "clipSha256": "a0aaa4c781a8961e5a0526f91862519162ae8c5d55b27a74710ae98657f7db06"
+    }
+  ]
+}

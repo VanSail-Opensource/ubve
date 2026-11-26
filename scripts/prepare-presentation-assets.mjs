@@ -14,6 +14,8 @@ await mkdir(path.join(destination, 'ubve'), { recursive: true });
 await mkdir(path.join(destination, 'jassub'), { recursive: true });
 await build({ entryPoints: [path.join(root, 'packages/presentation/worklet/pcm-processor.ts')],
   outfile: path.join(destination, 'ubve/pcm-worklet.js'), bundle: true, format: 'esm', target: 'es2023', sourcemap: false });
+await build({ entryPoints: [path.join(root, 'packages/presentation/workers/rgba.worker.ts')],
+  outfile: path.join(destination, 'ubve/rgba-worker.js'), bundle: true, format: 'esm', target: 'es2023', sourcemap: false });
 
 const expectedThreadSource = 'export const THREAD_COUNT = self.crossOriginIsolated ? Math.min(Math.max(1, navigator.hardwareConcurrency - 2), 8) : 1;';
 const utilFile = path.join(jassubRoot, 'dist/worker/util.js');

@@ -11,7 +11,7 @@ const documentIsolation: Plugin = {
   configureServer(server) {
     server.middlewares.use((request, response, next) => {
       const path = (request.url ?? '/').split('?', 1)[0];
-      if (path === '/isolated' || path?.startsWith('/isolated/') || path?.startsWith('/tests/')) {
+      if (path === '/isolated' || path?.startsWith('/isolated/') || (path?.startsWith('/tests/') && path !== '/tests/software.html')) {
         response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
         response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
       } else if (isolatedAsset(path)) {

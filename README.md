@@ -11,15 +11,16 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-The standard document is `/`. Use `/isolated/` for compatible shared-memory workers. Changing documents requires reopening a selected local file. Browser and output capability checks may refuse a specific route. The app reports the selected route, transforms and qualification separately.
+The standard document is `/`. Portable software codecs work without shared memory. Use `/isolated/` to try the shared-memory AV1 candidate. Changing documents requires reopening a selected local file. Browser and output capability checks may refuse a specific route. The app reports the selected route, transforms and qualification separately.
 
 ### What is implemented
 
 - Bounded Blob and strict HTTP range reads, selected-track Matroska demuxing, and exact packet provenance where available.
 - Packet-fed AV1 and TrueHD software candidates, an AudioWorklet clock, and ASS/PGS/IMSC and timed-text components.
+- Bounded software fallback for the [modern codec matrix](docs/modern-software-codecs.md), including AVC, HEVC, VP8/VP9, AAC, Opus, ALAC, and conventional AC-3/E-AC-3/DTS Core.
 - Browser-native direct playback candidates, bounded stream-copy remuxing, and a lossless TrueHD-to-FLAC candidate for one native media clock.
 - Canvas presentation with declared SDR transforms and an explicit, unqualified WebGPU presentation candidate. WebGPU does not decode the compressed AV1 stream.
-- A narrow classic MP4 index and clear local UDF/BDMV title inventory, clip mapping and range access. Neither extends the player to unqualified profiles automatically.
+- A [verified packing matrix](docs/packing-formats.md) spanning MP4/MOV, MKV/WebM, MPEG-TS/M2TS, common audio containers and clear local Blu-ray ISO/BDMV clip playback. This is not whole-disc or release qualification.
 
 ## Verify the build
 
@@ -31,6 +32,8 @@ npm run check:static
 ```
 
 [Command reference](docs/commands.md) · [Canonical phases and status](docs/IMPLEMENTATION-STATUS.md) · [Cloudflare Pages target](docs/cloudflare-pages.md) · [Distributed asset audit](docs/distributed-assets.md)
+
+The optional [LAN test lab](docs/device-lab.md) lets the master pair browser devices, queue software playback and timing screens, and retain every attempt. It is not deployed with the static player.
 
 ## Playback gates
 

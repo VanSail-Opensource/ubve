@@ -1,0 +1,33 @@
+{
+  "schema": "ubve-external-software-fixtures-v1",
+  "source": "https://www2.iis.fraunhofer.de/AAC/stereo.html",
+  "referenceTool": "FFmpeg 9.1 essentials_build, scalar CPU, bitexact, normalized interleaved float32",
+  "cases": [
+    {
+      "id": "heaac-v1",
+      "path": "SBRtestStereoAot5Sig1.mp4",
+      "sourceUrl": "https://www2.iis.fraunhofer.de/AAC/SBRtestStereoAot5Sig1.mp4",
+      "bytes": 234051,
+      "sha256": "ede70e3b2f7e364aeb0eb3854b7d9a5877be99a499dcebe22ac5a7349d68747c",
+      "expected": { "videoFrames": 0, "pcmFrames": 1443584 },
+      "reference": {
+        "kind": "audio", "format": "f32le", "rate": 44100, "channels": 2,
+        "sha256": "55cf397c41c6f527e0abe97d816dca5fe0163282bbcdf40562f9137d62688439",
+        "absoluteTolerance": 0.0001, "rmsTolerance": 0.00001
+      }
+    },
+    {
+      "id": "heaac-v2",
+      "path": "SBRtestStereoAot29Sig2.mp4",
+      "sourceUrl": "https://www2.iis.fraunhofer.de/AAC/SBRtestStereoAot29Sig2.mp4",
+      "bytes": 241058,
+      "sha256": "4688dc3ef48798b7f34e27fe5f123102ba95aff8806bbe7925cf8a318a3c6db5",
+      "expected": { "videoFrames": 0, "pcmFrames": 1485443 },
+      "reference": {
+        "kind": "audio", "format": "f32le", "rate": 44100, "channels": 2,
+        "sha256": "0118f6eeb91ac6fbed30db7d6d9b47bb968ba1947dfb10c7deaa737f27aa466b",
+        "absoluteTolerance": 0.0001, "rmsTolerance": 0.00001
+      }
+    }
+  ]
+}

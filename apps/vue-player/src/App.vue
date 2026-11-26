@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
-import { createReferencePlayer } from '@ubve/browser';
-import type { MediaInput, PlayerSnapshot, ReferencePlayer, QualityMode, RoutePreference } from '@ubve/browser';
+import { createReferencePlayer, inspectBluRayClips, isDiscImageName } from '@ubve/browser';
+import type { BluRayClipChoice, LocalBluRay, MediaInput, PlayerSnapshot, ReferencePlayer, QualityMode, RoutePreference } from '@ubve/browser';
 import Icon from './components/Icon.vue';
 import { messages } from './i18n';
 import type { Locale } from './i18n';
@@ -11,13 +11,21 @@ const media = ref<HTMLVideoElement>();
 const overlay = ref<HTMLElement>();
 const playerHost = ref<HTMLElement>();
 const fileInput = ref<HTMLInputElement>();
+const folderInput = ref<HTMLInputElement>();
+const discDialog = ref<HTMLDialogElement>();
 const subtitleInput = ref<HTMLInputElement>();
 const urlDialog = ref<HTMLDialogElement>();
 const urlInput = ref<HTMLInputElement>();
 const player = shallowRef<ReferencePlayer>();
 const snapshot = shallowRef<PlayerSnapshot>();
 const queue = ref<QueueItem[]>([]);
-const inputs = new Map<string, MediaInput>();
+const inputs = new Map<string, MediaInput | { readonly discFolder: LocalBluRay }>();
+const discPending = shallowRef<{ id: string; source: LocalBluRay; name: string; subtitle?: File } | null>(null);
+const discChoices = shallowRef<readonly BluRayClipChoice[]>([]);
+const discBusy = ref(false);
+const discIssue = ref<string | null>(null);
+const canPickFolder = 'webkitdirectory' in document.createElement('input');
+let discAbort: AbortController | null = null;
 const selectedId = ref<string | null>(null);
 const locale = ref<Locale>('en');
 const t = computed(() => messages[locale.value]);
@@ -89,10 +97,43 @@ function savePreferences(): void {
 }
 async function openItem(id: string): Promise<void> {
   const input = inputs.get(id); if (!input || !player.value) return;
+  if (input instanceof File && isDiscImageName(input.name)) { await inspectDisc(id, input, input.name); return; }
+  if ('discFolder' in input) { await inspectDisc(id, input.discFolder, queue.value.find(item => item.id === id)?.name ?? t.value.discFolder); return; }
   selectedId.value = id;
   seekDraft.value = null;
   toast.value = null;
   await player.value.open(input);
+}
+async function inspectDisc(id: string, source: LocalBluRay, name: string): Promise<void> {
+  discAbort?.abort();
+  const controller = new AbortController(); discAbort = controller;
+  discPending.value = { id, source, name }; discChoices.value = []; discBusy.value = true; discIssue.value = null;
+  if (!discDialog.value?.open) discDialog.value?.showModal();
+  try {
+    const found = await inspectBluRayClips(source, { signal: controller.signal });
+    if (discAbort === controller && !controller.signal.aborted) discChoices.value = found;
+  } catch (error) {
+    if (discAbort === controller && !controller.signal.aborted) discIssue.value = error instanceof Error ? error.message : String(error);
+  } finally { if (discAbort === controller) discBusy.value = false; }
+}
+function closeDiscDialog(): void {
+  discAbort?.abort(); discAbort = null; discPending.value = null; discChoices.value = [];
+}
+async function selectDiscClip(choice: BluRayClipChoice): Promise<void> {
+  const selected = discPending.value; if (!selected) return;
+  inputs.set(selected.id, { kind: 'bluray-clip', disc: selected.source, title: choice.title, clip: choice.clip, label: `${selected.name} · ${choice.stream}` });
+  discDialog.value?.close();
+  await openItem(selected.id);
+  if (selected.subtitle) await player.value?.loadSubtitle(selected.subtitle, { pgsPalette: pgsPalette.value });
+}
+async function chooseFolder(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement, files = Array.from(target.files ?? []);
+  target.value = '';
+  if (!files.length) return;
+  const id = crypto.randomUUID(), name = files[0]!.webkitRelativePath.split('/')[0] || t.value.discFolder;
+  inputs.set(id, { discFolder: files.map(blob => ({ path: blob.webkitRelativePath, blob })) });
+  queue.value.push({ id, kind: 'local', name, size: null });
+  await act(() => openItem(id));
 }
 async function addFiles(list: FileList | File[]): Promise<void> {
   const files = Array.from(list);
@@ -105,7 +146,11 @@ async function addFiles(list: FileList | File[]): Promise<void> {
     firstId ??= id;
   }
   if (firstId) await openItem(firstId);
-  if (subtitles[0] && player.value) await player.value.loadSubtitle(subtitles[0], { pgsPalette: pgsPalette.value });
+  if (subtitles[0] && player.value) {
+    const pending = discPending.value;
+    if (pending && pending.id === firstId) discPending.value = { ...pending, subtitle: subtitles[0] };
+    else await player.value.loadSubtitle(subtitles[0], { pgsPalette: pgsPalette.value });
+  }
 }
 async function chooseFiles(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement;
@@ -163,7 +208,7 @@ function clearQueue(): void {
 }
 function keyboard(event: KeyboardEvent): void {
   if (event.target instanceof HTMLElement && (event.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(event.target.tagName))) return;
-  if (event.altKey || event.ctrlKey || event.metaKey || urlDialog.value?.open) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || urlDialog.value?.open || discDialog.value?.open) return;
   switch (event.key.toLowerCase()) {
     case ' ': case 'k': if (playable.value) { event.preventDefault(); void togglePlayback(); } break;
     case 'arrowleft': if (seekable.value) { event.preventDefault(); void act(() => player.value?.seek((snapshot.value?.time ?? 0) - 5)); } break;
@@ -195,7 +240,7 @@ onMounted(() => {
   pipSupported.value = Boolean(document.pictureInPictureEnabled && media.value.requestPictureInPicture);
   document.addEventListener('keydown', keyboard);
 });
-onBeforeUnmount(() => { unsubscribe?.(); document.removeEventListener('keydown', keyboard); clearTimeout(toastTimer); void player.value?.dispose(); });
+onBeforeUnmount(() => { closeDiscDialog(); unsubscribe?.(); document.removeEventListener('keydown', keyboard); clearTimeout(toastTimer); void player.value?.dispose(); });
 </script>
 
 <template>
@@ -240,7 +285,7 @@ onBeforeUnmount(() => { unsubscribe?.(); document.removeEventListener('keydown',
           </div>
         </div>
 
-        <div class="under-player"><p><Icon name="shield" :size="14" />{{ t.private }}</p><span>{{ t.shortcut }}</span></div>
+        <div class="under-player"><p><Icon name="shield" :size="14" />{{ t.private }}</p><button v-if="canPickFolder" class="text-button" @click="folderInput?.click()">{{ t.discFolder }}</button><span>{{ t.shortcut }}</span></div>
         <section class="queue-panel"><div class="panel-heading"><h2>{{ t.library }}<span class="count">{{ queue.length }}</span></h2><div><button v-if="queue.length" class="text-button subdued" @click="clearQueue">{{ t.clear }}</button><button class="quiet-button" @click="fileInput?.click()"><Icon name="plus" :size="16" />{{ t.add }}</button></div></div><div v-if="!queue.length" class="empty-queue"><Icon name="film" :size="24" /><div><strong>{{ t.queueEmpty }}</strong><p>{{ t.queueHint }}</p></div></div><ol v-else class="queue-list"><li v-for="(item, index) in queue" :key="item.id" :class="{ current: item.id === selectedId }"><button class="queue-item" @click="act(() => openItem(item.id))"><span class="queue-number"><Icon v-if="item.id === selectedId" name="play" :size="14" /><template v-else>{{ String(index + 1).padStart(2, '0') }}</template></span><span class="queue-file-icon"><Icon :name="item.kind === 'url' ? 'link' : 'film'" :size="20" /></span><span class="queue-name">{{ item.name }}<small>{{ item.kind === 'local' ? bytes(item.size) : 'URL' }}</small></span><span v-if="item.id === selectedId" class="queue-current-label">{{ stateLabel }}</span></button><button class="icon-button remove-item" :aria-label="`${t.close}: ${item.name}`" @click="removeQueueItem(item.id)"><Icon name="close" :size="16" /></button></li></ol></section>
       </section>
 
@@ -259,7 +304,14 @@ onBeforeUnmount(() => { unsubscribe?.(); document.removeEventListener('keydown',
     <div v-if="dragging" class="drop-screen"><Icon name="folder" :size="48" /><strong>{{ t.drop }}</strong></div>
     <div v-if="toast" class="toast" role="alert"><Icon name="info" :size="19" /><p>{{ toast }}</p><button class="icon-button" :aria-label="t.dismiss" @click="toast = null"><Icon name="close" :size="17" /></button></div>
     <dialog ref="urlDialog" class="url-dialog" @click="($event.target === urlDialog) && urlDialog?.close()"><form @submit.prevent="addUrl"><div class="dialog-heading"><span class="dialog-icon"><Icon name="link" :size="23" /></span><button type="button" class="icon-button" :aria-label="t.close" @click="urlDialog?.close()"><Icon name="close" /></button></div><h2>{{ t.urlTitle }}</h2><p>{{ t.urlHint }}</p><label for="media-url">{{ t.urlLabel }}</label><input id="media-url" ref="urlInput" v-model="url" type="url" placeholder="https://example.com/video.mp4" autocomplete="off" required /><div class="dialog-actions"><button type="button" class="button" @click="urlDialog?.close()">{{ t.cancel }}</button><button type="submit" class="button button-primary">{{ t.urlAction }}</button></div></form></dialog>
-    <input ref="fileInput" class="sr-only" type="file" multiple accept="video/*,audio/*,.mkv,.m2ts,.mts,.ts,.mov,.avi,.mxf,.nut,.flv,.ogv,.mpg,.mpeg,.vob,.webm,.mp4,.wav,.flac,.mp3,.ass,.ssa,.srt,.vtt,.ttml,.sup" :aria-label="t.open" @change="chooseFiles" />
+    <dialog ref="discDialog" class="url-dialog" aria-labelledby="disc-title" @close="closeDiscDialog">
+      <h2 id="disc-title">{{ t.discTitle }}</h2><p>{{ t.discHint }}</p>
+      <p v-if="discBusy" role="status">{{ t.discReading }}</p><p v-if="discIssue" role="alert">{{ discIssue }}</p>
+      <ul v-if="discChoices.length"><li v-for="choice in discChoices" :key="`${choice.title}-${choice.clip}`"><button class="button" @click="act(() => selectDiscClip(choice))">{{ String(choice.playlist).padStart(5, '0') }}.mpls · {{ choice.stream }}</button></li></ul>
+      <div class="dialog-actions"><button class="button" @click="discDialog?.close()">{{ t.cancel }}</button></div>
+    </dialog>
+    <input ref="fileInput" class="sr-only" type="file" multiple accept="video/*,audio/*,.mkv,.mka,.m2ts,.mts,.ts,.mov,.3gp,.3g2,.webm,.weba,.mp4,.m4v,.m4a,.wav,.aif,.aiff,.aifc,.caf,.flac,.mp3,.aac,.ogg,.oga,.opus,.iso,.udf,.ass,.ssa,.srt,.vtt,.ttml,.sup" :aria-label="t.open" @change="chooseFiles" />
+    <input ref="folderInput" class="sr-only" type="file" multiple webkitdirectory :aria-label="t.discFolder" @change="chooseFolder" />
     <input ref="subtitleInput" class="sr-only" type="file" accept=".ass,.ssa,.srt,.vtt,.ttml,.dfxp,.sup" :aria-label="t.subtitleLoad" @change="act(async () => { const input = $event.target as HTMLInputElement; const selected = input.files?.[0]; input.value = ''; if (selected) await player?.loadSubtitle(selected, { pgsPalette }); })" />
   </div>
 </template>

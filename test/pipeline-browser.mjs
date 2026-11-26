@@ -121,7 +121,9 @@ try {
       page.on('console', message => {
         if (message.type() === 'warning' || message.type() === 'error') consoleWarnings.push({ type: message.type(), text: message.text() });
       });
-      await page.goto(`http://127.0.0.1:${address.port}/tests/pipeline.html`);
+      const query = new URLSearchParams({ trace: process.env.UBVE_PIPELINE_TRACE === '1' ? '1' : '0',
+        prefetch: process.env.UBVE_PIPELINE_PREFETCH === '1' ? '1' : '0' });
+      await page.goto(`http://127.0.0.1:${address.port}/tests/pipeline.html?${query}`);
       await page.locator('#fixture').setInputFiles(filename);
       await page.locator('#run').click();
       await page.waitForFunction(() => ['complete', 'failed'].includes(document.querySelector('#result')?.getAttribute('data-status') ?? ''), null, { timeout: 90000 });

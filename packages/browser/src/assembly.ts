@@ -7,6 +7,7 @@ import { SubtitleController } from '@ubve/presentation';
 import { ReferencePlayer, describeInput, prepareDirectPlayback } from './player.js';
 import type { MediaInput, PlayerSourceInfo, PlayerTrack, PreparedPlayback, QualityMode } from './player.js';
 import { ManagedPlayback } from './managed.js';
+import { isDiscImageName, openBluRayClip } from './disc-input.js';
 
 export type RoutePreference = 'automatic' | 'native' | 'experimental' | 'managed';
 export interface ReferencePlayerFactoryOptions {
@@ -16,6 +17,13 @@ export interface ReferencePlayerFactoryOptions {
   readonly assetBaseUrl?: string;
   readonly allowStereoFoldDown?: () => boolean;
   readonly preferWebGpu?: () => boolean;
+  readonly portableAv1?: boolean;
+  readonly tracePerformance?: boolean;
+  readonly prefetchCanvas?: boolean;
+  /** Opt in to Fetch's same-origin credentials for a readable HTTP source. */
+  readonly sameOriginMediaCredentials?: boolean;
+  /** Optional document-owned audio context, leased by one managed PCM epoch at a time. */
+  readonly contextForPcm?: (sampleRate: number) => AudioContext;
 }
 
 /** Builds one source owner and one subtitle renderer for this presentation host. */
@@ -28,25 +36,31 @@ export function createReferencePlayer(options: ReferencePlayerFactoryOptions): R
     video: options.video,
     subtitles,
     prepare: (input, signal) => preparePlayback(input, options.video, signal, options.routePreference?.() ?? 'automatic', options.assetBaseUrl ?? '/vendor/', subtitles,
-      { overlay: options.overlay, quality: player.snapshot().quality, allowStereoFoldDown: options.allowStereoFoldDown?.() ?? false, preferWebGpu: options.preferWebGpu?.() ?? false }),
+      { overlay: options.overlay, quality: player.snapshot().quality, allowStereoFoldDown: options.allowStereoFoldDown?.() ?? false, preferWebGpu: options.preferWebGpu?.() ?? false,
+        portableAv1: options.portableAv1 ?? false, tracePerformance: options.tracePerformance ?? false, prefetchCanvas: options.prefetchCanvas ?? false,
+        sameOriginMediaCredentials: options.sameOriginMediaCredentials ?? false,
+        ...(options.contextForPcm ? { contextForPcm: options.contextForPcm } : {}) }),
   });
   return player;
 }
 
 export async function preparePlayback(input: MediaInput, video: HTMLVideoElement, signal: AbortSignal, preference: RoutePreference = 'automatic', assetBaseUrl = '/vendor/', subtitles?: SubtitleController,
-  managed?: { readonly overlay: HTMLElement; readonly quality: QualityMode; readonly allowStereoFoldDown: boolean; readonly preferWebGpu?: boolean }): Promise<PreparedPlayback> {
+  managed?: { readonly overlay: HTMLElement; readonly quality: QualityMode; readonly allowStereoFoldDown: boolean; readonly preferWebGpu?: boolean; readonly portableAv1?: boolean; readonly tracePerformance?: boolean; readonly prefetchCanvas?: boolean; readonly sameOriginMediaCredentials?: boolean; readonly contextForPcm?: (sampleRate: number) => AudioContext }): Promise<PreparedPlayback> {
   describeInput(input);
   assetBaseUrl = assetBaseUrl.endsWith('/') ? assetBaseUrl : `${assetBaseUrl}/`;
-  // The pinned AV1 atomic ABI uses shared memory even with one codec thread.
-  if (preference === 'managed' && (globalThis.crossOriginIsolated !== true || typeof SharedArrayBuffer === 'undefined')) {
-    throw new EngineError('UNSUPPORTED_PROFILE', 'Managed AV1 requires shared memory. Open the isolated player and reselect this source.', 'caller-fix');
-  }
+  if ('url' in input && isDiscImageName(new URL(input.url).pathname)) throw new EngineError('UNSUPPORTED_PROFILE', 'Blu-ray disc images must be opened from a local file');
+  if (input instanceof File && isDiscImageName(input.name)) throw new EngineError('UNSUPPORTED_PROFILE', 'Inspect this local disc and explicitly choose a Blu-ray clip');
+  if ('disc' in input && preference !== 'automatic' && preference !== 'managed') throw new EngineError('UNSUPPORTED_PROFILE', 'Local Blu-ray clips require Automatic or Managed playback');
   if (preference !== 'managed') subtitles?.followVideo();
   // An opaque native URL need not offer readable CORS byte access. It remains opaque.
-  if (!(input instanceof File) && (preference === 'automatic' || preference === 'native')) return prepareDirectPlayback(input, signal);
+  if ('url' in input && (preference === 'automatic' || preference === 'native')) return prepareDirectPlayback(input, signal);
   let media: MediaSourceSession | null = null;
   try {
-    media = await openMedia(input, { signal });
+    if ('disc' in input) {
+      const clip = await openBluRayClip(input, signal, assetBaseUrl);
+      media = await openMedia(clip.source, { signal });
+      clip.validate(media);
+    } else media = await openMedia(input, { signal, sameOriginCredentials: managed?.sameOriginMediaCredentials === true });
     if (signal.aborted) throw new DOMException('Open was cancelled', 'AbortError');
     if (media.preflight.dolbyVision.length) {
       const descriptions = media.preflight.dolbyVision.map(({ sampleEntry, profile, compatibilityId }) => {
@@ -57,23 +71,29 @@ export async function preparePlayback(input: MediaInput, video: HTMLVideoElement
       throw new EngineError('UNSUPPORTED_PROFILE', `Dolby Vision ${[...new Set(descriptions)].join(', ')} is signaled in this file. Dolby Vision output and an implicit compatibility-base fallback are not admitted by this player.`, 'caller-fix',
         { sampleEntry: first.sampleEntry, dolbyVisionProfile: first.profile, dolbyVisionLevel: first.level, dolbyVisionCompatibilityId: first.compatibilityId });
     }
-    if (preference === 'managed') {
+    const preparedMedia = media;
+    const software = (): PreparedPlayback => {
       if (!managed || !subtitles) throw new EngineError('INVALID_ARGUMENT', 'Managed playback requires an output host and subtitle controller');
-      return new ManagedPlayback({ media, video, subtitles, signal, assetBaseUrl, ...managed }).asPrepared();
-    }
+      return new ManagedPlayback({ media: preparedMedia, video, subtitles, signal, assetBaseUrl, ...managed }).asPrepared();
+    };
+    if (preference === 'managed' || 'disc' in input) return software();
     if (preference === 'experimental') return prepareNativeCandidate(media, video, signal, assetBaseUrl, subtitles);
     const primaryVideo = selectDefault(media.tracks, 'video'), audio = selectDefault(media.tracks, 'audio');
     const requiredSubtitle = media.tracks.find(track => track.kind === 'subtitle' && (track.forced || track.default));
-    if (audio?.codec === 'truehd') throw new EngineError('UNSUPPORTED_PROFILE', 'TrueHD has no admitted native soundtrack path here. Select Experimental remux / audio bridge to try the lossless candidate.', 'caller-fix');
-    if (audio && ['dts', 'dts-hd'].includes(audio.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `${audio.codec.toUpperCase()} has no admitted native or lossless bridge soundtrack path here.`, 'caller-fix');
-    if (requiredSubtitle) throw new EngineError('UNSUPPORTED_PROFILE', 'The source requires an embedded subtitle track that native direct playback cannot preserve. Select a complete managed/remux route or add an external subtitle track.', 'caller-fix');
+    const capability = (error: EngineError): PreparedPlayback => {
+      if (preference === 'automatic' && managed && subtitles) return software();
+      throw error;
+    };
+    if (audio?.codec === 'truehd') return capability(new EngineError('UNSUPPORTED_PROFILE', 'TrueHD has no admitted native soundtrack path here. Select Managed or Experimental remux / audio bridge.', 'caller-fix'));
+    if (audio && ['dts', 'dts-hd'].includes(audio.codec)) return capability(new EngineError('UNSUPPORTED_PROFILE', `${audio.codec.toUpperCase()} has no admitted native soundtrack route here.`, 'caller-fix'));
+    if (requiredSubtitle) return capability(new EngineError('UNSUPPORTED_PROFILE', 'The source requires an embedded subtitle track that native direct playback cannot preserve. Select a complete managed/remux route.', 'caller-fix'));
     const mime = media.mimeType;
     const details = { mimeType: mime || null, videoCodec: primaryVideo?.codecString ?? null, audioCodec: audio?.codecString ?? null };
     if (media.preflight.format === 'isobmff' && (!mime.includes('codecs=') || (primaryVideo && !primaryVideo.codecString) || (audio && !audio.codecString))) {
-      throw new EngineError('UNSUPPORTED_PROFILE', 'The exact selected MP4 codec configuration is unknown. Generic container acceptance does not admit this source.', 'caller-fix', details);
+      return capability(new EngineError('UNSUPPORTED_PROFILE', 'The exact selected MP4 codec configuration is unknown. Generic container acceptance does not admit this source.', 'caller-fix', details));
     }
     const nativeProbe = mime ? video.canPlayType(mime) : null;
-    if (nativeProbe === '') throw new EngineError('UNSUPPORTED_PROFILE', `Native direct playback is not advertised for ${mime} by this browser. Repackaging cannot add a missing decoder.`, 'caller-fix', details);
+    if (nativeProbe === '') return capability(new EngineError('UNSUPPORTED_PROFILE', `Native direct playback is not advertised for ${mime} by this browser. Repackaging cannot add a missing decoder.`, 'caller-fix', details));
     const source = describeMedia(media), tracks = mapTracks(media.tracks, false);
     // The element owns the original File during native playback. Retain only
     // the small, inspected metadata projection, not a second byte source/cache.

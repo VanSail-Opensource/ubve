@@ -1,13 +1,14 @@
 import { EngineError, sessionStamp } from '@ubve/core';
-import type { Decoder, EncodedPacket, IntegerAudioPCM, OwnedOutput, SessionState, VideoPixels } from '@ubve/core';
+import type { AudioPCM, Decoder, EncodedPacket, IntegerAudioPCM, OwnedLease, OwnedOutput, SessionState, VideoPixels } from '@ubve/core';
 import { operationContext, packetSeconds } from '@ubve/io-demux';
 import type { MediaSourceSession, MediaTrack } from '@ubve/io-demux';
-import { Av1Decoder, TrueHdDecoder, integerPcmToFloat } from '@ubve/wasm-adapters';
-import { PcmOutput, RawCanvasRenderer, WebGpuRawRenderer, finite } from '@ubve/presentation';
-import type { PcmEvent, SubtitleController } from '@ubve/presentation';
+import { Av1Decoder, PortableDecoder, TrueHdDecoder, integerPcmToFloat, supportsPortableCodec } from '@ubve/wasm-adapters';
+import { CanvasPreconverter, PcmOutput, RawCanvasRenderer, WebGpuRawRenderer, finite } from '@ubve/presentation';
+import type { ConvertedFrame, PcmEvent, SubtitleController } from '@ubve/presentation';
 import type { ManagedTransport, ManagedTransportSnapshot, PlayerTrack, PreparedPlayback, QualityMode } from './player.js';
 import { PacketStage } from './packet-stage.js';
 import { managedGpuOptions } from './gpu-admission.js';
+import { PlaybackTrace } from './trace.js';
 
 export interface ManagedPlaybackOptions {
   readonly media: MediaSourceSession;
@@ -20,6 +21,10 @@ export interface ManagedPlaybackOptions {
   /** Explicit output policy, never part of exact decoded-source PCM. */
   readonly allowStereoFoldDown?: boolean;
   readonly preferWebGpu?: boolean;
+  readonly portableAv1?: boolean;
+  readonly tracePerformance?: boolean;
+  readonly prefetchCanvas?: boolean;
+  readonly contextForPcm?: (sampleRate: number) => AudioContext;
 }
 
 type Frame = OwnedOutput<VideoPixels>;
@@ -32,8 +37,8 @@ type Epoch = {
   readonly tasks: Promise<void>[];
   readonly videoPackets: PacketStage<EncodedPacket>;
   readonly audioPackets: PacketStage<EncodedPacket>;
-  video: Av1Decoder | null;
-  audio: TrueHdDecoder | null;
+  video: (Decoder<VideoPixels> & { diagnostics(): unknown }) | null;
+  audio: TrueHdDecoder | PortableDecoder<AudioPCM> | null;
   pcm: PcmOutput | null;
   preroll: Frame | null;
   videoPrimed: boolean;
@@ -50,13 +55,14 @@ type Epoch = {
   nextDecoded: bigint;
   pendingPcm: Float32Array | null;
   pendingFrames: number;
+  prefetched: { readonly frame: Frame; readonly result: Promise<OwnedLease<ConvertedFrame>> } | null;
 };
 
 const stampTime = <T>(output: OwnedOutput<T>): number => Number(output.pts.ticks) * Number(output.pts.timeBase.numerator) / Number(output.pts.timeBase.denominator);
 const cancelled = (): DOMException => new DOMException('Managed epoch was cancelled', 'AbortError');
 const isCancellation = (error: unknown): boolean => (error instanceof DOMException && error.name === 'AbortError') || (error instanceof EngineError && ['CANCELLED', 'STALE_EPOCH', 'DISPOSED'].includes(error.code));
 
-/** AV1/TrueHD/ASS software decode, paced by the PCM graph. The independently
+/** Selected packet-fed software decode, paced by the PCM graph. The independently
  * selected SDR or HDR presentation candidate never qualifies physical output. */
 export class ManagedPlayback implements ManagedTransport {
   readonly #options: ManagedPlaybackOptions;
@@ -65,6 +71,7 @@ export class ManagedPlayback implements ManagedTransport {
   readonly #subtitleTrack: MediaTrack | undefined;
   readonly #canvas: HTMLCanvasElement;
   readonly #renderer: RawCanvasRenderer | null;
+  readonly #preconverter: CanvasPreconverter | null;
   #gpuRenderer: WebGpuRawRenderer | null = null;
   readonly #errors = new Set<(error: unknown) => void>();
   readonly #waiters = new Set<() => void>();
@@ -86,6 +93,7 @@ export class ManagedPlayback implements ManagedTransport {
   #submitted = 0;
   #late = 0;
   #renderMs = 0;
+  readonly #trace: PlaybackTrace | null;
   #lastRateAt = 0;
   #lastRateFrames = 0;
   #rate: number | null = null;
@@ -101,10 +109,12 @@ export class ManagedPlayback implements ManagedTransport {
 
   constructor(options: ManagedPlaybackOptions) {
     this.#options = options; this.#quality = options.quality;
+    this.#trace = options.tracePerformance ? new PlaybackTrace() : null;
     const primary = (kind: MediaTrack['kind']): MediaTrack | undefined => options.media.tracks.find(t => t.kind === kind && t.default) ?? options.media.tracks.find(t => t.kind === kind);
     this.#videoTrack = primary('video'); this.#audioTrack = primary('audio'); this.#subtitleTrack = primary('subtitle');
-    if (this.#videoTrack && this.#videoTrack.codec !== 'av1') throw new EngineError('UNSUPPORTED_PROFILE', `Managed ${this.#videoTrack.codec} video is not registered in this candidate.`, 'caller-fix');
-    if (this.#audioTrack && this.#audioTrack.codec !== 'truehd') throw new EngineError('UNSUPPORTED_PROFILE', `Managed ${this.#audioTrack.codec} audio is not registered in this candidate.`, 'caller-fix');
+    if (this.#videoTrack && !supportsPortableCodec('video', this.#videoTrack.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `Managed ${this.#videoTrack.codec} video is not registered in this candidate.`, 'caller-fix');
+    if (this.#audioTrack && this.#audioTrack.codec !== 'truehd' && !supportsPortableCodec('audio', this.#audioTrack.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `Managed ${this.#audioTrack.codec} audio is not registered in this candidate.`, 'caller-fix');
+    if (this.#audioTrack?.audioEditUnsupported) throw new EngineError('UNSUPPORTED_PROFILE', 'Software audio requires one contiguous admitted MP4 edit');
     if (!this.#videoTrack && !this.#audioTrack) throw new EngineError('UNSUPPORTED_PROFILE', 'No registered managed video or audio track exists.');
     if (this.#subtitleTrack && !['ass', 'ssa'].includes(this.#subtitleTrack.codec)) throw new EngineError('UNSUPPORTED_PROFILE', `Embedded ${this.#subtitleTrack.codec} streaming is not registered in this candidate.`);
     const transfer = String(this.#videoTrack?.color?.transfer ?? '');
@@ -116,6 +126,7 @@ export class ManagedPlayback implements ManagedTransport {
     this.#canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none';
     this.#canvas.setAttribute('aria-label', 'Managed video presentation');
     this.#renderer = options.preferWebGpu ? null : new RawCanvasRenderer(this.#canvas, { allowSdrToneMap: options.quality === 'performance', ...(options.quality === 'performance' ? { maximumHeight: 720 } : {}) });
+    this.#preconverter = options.prefetchCanvas && this.#renderer && this.#videoTrack ? new CanvasPreconverter(options.assetBaseUrl) : null;
     this.#abortListener = () => { this.#epoch?.abort.abort(); this.#wake(); };
     options.signal.addEventListener('abort', this.#abortListener, { once: true });
     this.#visibilityListener = () => { if (document.hidden && this.#state === 'playing') void this.pause().catch(error => this.#fail(error)); };
@@ -135,16 +146,17 @@ export class ManagedPlayback implements ManagedTransport {
     const self = this, media = this.#options.media;
     const tracks: readonly PlayerTrack[] = media.tracks.map(track => ({ id: track.id, kind: track.kind, label: track.name ?? track.codec.toUpperCase(), codec: track.codec, language: track.language, channels: track.channelCount, selectable: false }));
     return {
-      route: 'C1', get description() { return `AV1 dav1d WASM + TrueHD PCM + ${self.#options.preferWebGpu ? 'WebGPU video' : 'Canvas2D video'} / subtitle composition`; }, tracks,
+      route: 'C1', description: [self.#videoTrack && `${self.#videoTrack.codec.toUpperCase()} software`, self.#audioTrack && `${self.#audioTrack.codec.toUpperCase()} PCM`,
+        self.#videoTrack && (self.#options.preferWebGpu ? 'WebGPU composition' : 'Canvas2D composition')].filter(Boolean).join(' · '), tracks,
       selectedAudio: this.#audioTrack?.id ?? null,
       selectedSubtitle: this.#subtitleTrack?.id ?? null,
       subtitleLabel: this.#subtitleTrack ? `Embedded ${this.#subtitleTrack.codec.toUpperCase()}` : null,
       get source() { return { width: self.#videoTrack?.width ?? null, height: self.#videoTrack?.height ?? null, mime: media.mimeType || media.container,
         color: self.#gpuRenderer?.options.output === 'hdr-candidate' ? 'Original decode → extended linear Display P3 HDR candidate · unverified'
           : self.#quality === 'performance' ? 'Original decode → ≤720p SDR / sRGB' : 'Original decode → SDR / sRGB',
-        audio: self.#audioTrack ? `TrueHD · ${self.#audioTrack.channelCount} source channels${self.#sourceChannels > self.#audioChannels ? ' · explicit stereo index fold-down' : ' · discrete channel output'}` : 'No audio track' }; },
+        audio: self.#audioTrack ? `${self.#audioTrack.codec.toUpperCase()} · ${self.#audioTrack.channelCount} source channels${self.#sourceChannels > self.#audioChannels ? ' · explicit stereo index fold-down' : ' · discrete channel output'}` : 'No audio track' }; },
       notices: ['Managed software candidate. Decode, draw submissions and the PCM graph are observed separately; physical output and full 60/120 gates remain unqualified.',
-        ...(this.#options.preferWebGpu ? ['WebGPU presents decoded planes; AV1 bitstream decoding is still WASM. Extended linear HDR presentation does not carry static HDR10 metadata into a native media pipeline. No automatic fallback.'] : []),
+        ...(this.#options.preferWebGpu ? ['WebGPU presents decoded planes; bitstream decoding is still WASM. Extended linear HDR presentation does not carry static HDR10 metadata into a native media pipeline. No automatic fallback.'] : []),
         'Channel-index identity is retained. Speaker mapping and output-device routing are unverified.',
         ...(this.#options.allowStereoFoldDown ? ['Explicit stereo output transform: even source channel indices average to left, odd indices average to right. This does not preserve a cinema speaker layout.'] : [])],
       driver: this,
@@ -160,7 +172,7 @@ export class ManagedPlayback implements ManagedTransport {
     const epoch = this.#epoch;
     const time = this.#clock();
     const pendingVideoBytes = epoch?.frames.reduce((total, frame) => total + frame.payload.bytes, 0) ?? 0;
-    const transforms = ['Original AV1 source pictures decoded', ...(this.#options.preferWebGpu ? ['Explicit WebGPU decoded-plane composition'] : ['Canvas2D decoded-plane composition']),
+    const transforms = [...(this.#videoTrack ? [`Original ${this.#videoTrack.codec.toUpperCase()} source pictures decoded`] : []), ...(this.#options.preferWebGpu ? ['Explicit WebGPU decoded-plane composition'] : ['Canvas2D decoded-plane composition']),
       ...(this.#quality === 'performance' ? ['Video output capped at 720p', 'PQ/BT.2020 mapped to SDR/sRGB when required', 'Subtitle raster capped at 1080p']
         : [this.#gpuRenderer?.options.output === 'hdr-candidate' ? 'Original raster · extended linear Display P3 candidate' : 'Original SDR output raster', 'Full subtitle raster']),
       ...(this.#sourceChannels > this.#audioChannels ? ['Explicit channel-index stereo fold-down'] : ['Decoded PCM channel indices retained']), 'No temporal frame dropping'];
@@ -168,7 +180,7 @@ export class ManagedPlayback implements ManagedTransport {
       presentedFrames: this.#submitted, droppedFrames: 0, callbackRate: this.#rate, processingMs: this.#renderMs,
       bufferedSeconds: epoch?.pcm ? Math.max(0, Number(epoch.nextWritten) / epoch.sampleRate - time) : Math.max(0, (epoch?.frames.at(-1) ? stampTime(epoch.frames.at(-1)!) : time) - time),
       explicitBytes: this.#options.media.snapshot().cache.bytes + pendingVideoBytes + (epoch?.pcm?.transportBytes ?? 0) +
-        (epoch?.videoPackets.snapshot().bytes ?? 0) + (epoch?.audioPackets.snapshot().bytes ?? 0),
+        (epoch?.videoPackets.snapshot().bytes ?? 0) + (epoch?.audioPackets.snapshot().bytes ?? 0) + (this.#preconverter?.bytes ?? 0),
     } });
   }
 
@@ -182,6 +194,8 @@ export class ManagedPlayback implements ManagedTransport {
       renderer: this.#gpuRenderer ? { api: 'webgpu', output: this.#gpuRenderer.options.output, referenceWhiteNits: this.#gpuRenderer.options.referenceWhiteNits,
         chromaLocation: this.#gpuRenderer.options.chromaLocation, qualification: this.#gpuRenderer.qualification }
         : { api: this.#options.preferWebGpu ? 'webgpu-pending-or-refused' : 'canvas2d', qualification: 'NOT_QUALIFIED' },
+      timings: this.#trace?.summary() ?? null,
+      conversion: this.#preconverter ? 'one-frame-worker-candidate' : 'inline',
       cadenceEvidence: 'Draw submissions and bounded GPU queue fences when selected; no physical-display qualification', failure: this.#failure instanceof Error ? this.#failure.message : this.#failure,
     };
   }
@@ -245,6 +259,7 @@ export class ManagedPlayback implements ManagedTransport {
   setQuality(mode: QualityMode): void {
     if (mode === this.#quality) return;
     if (this.#options.preferWebGpu) throw new EngineError('OUTPUT_UNAVAILABLE', 'Close and reopen the source to change the WebGPU output configuration.', 'caller-fix');
+    if (this.#preconverter) throw new EngineError('OUTPUT_UNAVAILABLE', 'Close and reopen the test source to change the prefetched output raster.', 'caller-fix');
     const transfer = String(this.#videoTrack?.color?.transfer ?? '');
     if (mode === 'full' && ['pq', 'smpte2084', 'hlg', 'arib-std-b67'].includes(transfer)) throw new EngineError('OUTPUT_UNAVAILABLE', 'Full HDR output is not available on the managed SDR renderer.', 'caller-fix');
     this.#renderer?.setOptions({ allowSdrToneMap: mode === 'performance', ...(mode === 'performance' ? { maximumHeight: 720 } : {}) });
@@ -270,7 +285,7 @@ export class ManagedPlayback implements ManagedTransport {
       videoPackets: new PacketStage(56, 16 * 1024 * 1024), audioPackets: new PacketStage(64, 4 * 1024 * 1024),
       video: null, audio: null, pcm: null, preroll: null, videoPrimed: !this.#videoTrack, audioPrimed: !this.#audioTrack,
       videoEos: !this.#videoTrack, audioEos: !this.#audioTrack, audioOutputEnded: !this.#audioTrack, sourceEos: false, priming: true, sampleRate: rate, anchor: null,
-      frozenSample: Number(firstSample), nextWritten: firstSample, nextDecoded: firstSample, pendingPcm: null, pendingFrames: 0 };
+      frozenSample: Number(firstSample), nextWritten: firstSample, nextDecoded: firstSample, pendingPcm: null, pendingFrames: 0, prefetched: null };
     this.#epoch = epoch; this.#logicalTime = target; this.#wallAnchor = null;
     const cancelOperation = (): void => { epoch.abort.abort(); this.#wake(); };
     operationSignal?.addEventListener('abort', cancelOperation, { once: true });
@@ -279,26 +294,33 @@ export class ManagedPlayback implements ManagedTransport {
       if (this.#subtitleTrack && this.#embeddedSubtitlesEnabled) await this.#options.subtitles.resetStream(id);
       if (this.#videoTrack) {
         const track = this.#videoTrack;
-        if (!track.width || !track.height) throw new EngineError('INVALID_PACKET', 'AV1 source dimensions are missing');
-        // The four-thread atomic configuration returned different pixels on
-        // a Jellyfin ISO BMFF source despite emitting the right frame count.
-        // Both native references and the single-thread route matched. Keep
-        // this container family on the checked single-thread candidate.
-        const threads = this.#options.media.preflight.format === 'isobmff' ? 1 : 4;
-        epoch.video = await Av1Decoder.create({ width: track.width, height: track.height, description: track.codecPrivate, stamp, threads, assetBaseUrl: this.#options.assetBaseUrl, outputFrames: 8 });
+        if (!track.width || !track.height) throw new EngineError('INVALID_PACKET', 'Software video source dimensions are missing');
+        const options = { width: track.width, height: track.height, description: track.codecPrivate, stamp, assetBaseUrl: this.#options.assetBaseUrl };
+        // The retained four-thread pixel failure is not a container admission rule.
+        if (track.codec === 'av1' && !this.#options.portableAv1 && globalThis.crossOriginIsolated === true && typeof SharedArrayBuffer !== 'undefined') {
+          epoch.video = await Av1Decoder.create({ ...options, threads: 1, outputFrames: 8 });
+        } else {
+          epoch.video = await PortableDecoder.create({ ...options, kind: 'video', codec: track.codec, color: track.color });
+        }
       }
       if (this.#audioTrack) {
         const count = this.#audioTrack.channelCount;
-        if (!count || count > 8 || !this.#audioTrack.sampleRate) throw new EngineError('UNSUPPORTED_PROFILE', 'TrueHD channel count or sample rate is unavailable');
+        if (!count || count > 8 || !this.#audioTrack.sampleRate) throw new EngineError('UNSUPPORTED_PROFILE', 'Software audio channel count or sample rate is unavailable');
         const labels = Array.from({ length: count }, (_, index) => `channel-${index + 1}`);
         this.#sourceChannels = count;
         this.#audioChannels = this.#options.allowStereoFoldDown && count > 2 ? 2 : count;
+        const borrowedContext = this.#options.contextForPcm?.(rate);
         epoch.pcm = await PcmOutput.create({ sampleRate: rate, channelLabels: this.#audioChannels === count ? labels : ['fold-left', 'fold-right'],
+          ...(borrowedContext ? { borrowedContext } : {}),
           firstMediaSample: firstSample, blockFrames: Math.round(rate / 50), poolBlocks: 48, primeMs: 240, onEvent: event => this.#audioEvent(epoch, event) });
         epoch.pcm.setVolume(this.#volume);
         epoch.pendingPcm = new Float32Array(epoch.pcm.config.blockFrames * this.#audioChannels);
-        epoch.audio = await TrueHdDecoder.create({ sampleRate: rate, channelLabels: labels, stamp, outputFrames: 8, assetBaseUrl: this.#options.assetBaseUrl,
-          timestampResolutionSeconds: this.#options.media.matroska ? Number(this.#options.media.matroska.timecodeScaleNs) / 1e9 : 0 });
+        const resolution = this.#options.media.audioTimestampResolutionSeconds;
+        epoch.audio = this.#audioTrack.codec === 'truehd'
+          ? await TrueHdDecoder.create({ sampleRate: rate, channelLabels: labels, stamp, outputFrames: 8, assetBaseUrl: this.#options.assetBaseUrl, timestampResolutionSeconds: resolution })
+          : await PortableDecoder.create({ kind: 'audio', codec: this.#audioTrack.codec, channels: count, sampleRate: rate,
+            stamp, description: this.#audioTrack.codecPrivate, assetBaseUrl: this.#options.assetBaseUrl,
+            timestampToleranceSamples: Math.ceil(resolution * rate), endSample: this.#audioTrack.audioEndSample ?? null });
       }
       if (epoch.abort.signal.aborted || this.#options.signal.aborted) throw cancelled();
       const trackTask = (task: Promise<void>): void => {
@@ -312,6 +334,7 @@ export class ManagedPlayback implements ManagedTransport {
       epoch.priming = false;
       const first = epoch.frames[0];
       if (first) { const pixels = first.payload.borrow(); await this.#drawVideo(pixels, epoch); await this.#options.subtitles.renderAt(target, pixels.visibleRect.width, pixels.visibleRect.height); }
+      this.#prefetch(epoch);
       this.#wake();
     } catch (error) { epoch.abort.abort(); this.#wake(); await this.#retireEpoch(); throw error; }
     finally { operationSignal?.removeEventListener('abort', cancelOperation); }
@@ -325,11 +348,13 @@ export class ManagedPlayback implements ManagedTransport {
   async #produce(epoch: Epoch): Promise<void> {
     const tracks = [this.#videoTrack, this.#audioTrack, this.#subtitleTrack].filter((track): track is MediaTrack => Boolean(track));
     const stamp = sessionStamp(this.#options.media.stamp.sessionId, epoch.id);
+    let requested = this.#trace ? performance.now() : 0;
     for await (const packet of this.#options.media.packets(tracks.map(track => track.id), { startTime: epoch.target, signal: epoch.abort.signal, stamp })) {
+      this.#trace?.add('sourcePacketWait', performance.now() - requested);
       let staged = false;
       try {
         await this.#waitForActive(epoch);
-        if (packet.discardPaddingNs !== 0n) throw new EngineError('UNSUPPORTED_PROFILE', 'Selected-track discard padding requires sample-accurate trim before managed admission');
+        if (packet.discardPaddingNs !== 0n && (packet.trackId !== this.#audioTrack?.id || this.#audioTrack.codec === 'truehd')) throw new EngineError('UNSUPPORTED_PROFILE', 'Selected-track discard padding requires an admitted audio trim');
         if (packet.trackId === this.#subtitleTrack?.id) {
           const timing = packetSeconds(packet);
           if (this.#embeddedSubtitlesEnabled) await this.#options.subtitles.addPacket({ kind: this.#subtitleTrack.codec as 'ass' | 'ssa', data: packet.bytes.borrow(), ptsSeconds: timing.timestamp, durationSeconds: timing.duration, epoch: epoch.id });
@@ -340,7 +365,7 @@ export class ManagedPlayback implements ManagedTransport {
           stage.enqueue(packet, bytes, () => packet.bytes.release()); staged = true;
           this.#wake();
         }
-      } finally { if (!staged) packet.bytes.release(); }
+      } finally { if (!staged) packet.bytes.release(); if (this.#trace) requested = performance.now(); }
     }
     epoch.sourceEos = true;
     this.#wake();
@@ -348,12 +373,16 @@ export class ManagedPlayback implements ManagedTransport {
 
   async #feed(epoch: Epoch, stage: PacketStage<EncodedPacket>, decoder: Pick<Decoder<VideoPixels>, 'trySubmit' | 'flushEndOfStream'>, kind: 'video' | 'audio'): Promise<void> {
     for (;;) {
+      const waiting = this.#trace ? performance.now() : 0;
       await this.#wait(() => (!stage.empty && this.#active(epoch)) || (epoch.sourceEos && stage.empty), epoch.abort.signal, null, `${kind} input`);
+      this.#trace?.add(kind === 'video' ? 'videoPacketQueueWait' : 'audioPacketQueueWait', performance.now() - waiting);
       const item = stage.take();
       if (!item) break;
       try {
         if (kind === 'video') await this.#wait(() => epoch.frames.length < 6 && this.#active(epoch), epoch.abort.signal, null, 'Video queue capacity');
+        const submitted = this.#trace ? performance.now() : 0;
         await this.#submit(decoder, item.value, epoch);
+        this.#trace?.add(kind === 'video' ? 'videoInputConsumed' : 'audioInputConsumed', performance.now() - submitted);
       } finally { item.release(); this.#wake(); }
     }
     await decoder.flushEndOfStream(this.#op(epoch, `${kind}-eos`, 15_000));
@@ -375,8 +404,10 @@ export class ManagedPlayback implements ManagedTransport {
       await this.#waitForActive(epoch);
       await this.#wait(() => epoch.frames.length < 6, epoch.abort.signal, null, 'Video presentation queue');
       let output: Frame | null;
+      const waiting = this.#trace ? performance.now() : 0;
       try { output = await decoder.readOutput(this.#op(epoch, 'video-output', 15_000)); }
       catch (error) { if (error instanceof EngineError && error.code === 'DEADLINE_EXCEEDED' && !this.#active(epoch)) continue; throw error; }
+      this.#trace?.add('videoOutputWait', performance.now() - waiting);
       if (!output) {
         if (epoch.preroll) { epoch.frames.push(epoch.preroll); epoch.preroll = null; epoch.videoPrimed = true; }
         epoch.videoEos = true; this.#wake(); return;
@@ -398,18 +429,23 @@ export class ManagedPlayback implements ManagedTransport {
     const decoder = epoch.audio!, pcm = epoch.pcm!;
     for (;;) {
       await this.#waitForActive(epoch);
-      let output: OwnedOutput<IntegerAudioPCM> | null;
+      let output: OwnedOutput<AudioPCM> | OwnedOutput<IntegerAudioPCM> | null;
+      const waiting = this.#trace ? performance.now() : 0;
       try { output = await decoder.readOutput(this.#op(epoch, 'audio-output', 15_000)); }
       catch (error) { if (error instanceof EngineError && error.code === 'DEADLINE_EXCEEDED' && !this.#active(epoch)) continue; throw error; }
+      this.#trace?.add('audioOutputWait', performance.now() - waiting);
       if (!output) { await this.#flushPcm(epoch); epoch.audioEos = true; await pcm.end(epoch.nextWritten); this.#wake(); return; }
       try {
         const audio = output.payload.borrow();
-        if (audio.sampleRate !== epoch.sampleRate || audio.format !== 's32-interleaved') throw new EngineError('UNSUPPORTED_PROFILE', 'Managed audio configuration changed');
-        const start = Math.round(stampTime(output) * epoch.sampleRate);
+        if (audio.sampleRate !== epoch.sampleRate || (audio.format !== 's32-interleaved' && audio.format !== 'f32-interleaved')) throw new EngineError('UNSUPPORTED_PROFILE', 'Managed audio configuration changed');
+        if (output.pts.timeBase.numerator !== 1n || output.pts.timeBase.denominator !== BigInt(epoch.sampleRate) ||
+            !Number.isSafeInteger(Number(output.pts.ticks))) throw new EngineError('UNSUPPORTED_PROFILE', 'Managed audio needs an admitted exact sample position');
+        const start = Number(output.pts.ticks);
         const trim = Math.max(0, Number(epoch.nextDecoded) - start);
         if (trim >= audio.frames) continue;
         if (start + trim !== Number(epoch.nextDecoded)) throw new EngineError('UNSUPPORTED_PROFILE', 'Audio sample gap cannot be silently filled');
-        const interleaved = integerPcmToFloat(audio);
+        const interleaved = audio.format === 's32-interleaved' ? integerPcmToFloat(audio) : audio.planes[0]!;
+        if (!(interleaved instanceof Float32Array)) throw new EngineError('INVALID_PACKET', 'Managed audio expected float32 output storage');
         const samples = this.#audioChannels === audio.channelLabels.length ? interleaved : stereoIndexFold(interleaved, audio.channelLabels.length);
         for (let offset = trim; offset < audio.frames;) {
           if (epoch.abort.signal.aborted) throw cancelled();
@@ -496,7 +532,12 @@ export class ManagedPlayback implements ManagedTransport {
   }
   async #drawVideo(pixels: VideoPixels, epoch: Epoch): Promise<number> {
     if (epoch.abort.signal.aborted) throw cancelled();
-    if (this.#renderer) return this.#renderer.present(pixels).cpuMs;
+    if (this.#renderer) {
+      const rendered = this.#renderer.present(pixels);
+      this.#trace?.add('colorConversion', rendered.conversionMs);
+      this.#trace?.add('canvasUpload', rendered.uploadMs);
+      return rendered.cpuMs;
+    }
     const options = managedGpuOptions(pixels, this.#quality);
     if (!this.#gpuRenderer) {
       let candidate: WebGpuRawRenderer;
@@ -522,6 +563,14 @@ export class ManagedPlayback implements ManagedTransport {
     if (epoch.abort.signal.aborted) throw cancelled();
     return submitted;
   }
+  #prefetch(epoch: Epoch): void {
+    const next = epoch.frames[0];
+    if (!this.#preconverter || !next || epoch.prefetched || epoch.abort.signal.aborted) return;
+    const result = this.#preconverter.prepare(next.payload.borrow(), this.#quality === 'performance'
+      ? { allowSdrToneMap: true, maximumHeight: 720 } : {}, epoch.abort.signal);
+    epoch.prefetched = { frame: next, result };
+    void result.catch(() => undefined); // observed on submission or epoch retirement
+  }
   async #present(): Promise<void> {
     if (this.#rendering || this.#state !== 'playing' || !this.#epoch) return;
     this.#rendering = true;
@@ -533,13 +582,35 @@ export class ManagedPlayback implements ManagedTransport {
       // interval do not establish distinct physical presentations.
       while (epoch.frames[0] && stampTime(epoch.frames[0]) <= mediaTime + .001) {
         const frame = epoch.frames.shift()!;
+        let retained = false;
         try {
           const pts = stampTime(frame);
           const pixels = frame.payload.borrow();
-          this.#renderMs = await this.#drawVideo(pixels, epoch);
+          const prefetch = epoch.prefetched;
+          if (prefetch && prefetch.frame === frame && this.#renderer) {
+            epoch.prefetched = null;
+            const lease = await prefetch.result;
+            try {
+              if (epoch.abort.signal.aborted) throw cancelled();
+              // Pause may complete while the worker is still preparing the
+              // raster. Return ownership to the queue without painting it.
+              if (this.#state !== 'playing') {
+                epoch.frames.unshift(frame); epoch.prefetched = prefetch; retained = true;
+                return;
+              }
+              const rgba = lease.borrow();
+              this.#renderMs = this.#renderer.presentConverted(rgba);
+              this.#trace?.add('workerColorConversion', rgba.conversionMs);
+              this.#trace?.add('canvasUpload', this.#renderMs);
+            } finally { if (!retained) lease.release(); }
+          } else this.#renderMs = await this.#drawVideo(pixels, epoch);
+          this.#prefetch(epoch);
+          const subtitleStarted = this.#trace ? performance.now() : 0;
           await this.#options.subtitles.renderAt(pts, pixels.visibleRect.width, pixels.visibleRect.height);
+          this.#trace?.add('subtitleRender', performance.now() - subtitleStarted);
+          this.#trace?.add('combinedSubmissionLateness', Math.max(0, (this.#clock() - pts) * 1000));
           this.#submitted++; if (mediaTime - pts > .02) this.#late++;
-        } finally { frame.payload.release(); }
+        } finally { if (!retained) frame.payload.release(); }
         if (epoch.abort.signal.aborted || this.#epoch !== epoch || this.#state !== 'playing') return;
         this.#wake();
       }
@@ -547,6 +618,7 @@ export class ManagedPlayback implements ManagedTransport {
       // Never overwrite that newer final-sample anchor with this draw's tick.
       this.#logicalTime = Math.max(this.#logicalTime, mediaTime);
       const now = performance.now();
+      this.#prefetch(epoch);
       if (now - this.#lastRateAt >= 1000) { this.#rate = (this.#submitted - this.#lastRateFrames) * 1000 / (now - this.#lastRateAt); this.#lastRateFrames = this.#submitted; this.#lastRateAt = now; }
       complete = true;
     } finally {
@@ -566,13 +638,14 @@ export class ManagedPlayback implements ManagedTransport {
   #op(epoch: Epoch, label: string, timeout: number) { return operationContext(sessionStamp(this.#options.media.stamp.sessionId, epoch.id), `${label}-${++this.#operation}`, epoch.abort.signal, timeout); }
   #wake(): void { for (const wake of [...this.#waiters]) wake(); }
   async #wait(predicate: () => boolean, signal: AbortSignal, timeout: number | null, label: string): Promise<void> {
+    if (this.#failure) throw this.#failure;
     if (signal.aborted) throw cancelled();
     if (predicate()) return;
     await new Promise<void>((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const cleanup = (): void => { if (timer) clearTimeout(timer); signal.removeEventListener('abort', abort); this.#waiters.delete(check); };
-      const abort = (): void => { cleanup(); reject(cancelled()); };
-      const check = (): void => { if (signal.aborted) abort(); else if (this.#failure) { cleanup(); reject(this.#failure); } else if (predicate()) { cleanup(); resolve(); } };
+      const abort = (): void => { cleanup(); reject(this.#failure ?? cancelled()); };
+      const check = (): void => { if (signal.aborted || this.#failure) abort(); else if (predicate()) { cleanup(); resolve(); } };
       if (timeout !== null) timer = setTimeout(() => { cleanup(); reject(new EngineError('DEADLINE_EXCEEDED', `${label} deadline elapsed`)); }, timeout);
       signal.addEventListener('abort', abort, { once: true }); this.#waiters.add(check); check();
     });
@@ -594,7 +667,12 @@ export class ManagedPlayback implements ManagedTransport {
     epoch.abort.abort(); this.#wake();
     if (this.#frameRequest !== null) cancelAnimationFrame(this.#frameRequest); this.#frameRequest = null;
     this.#epoch = null;
+    this.#preconverter?.cancel();
     await this.#renderTask?.catch(() => undefined);
+    if (epoch.prefetched) {
+      await epoch.prefetched.result.then(lease => lease.release(), () => undefined);
+      epoch.prefetched = null;
+    }
     for (const frame of epoch.frames) frame.payload.release(); epoch.frames.length = 0;
     epoch.preroll?.payload.release(); epoch.preroll = null;
     epoch.videoPackets.clear(); epoch.audioPackets.clear();
